@@ -429,35 +429,7 @@
   </div>
 
   <!-- AFFILIATO VIEW -->
-  <div class="account-view" id="affiliato-view" style="display:none">
-    <p class="section-title" style="padding:0">🤝 Programma Affiliati</p>
-    <div style="background:linear-gradient(135deg,#0a1f0e,#0d2e14);border:1px solid rgba(61,255,110,.3);border-radius:var(--radius);padding:24px;text-align:center;display:flex;flex-direction:column;gap:10px;box-shadow:0 0 20px rgba(61,255,110,.06);">
-      <div style="font-size:3rem">💸</div>
-      <div style="font-family:'Fredoka One',cursive;font-size:1.3rem;color:var(--green);text-shadow:var(--led-green)">Guadagna con noi!</div>
-      <div style="color:#b8d4bb;font-size:.88rem;line-height:1.6">Porta nuovi clienti e guadagna una <b style="color:var(--gold)">commissione su ogni ordine</b> che fanno. Più porti, più guadagni.</div>
-    </div>
-    <div class="menu-item" style="background:linear-gradient(135deg,#1a1200,#2a1e00);border-color:rgba(245,200,66,.3)">
-      <div class="menu-icon">🎯</div>
-      <div><h3 style="color:var(--gold)">Commissione 10%</h3><p>Su ogni ordine dei tuoi referral</p></div>
-    </div>
-    <div class="menu-item">
-      <div class="menu-icon">🔗</div>
-      <div><h3>Il tuo link affiliato</h3><p id="aff-link-preview" style="color:var(--green);font-size:.7rem">Accedi per ottenere il tuo link</p></div>
-      <button onclick="copyAffLink()" style="background:var(--green);border:none;border-radius:8px;padding:6px 12px;font-size:.75rem;font-weight:700;cursor:pointer;color:#000;font-family:inherit" id="copy-aff-btn">Copia</button>
-    </div>
-    <div class="menu-item">
-      <div class="menu-icon">📊</div>
-      <div><h3>I tuoi referral</h3><p id="aff-count">0 clienti portati</p></div>
-    </div>
-    <div class="menu-item">
-      <div class="menu-icon">💰</div>
-      <div><h3>Guadagni totali</h3><p id="aff-earnings" style="color:var(--green);font-weight:700">€0.00</p></div>
-    </div>
-    <div class="menu-item" onclick="window.open('https://t.me/MagicTripHouseSupport','_blank')">
-      <div class="menu-icon">💬</div>
-      <div><h3>Diventa Affiliato</h3><p>Contattaci su Telegram per iniziare</p></div>
-      <span class="arrow">›</span>
-    </div>
+  <div class="account-view" id="affiliato-view" style="display:none;padding-bottom:110px">
   </div>
 
   <!-- BOTTOM NAV -->
@@ -537,7 +509,26 @@
       <div class="panel-title">⚙️ Gestisci Prodotti</div>
     </div>
     <button class="btn-add-product" onclick="openProductForm(null)">＋ Aggiungi Prodotto</button>
+    <div style="background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.25);border-radius:12px;padding:12px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openAdminAffiliates()">
+      <span style="font-size:1.4rem">🤝</span>
+      <div>
+        <div style="font-family:'Fredoka One',cursive;font-size:.92rem;color:var(--gold)">Elenco Affiliati</div>
+        <div style="font-size:.72rem;color:var(--muted)">Visualizza tutti i referral</div>
+      </div>
+      <span style="margin-left:auto;color:var(--muted)">›</span>
+    </div>
     <div class="admin-list" id="admin-list"></div>
+  </div>
+</div>
+
+<!-- ADMIN AFFILIATI PANEL -->
+<div class="panel" id="admin-aff-panel">
+  <div class="panel-overlay" onclick="closePanel('admin-aff-panel')"></div>
+  <div class="panel-content">
+    <div class="panel-handle"></div>
+    <div class="panel-title">🤝 Elenco Referral</div>
+    <div style="font-size:.78rem;color:var(--muted)">Ogni riga = chi ha invitato chi, con data e ora</div>
+    <div id="admin-aff-content" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 </div>
 
@@ -552,7 +543,7 @@
 <script type="module">
 // ===== FIREBASE SETUP =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ✅ Firebase Magic Trip House
 const firebaseConfig = {
@@ -657,7 +648,7 @@ function showLoadingGrid() {
 }
 
 // ===== INIT =====
-window.onload = () => {
+window.onload = async () => {
   if (window.Telegram && window.Telegram.WebApp) {
     const tg = window.Telegram.WebApp;
     tg.ready(); tg.expand(); tg.MainButton.hide();
@@ -672,6 +663,8 @@ window.onload = () => {
   renderOrders();
   renderAccount();
   buildMarquee();
+  // Se già loggato, inizializza affiliato in background
+  if (currentUser) initAffiliate(currentUser);
 };
 
 function buildMarquee(){
@@ -928,27 +921,234 @@ function renderAccount(){
   }
 }
 
-function renderAffiliate(){
-  const baseUrl = window.location.href.split('?')[0];
-  const affCode = currentUser ? btoa(currentUser).replace(/=/g,'') : null;
-  const affLink = affCode ? `${baseUrl}?ref=${affCode}` : null;
-  if(affLink){
-    document.getElementById('aff-link-preview').textContent = affLink.length > 40 ? affLink.substring(0,40)+'...' : affLink;
-  } else {
-    document.getElementById('aff-link-preview').textContent = 'Accedi per ottenere il tuo link';
-    document.getElementById('copy-aff-btn').style.display = 'none';
+// ===== SISTEMA AFFILIATI =====
+// Struttura Firebase: affiliates/{username} = { code, referredBy, referredAt, joinedAt }
+// Commissione: 5% — approvata manualmente dall'admin
+
+let myAffData = null; // dati affiliato dell'utente corrente
+
+function generateAffCode(username) {
+  // Genera codice deterministico da username — 6 caratteri senza ambigui
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let hash = 5381;
+  for (let i = 0; i < username.length; i++) {
+    hash = ((hash << 5) + hash) + username.charCodeAt(i);
+    hash |= 0;
   }
+  let code = '';
+  let n = Math.abs(hash);
+  for (let i = 0; i < 6; i++) {
+    code += chars[n % chars.length];
+    n = Math.floor(n / chars.length) + 1;
+  }
+  return code;
 }
 
-function copyAffLink(){
-  const baseUrl = window.location.href.split('?')[0];
-  const affCode = currentUser ? btoa(currentUser).replace(/=/g,'') : null;
-  if(!affCode){ showToast('⚠️ Accedi prima'); return; }
-  const affLink = `${baseUrl}?ref=${affCode}`;
-  navigator.clipboard.writeText(affLink).then(()=>showToast('✅ Link copiato!'));
+async function initAffiliate(username) {
+  // Crea o carica il record affiliato dell'utente
+  const ref = doc(db, 'affiliates', username);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    const code = generateAffCode(username);
+    const data = { code, referredBy: null, referredAt: null, joinedAt: new Date().toISOString(), username };
+    await setDoc(ref, data);
+    myAffData = data;
+  } else {
+    myAffData = snap.data();
+  }
+  if (document.getElementById('affiliato-view').style.display !== 'none') renderAffiliate();
+}
+
+async function submitAffCode() {
+  const input = document.getElementById('aff-code-input').value.trim().toUpperCase();
+  if (!input || input.length !== 6) { showToast('⚠️ Codice non valido (6 caratteri)'); return; }
+  if (!currentUser) { showToast('⚠️ Devi accedere prima'); return; }
+  if (!myAffData) { showToast('⚠️ Errore, riprova'); return; }
+
+  // Blocco 1: già ha un referrer
+  if (myAffData.referredBy) { showToast('⚠️ Hai già un affiliato registrato'); return; }
+
+  // Blocco 2: sta inserendo il proprio codice
+  if (input === myAffData.code) { showToast('⚠️ Non puoi usare il tuo stesso codice!'); return; }
+
+  // Blocco 3: trova chi possiede questo codice
+  showToast('🔍 Verifica in corso...');
+  const allSnap = await getDocs(collection(db, 'affiliates'));
+  let referrerDoc = null;
+  allSnap.forEach(d => { if (d.data().code === input) referrerDoc = d; });
+
+  if (!referrerDoc) { showToast('❌ Codice non trovato'); return; }
+
+  const referrerData = referrerDoc.data();
+  const referrerUsername = referrerDoc.id;
+
+  // Blocco 4: il referrer ha già impostato l'utente corrente come suo referrer (circolare)
+  if (referrerData.referredBy === currentUser) {
+    showToast('❌ Riferimento circolare non consentito!'); return;
+  }
+
+  // Blocco 5: il referrer stesso è stato invitato da qualcuno che è stato invitato da me (catena)
+  // Controllo a 2 livelli per sicurezza
+  if (referrerData.referredBy) {
+    const grandSnap = await getDoc(doc(db, 'affiliates', referrerData.referredBy));
+    if (grandSnap.exists() && grandSnap.data().referredBy === currentUser) {
+      showToast('❌ Catena circolare non consentita!'); return;
+    }
+  }
+
+  // ✅ Tutto ok — salva il legame
+  const updatedData = { ...myAffData, referredBy: referrerUsername, referredAt: new Date().toISOString() };
+  await setDoc(doc(db, 'affiliates', currentUser), updatedData);
+  myAffData = updatedData;
+  showToast('✅ Codice confermato! Sei collegato a ' + referrerUsername);
+  renderAffiliate();
+}
+
+async function renderAffiliate() {
+  const view = document.getElementById('affiliato-view');
+  if (!currentUser) {
+    view.innerHTML = `
+      <p class="section-title" style="padding:0">🤝 Programma Affiliati</p>
+      <div style="background:linear-gradient(135deg,#0a1f0e,#0d2e14);border:1px solid rgba(61,255,110,.3);border-radius:var(--radius);padding:24px;text-align:center;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:3rem">💸</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:1.3rem;color:var(--green);text-shadow:var(--led-green)">Guadagna con noi!</div>
+        <div style="color:#b8d4bb;font-size:.85rem;line-height:1.6">Porta nuovi clienti e ricevi una <b style="color:var(--gold)">commissione del 5%</b> su ogni loro ordine, approvata dall'admin. Codice personale, non modificabile.</div>
+        <button class="btn-primary" onclick="openLoginPanel()" style="margin-top:8px">Accedi per il tuo codice →</button>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-size:.82rem;color:var(--muted);line-height:1.7">
+        <b style="color:var(--text)">📋 Regole del programma</b><br>
+        • Commissione <b style="color:var(--gold)">5%</b> per ogni ordine di chi hai invitato<br>
+        • Il codice si inserisce <b>una sola volta</b> e non è modificabile<br>
+        • Non puoi usare il codice di chi ha già usato il tuo<br>
+        • Non puoi usare il tuo stesso codice<br>
+        • Le commissioni vengono approvate e pagate dall'admin
+      </div>`;
+    return;
+  }
+
+  if (!myAffData) await initAffiliate(currentUser);
+
+  // Carica i referral dell'utente (chi ha usato il suo codice)
+  const allSnap = await getDocs(collection(db, 'affiliates'));
+  const myReferrals = [];
+  allSnap.forEach(d => {
+    if (d.data().referredBy === currentUser) myReferrals.push(d.data());
+  });
+
+  const referrerLine = myAffData.referredBy
+    ? `<div style="color:var(--muted);font-size:.78rem;margin-top:4px">Invitato da: <b style="color:var(--text)">${myAffData.referredBy}</b></div>`
+    : `<div style="color:var(--muted);font-size:.78rem;margin-top:4px">Nessun referrer impostato</div>`;
+
+  const referralsList = myReferrals.length
+    ? myReferrals.map(r => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-weight:700;font-size:.85rem">👤 ${r.username}</div>
+            <div style="color:var(--muted);font-size:.72rem">${r.referredAt ? new Date(r.referredAt).toLocaleDateString('it-IT') : '—'}</div>
+          </div>
+          <div style="color:var(--green);font-size:.78rem;font-weight:700">Attivo ✓</div>
+        </div>`).join('')
+    : `<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:16px">Nessun amico invitato ancora</div>`;
+
+  const enterCodeSection = myAffData.referredBy ? `
+    <div style="background:var(--bg3);border-radius:12px;padding:14px;font-size:.82rem;color:var(--muted)">
+      ✅ Codice affiliato già registrato — non modificabile
+    </div>` : `
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-family:'Fredoka One',cursive;font-size:.9rem;color:var(--text)">Hai un codice di un amico?</div>
+      <div style="display:flex;gap:8px">
+        <input id="aff-code-input" type="text" maxlength="6" placeholder="ES: ABC123"
+          style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:inherit;font-size:.9rem;outline:none;text-transform:uppercase;letter-spacing:2px">
+        <button onclick="submitAffCode()" class="btn-primary" style="padding:10px 16px;white-space:nowrap">Usa →</button>
+      </div>
+      <div style="color:var(--muted);font-size:.72rem">⚠️ Una volta confermato non è modificabile</div>
+    </div>`;
+
+  view.innerHTML = `
+    <p class="section-title" style="padding:0">🤝 Programma Affiliati</p>
+
+    <!-- Il tuo codice -->
+    <div style="background:linear-gradient(135deg,#0a1f0e,#0d2e14);border:1px solid rgba(61,255,110,.4);border-radius:var(--radius);padding:20px;text-align:center">
+      <div style="color:var(--muted);font-size:.75rem;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Il tuo codice affiliato</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:2.2rem;color:var(--green);text-shadow:var(--led-green);letter-spacing:6px">${myAffData.code}</div>
+      <button onclick="copyCode('${myAffData.code}')" style="margin-top:10px;background:var(--green);border:none;border-radius:8px;padding:8px 20px;font-size:.82rem;font-weight:700;cursor:pointer;color:#000;font-family:inherit;box-shadow:var(--led-green)">📋 Copia Codice</button>
+      ${referrerLine}
+    </div>
+
+    <!-- Stats -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-family:'Fredoka One',cursive;font-size:1.6rem;color:var(--green)">${myReferrals.length}</div>
+        <div style="color:var(--muted);font-size:.72rem">Amici invitati</div>
+      </div>
+      <div style="background:var(--card);border:1px solid rgba(245,200,66,.2);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-family:'Fredoka One',cursive;font-size:1.6rem;color:var(--gold)">5%</div>
+        <div style="color:var(--muted);font-size:.72rem">Commissione ordini</div>
+      </div>
+    </div>
+
+    <!-- Lista referral -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+      <div style="font-family:'Fredoka One',cursive;font-size:.95rem;margin-bottom:8px">👥 I tuoi referral</div>
+      ${referralsList}
+    </div>
+
+    <!-- Inserisci codice amico -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px">
+      ${enterCodeSection}
+    </div>
+
+    <!-- Regole -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-size:.78rem;color:var(--muted);line-height:1.8">
+      <b style="color:var(--text)">📋 Come funziona</b><br>
+      1. Condividi il tuo codice agli amici<br>
+      2. L'amico lo inserisce una volta sola nel suo profilo<br>
+      3. Per ogni ordine che fa, guadagni il <b style="color:var(--gold)">5%</b><br>
+      4. Le commissioni vengono pagate dall'admin su richiesta
+    </div>
+
+    <div class="menu-item" onclick="window.open('https://t.me/MagicTripHouseSupport','_blank')">
+      <div class="menu-icon">💬</div><div><h3>Richiedi i tuoi guadagni</h3><p>Contatta l'admin su Telegram</p></div><span class="arrow">›</span>
+    </div>`;
+}
+
+function copyCode(code) {
+  navigator.clipboard.writeText(code).then(() => showToast('✅ Codice copiato: ' + code));
+}
+
+// ===== ADMIN AFFILIATI =====
+async function openAdminAffiliates() {
+  closePanel('admin-panel');
+  const panel = document.getElementById('admin-aff-panel');
+  panel.classList.add('open');
+  const content = document.getElementById('admin-aff-content');
+  content.innerHTML = `<div style="text-align:center;color:var(--muted);padding:20px">⏳ Caricamento...</div>`;
+
+  const allSnap = await getDocs(collection(db, 'affiliates'));
+  const all = [];
+  allSnap.forEach(d => all.push({ id: d.id, ...d.data() }));
+
+  // Costruisce mappa referral
+  const referrals = all.filter(a => a.referredBy);
+
+  if (!referrals.length) {
+    content.innerHTML = `<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85rem">Nessun referral ancora</div>`;
+    return;
+  }
+
+  content.innerHTML = referrals.map(r => `
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="background:rgba(61,255,110,.1);color:var(--green);border-radius:20px;padding:3px 10px;font-size:.75rem;font-weight:700">${r.referredBy}</span>
+        <span style="color:var(--muted);font-size:.8rem">→ ha invitato</span>
+        <span style="background:rgba(59,130,246,.1);color:var(--blue);border-radius:20px;padding:3px 10px;font-size:.75rem;font-weight:700">${r.id}</span>
+      </div>
+      <div style="color:var(--muted);font-size:.72rem">📅 ${r.referredAt ? new Date(r.referredAt).toLocaleDateString('it-IT', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Data sconosciuta'}</div>
+      <div style="color:var(--muted);font-size:.72rem">🔑 Codice usato: <b style="color:var(--text)">${r.code}</b></div>
+    </div>`).join('');
 }
 function openLoginPanel(){ closePanel('login-panel'); document.getElementById('login-panel').classList.add('open'); }
-function doLogin(){
+async function doLogin(){
   const u=document.getElementById('login-user').value.trim();
   const p=document.getElementById('login-pass').value;
   if(!u||!p){ showToast('⚠️ Inserisci username e password'); return; }
@@ -960,9 +1160,11 @@ function doLogin(){
   closePanel('login-panel');
   renderAccount();
   showToast('✅ Benvenuto, '+u+'!');
+  // Inizializza record affiliato in background
+  await initAffiliate(u);
 }
 function doLogout(){
-  currentUser=null; isAdmin=false;
+  currentUser=null; isAdmin=false; myAffData=null;
   localStorage.removeItem('tp_user'); localStorage.removeItem('tp_admin');
   renderAccount(); showToast('👋 Disconnesso');
 }
@@ -975,7 +1177,7 @@ function openAdminPanel(){
 function renderAdminList(){
   const list=document.getElementById('admin-list');
   if(!list) return;
-  if(!PRODUCTS.length){ list.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:.85rem">No products yet</div>'; return; }
+  if(!PRODUCTS.length){ list.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:.85rem">Nessun prodotto</div>'; return; }
   list.innerHTML=PRODUCTS.map(p=>`
     <div class="admin-item">
       <div class="admin-thumb">${p.photo?`<img src="${p.photo}">`:(p.emoji||'🌿')}</div>
@@ -984,8 +1186,8 @@ function renderAdminList(){
         <div class="admin-item-price">€${p.price} · ${p.unit}</div>
       </div>
       <div class="admin-item-actions">
-        <button class="btn-edit" onclick="openProductForm('${p.id}')">Edit</button>
-        <button class="btn-del" onclick="deleteProduct('${p.id}')">Del</button>
+        <button class="btn-edit" onclick="openProductForm('${p.id}')">Modifica</button>
+        <button class="btn-del" onclick="deleteProduct('${p.id}')">Elimina</button>
       </div>
     </div>`).join('');
 }
@@ -1101,7 +1303,8 @@ window.openLoginPanel=openLoginPanel; window.doLogin=doLogin; window.doLogout=do
 window.openAdminPanel=openAdminPanel; window.renderAdminList=renderAdminList;
 window.deleteProduct=deleteProduct; window.openProductForm=openProductForm;
 window.handlePhotoUpload=handlePhotoUpload; window.saveProduct=saveProduct;
-window.copyAffLink=copyAffLink; window.renderAffiliate=renderAffiliate;
+window.renderAffiliate=renderAffiliate; window.submitAffCode=submitAffCode;
+window.copyCode=copyCode; window.openAdminAffiliates=openAdminAffiliates;
 </script>
 </body>
 </html>
