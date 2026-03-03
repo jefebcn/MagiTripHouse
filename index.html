@@ -351,6 +351,20 @@
   textarea{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:inherit;font-size:.88rem;outline:none;resize:none;width:100%;}
   textarea:focus{border-color:rgba(61,255,110,.4);}
 
+
+  /* Admin FAB */
+  .admin-fab{
+    position:fixed;bottom:82px;right:16px;z-index:150;
+    width:48px;height:48px;border-radius:50%;
+    background:linear-gradient(135deg,var(--green),var(--green2));
+    border:none;cursor:pointer;
+    display:none;align-items:center;justify-content:center;
+    font-size:1.5rem;color:#000;font-weight:900;
+    box-shadow:var(--led-green), 0 4px 14px rgba(0,0,0,.4);
+    transition:.2s;
+  }
+  .admin-fab:hover{transform:scale(1.1);}
+  .admin-fab.visible{display:flex;}
   /* LED accent line at top of page */
   .led-line{height:2px;background:linear-gradient(90deg,transparent,var(--green),rgba(245,200,66,.6),var(--green),transparent);box-shadow:0 0 8px rgba(61,255,110,.4);}
 </style>
@@ -432,6 +446,9 @@
   <div class="account-view" id="affiliato-view" style="display:none;padding-bottom:110px">
   </div>
 
+  <!-- ADMIN FAB -->
+  <button class="admin-fab" id="admin-fab" onclick="openProductForm(null)" title="Aggiungi prodotto al catalogo">＋</button>
+
   <!-- BOTTOM NAV -->
   <div class="bottom-nav">
     <div class="nav-item active" id="nav-catalog" onclick="showView('catalog')">
@@ -471,7 +488,7 @@
     <div id="cart-note-wrap" style="display:none">
       <textarea id="order-note" placeholder="Note ordine (facoltativo)..." rows="2"></textarea>
     </div>
-    <button class="checkout-btn" id="checkout-btn" onclick="placeOrder()" disabled>Invia Ordine →</button>
+    <button class="checkout-btn" id="checkout-btn" onclick="placeOrder()" disabled>📲 Conferma & Invia su Telegram →</button>
   </div>
 </div>
 
@@ -584,7 +601,8 @@ let PRODUCTS = [];
 let cart = JSON.parse(localStorage.getItem('tp_cart') || '[]');
 let orders = JSON.parse(localStorage.getItem('tp_orders') || '[]');
 let currentUser = localStorage.getItem('tp_user') || null;
-let isAdmin = localStorage.getItem('tp_admin') === '1';
+let isAdmin = (localStorage.getItem('tp_admin') === '1') &&
+              (localStorage.getItem('tp_admin_user') === localStorage.getItem('tp_user'));
 let currentFilter = 'all';
 let detailQty = 1;
 let editingProductId = null;
@@ -685,6 +703,9 @@ function showView(view){
   document.getElementById('nav-catalog').classList.toggle('active', view==='catalog');
   if(view==='account') renderAccount();
   if(view==='affiliato') renderAffiliate();
+  // Show FAB only on catalog when admin
+  const fab=document.getElementById('admin-fab');
+  if(fab) fab.classList.toggle('visible', view==='catalog' && isAdmin);
 }
 
 // Init view
@@ -692,6 +713,7 @@ document.getElementById('catalog-view').style.display='flex';
 document.getElementById('catalog-view').style.flexDirection='column';
 document.getElementById('orders-view').style.display='none';
 document.getElementById('account-view').style.display='none';
+if(isAdmin){ const fab=document.getElementById('admin-fab'); if(fab) fab.classList.add('visible'); }
 
 // ===== PRODUCTS =====
 function setFilter(el, filter){
@@ -843,33 +865,61 @@ function renderCartPanel(){
 // ===== ORDERS =====
 function placeOrder(){
   const note=document.getElementById('order-note').value;
-  const tot=cart.reduce((s,x)=>{const p=PRODUCTS.find(px=>px.id===x.id);return s+p.price*x.qty;},0);
+
+  // Build item lines
+  const itemLines = cart.map(x=>{
+    const p=PRODUCTS.find(px=>String(px.id)===String(x.id));
+    return p ? `${p.emoji||'🌿'} ${p.name} ×${x.qty} — €${p.price*x.qty}` : null;
+  }).filter(Boolean);
+
+  const tot=cart.reduce((s,x)=>{
+    const p=PRODUCTS.find(px=>String(px.id)===String(x.id));
+    return s+(p?p.price*x.qty:0);
+  },0);
+
+  const orderId='MTH-'+Date.now().toString(36).toUpperCase();
+  const date=new Date().toLocaleDateString('it-IT');
+
   const o={
-    id:'MTH-'+Date.now().toString(36).toUpperCase(),
-    date:new Date().toLocaleDateString('it-IT'),
-    items:cart.map(x=>{const p=PRODUCTS.find(px=>px.id===x.id);return`${p.name} ×${x.qty}`;}).join(', '),
-    total:tot, status:'pending', note
+    id:orderId, date, status:'pending', note,
+    items:cart.map(x=>{const p=PRODUCTS.find(px=>String(px.id)===String(x.id));return p?`${p.name} ×${x.qty}`:'?';}).join(', '),
+    total:tot
   };
   orders.unshift(o);
   localStorage.setItem('tp_orders',JSON.stringify(orders));
 
-  // 📲 Send order to Telegram bot
+  // 📲 Telegram WebApp native (if inside Telegram)
   if (window.Telegram?.WebApp) {
-    const orderData = {
-      order_id: o.id,
-      user: currentUser || 'Anonymous',
-      items: o.items,
-      total: tot,
-      note: note || '',
-      date: o.date
-    };
-    window.Telegram.WebApp.sendData(JSON.stringify(orderData));
+    window.Telegram.WebApp.sendData(JSON.stringify({
+      order_id:orderId, user:currentUser||'Anonymous',
+      items:o.items, total:tot, note:note||'', date
+    }));
   }
+
+  // 📲 Build pre-filled Telegram message for @magichous8
+  const user = currentUser || 'Guest';
+  const msgLines = [
+    '🛒 *NUOVO ORDINE — Magic Trip House*',
+    `🆔 Ordine: ${orderId}`,
+    `👤 Cliente: ${user}`,
+    `📅 Data: ${date}`,
+    '',
+    '📦 *Prodotti:*',
+    ...itemLines,
+    '',
+    `💰 *TOTALE: €${tot}*`,
+  ];
+  if(note) msgLines.push('', `📝 Note: ${note}`);
+  const msg = msgLines.join('\n');
 
   cart=[]; saveCart(); updateCartUI();
   closePanel('cart-panel');
-  renderOrders(); showToast('🎉 Ordine inviato! #'+o.id);
-  setTimeout(()=>showView('orders'),1000);
+  renderOrders();
+  showToast('🎉 Ordine pronto! #'+orderId);
+
+  // Open Telegram with pre-filled message — direct link (no setTimeout, avoids popup blocker)
+  const tgUrl = 'https://t.me/magichous8?text=' + encodeURIComponent(msg);
+  window.location.href = tgUrl;
 }
 function renderOrders(){
   const list=document.getElementById('orders-list');
@@ -892,6 +942,11 @@ function renderOrders(){
 
 // ===== ACCOUNT =====
 function renderAccount(){
+  // Always re-sync isAdmin from storage before rendering
+  isAdmin = (localStorage.getItem('tp_admin') === '1') &&
+            (localStorage.getItem('tp_admin_user') === localStorage.getItem('tp_user'));
+  const fab=document.getElementById('admin-fab');
+  if(fab) fab.classList.toggle('visible', isAdmin && document.getElementById('catalog-view')?.style.display !== 'none');
   const c=document.getElementById('account-content');
   if(currentUser){
     c.innerHTML=`
@@ -900,7 +955,16 @@ function renderAccount(){
         <div class="profile-name">${currentUser}</div>
         <div class="profile-badge">${isAdmin?'👑 Admin':'⭐ Cliente'}</div>
       </div>
-      ${isAdmin?`<div class="menu-item" onclick="openAdminPanel()"><div class="menu-icon">⚙️</div><div><h3>Gestisci Prodotti</h3><p>Aggiungi, modifica o rimuovi prodotti</p></div><span class="arrow">›</span></div>`:''}
+      ${isAdmin?`
+      <div style="background:var(--bg3);border:1px solid rgba(61,255,110,.2);border-radius:var(--radius);overflow:hidden;margin-bottom:2px">
+        <div style="padding:10px 14px 6px;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--green)">⚙️ Admin</div>
+        <div class="menu-item" style="border:none;border-radius:0;border-top:1px solid var(--border)" onclick="openProductForm(null)">
+          <div class="menu-icon">➕</div><div><h3>Aggiungi Prodotto</h3><p>Aggiungi al catalogo principale</p></div><span class="arrow">›</span>
+        </div>
+        <div class="menu-item" style="border:none;border-radius:0;border-top:1px solid var(--border)" onclick="openAdminPanel()">
+          <div class="menu-icon">📋</div><div><h3>Gestisci Catalogo</h3><p>Modifica o rimuovi prodotti</p></div><span class="arrow">›</span>
+        </div>
+      </div>`:''}
       <div class="menu-item" onclick="showView('orders')"><div class="menu-icon">📋</div><div><h3>I Miei Ordini</h3><p>Visualizza la cronologia ordini</p></div><span class="arrow">›</span></div>
       <div class="menu-item" onclick="showView('affiliato')"><div class="menu-icon">🤝</div><div><h3>Programma Affiliati</h3><p>Guadagna portando nuovi clienti</p></div><span class="arrow">›</span></div>
       <div class="menu-item" onclick="window.open('https://t.me/MagicTripHouseSupport','_blank')"><div class="menu-icon">💬</div><div><h3>Supporto Telegram</h3><p>Rispondiamo in pochi minuti</p></div><span class="arrow">›</span></div>
@@ -1150,22 +1214,34 @@ async function openAdminAffiliates() {
 function openLoginPanel(){ closePanel('login-panel'); document.getElementById('login-panel').classList.add('open'); }
 async function doLogin(){
   const u=document.getElementById('login-user').value.trim();
-  const p=document.getElementById('login-pass').value;
+  const p=document.getElementById('login-pass').value.trim();
   if(!u||!p){ showToast('⚠️ Inserisci username e password'); return; }
   currentUser=u;
   localStorage.setItem('tp_user',u);
   if(u===ADMIN_USER&&p===ADMIN_PASS){
-    isAdmin=true; localStorage.setItem('tp_admin','1');
-  } else { isAdmin=false; localStorage.removeItem('tp_admin'); }
+    isAdmin=true;
+    localStorage.setItem('tp_admin','1');
+    localStorage.setItem('tp_admin_user',u);
+  } else {
+    isAdmin=false;
+    localStorage.removeItem('tp_admin');
+    localStorage.removeItem('tp_admin_user');
+  }
   closePanel('login-panel');
   renderAccount();
-  showToast('✅ Benvenuto, '+u+'!');
+  const fab=document.getElementById('admin-fab');
+  if(fab) fab.classList.toggle('visible', isAdmin);
+  showToast(isAdmin ? '👑 Benvenuto Admin, '+u+'!' : '✅ Benvenuto, '+u+'!');
   // Inizializza record affiliato in background
   await initAffiliate(u);
 }
 function doLogout(){
   currentUser=null; isAdmin=false; myAffData=null;
-  localStorage.removeItem('tp_user'); localStorage.removeItem('tp_admin');
+  localStorage.removeItem('tp_user');
+  localStorage.removeItem('tp_admin');
+  localStorage.removeItem('tp_admin_user');
+  const fab=document.getElementById('admin-fab');
+  if(fab) fab.classList.remove('visible');
   renderAccount(); showToast('👋 Disconnesso');
 }
 
@@ -1300,7 +1376,7 @@ window.openDetail=openDetail; window.changeDetailQty=changeDetailQty;
 window.addToCart=addToCart; window.addToCartById=addToCartById; window.addToCartByIndex=addToCartByIndex;
 window.changeQty=changeQty; window.placeOrder=placeOrder;
 window.openLoginPanel=openLoginPanel; window.doLogin=doLogin; window.doLogout=doLogout;
-window.openAdminPanel=openAdminPanel; window.renderAdminList=renderAdminList;
+window.openProductForm=openProductForm; window.openAdminPanel=openAdminPanel; window.renderAdminList=renderAdminList;
 window.deleteProduct=deleteProduct; window.openProductForm=openProductForm;
 window.handlePhotoUpload=handlePhotoUpload; window.saveProduct=saveProduct;
 window.renderAffiliate=renderAffiliate; window.submitAffCode=submitAffCode;
