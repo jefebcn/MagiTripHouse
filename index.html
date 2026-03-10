@@ -221,9 +221,67 @@
   .empty-cart div{font-size:3rem;margin-bottom:8px;}
 
   /* Product detail */
-  .detail-img{font-size:6rem;text-align:center;background:var(--bg3);border-radius:12px;padding:24px;min-height:160px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
-  .detail-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;}
+  .detail-img{
+    text-align:center;background:var(--bg3);border-radius:14px;
+    overflow:hidden;position:relative;
+    /* Tall enough to show portrait product shots */
+    height:clamp(240px, 58vw, 340px);
+    display:flex;align-items:center;justify-content:center;
+    cursor:zoom-in;
+  }
+  .detail-img img{
+    position:absolute;inset:0;width:100%;height:100%;
+    /* contain so nothing gets cropped; bg fills empty space */
+    object-fit:contain;border-radius:14px;
+    background:var(--bg3);
+  }
   .detail-img .de{position:relative;z-index:1;font-size:5rem;}
+  /* Tap-to-zoom hint */
+  .detail-img::after{
+    content:'🔍';position:absolute;bottom:8px;right:10px;
+    font-size:.85rem;background:rgba(0,0,0,.55);border-radius:6px;
+    padding:3px 7px;pointer-events:none;opacity:.7;
+    letter-spacing:.2px;
+  }
+  .detail-img.no-media::after{display:none;}
+
+  /* ===== LIGHTBOX ===== */
+  #lightbox{
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(0,0,0,.94);
+    display:none;align-items:center;justify-content:center;
+    padding:16px;
+    cursor:zoom-out;
+    animation:lbIn .2s ease;
+  }
+  #lightbox.open{display:flex;}
+  @keyframes lbIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+  #lightbox img{
+    max-width:100%;max-height:90dvh;
+    object-fit:contain;border-radius:10px;
+    box-shadow:0 0 60px rgba(61,255,110,.15), 0 0 120px rgba(0,0,0,.8);
+    pointer-events:none;
+  }
+  #lightbox video{
+    max-width:100%;max-height:90dvh;
+    border-radius:10px;
+    box-shadow:0 0 60px rgba(61,255,110,.15);
+  }
+  #lightbox-close{
+    position:absolute;top:14px;right:16px;
+    background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+    color:#fff;font-size:1.2rem;border-radius:50%;
+    width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:.2s;backdrop-filter:blur(6px);
+  }
+  #lightbox-close:hover{background:rgba(255,255,255,.2);}
+  #lightbox-caption{
+    position:absolute;bottom:20px;left:50%;transform:translateX(-50%);
+    font-family:'Fredoka One',cursive;font-size:.9rem;color:rgba(255,255,255,.6);
+    letter-spacing:.5px;text-align:center;white-space:nowrap;
+    pointer-events:none;
+  }
+
   .detail-name{font-family:'Fredoka One',cursive;font-size:1.5rem;font-weight:400;letter-spacing:.3px;}
   .detail-origin{color:var(--muted);font-size:.82rem;margin-top:3px;}
   .detail-desc{color:#b8d4bb;font-size:.88rem;line-height:1.6;}
@@ -633,6 +691,13 @@
   <div class="panel-content" id="product-form-content"></div>
 </div>
 
+<!-- LIGHTBOX -->
+<div id="lightbox" onclick="closeLightbox()">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <div id="lightbox-inner"></div>
+  <div id="lightbox-caption"></div>
+</div>
+
 <div id="toast"></div>
 
 <script type="module">
@@ -914,7 +979,7 @@ function openDetail(idx){
 
   document.getElementById('detail-content').innerHTML = `
     <div class="panel-handle"></div>
-    <div class="detail-img">
+    <div class="detail-img${!p.photo?' no-media':''}" onclick="openLightbox('${p.photo||''}','${p.mediaType||'image'}','${p.name}')">
       ${p.photo
         ? (p.mediaType==='video'
             ? `<video src="${p.photo}" autoplay muted loop playsinline></video>`
@@ -1664,6 +1729,29 @@ async function saveProduct(){
   showToast(editingProductId?'✅ Prodotto aggiornato!':'✅ Prodotto aggiunto!');
 }
 
+// ===== LIGHTBOX =====
+function openLightbox(src, mediaType, name){
+  if(!src) return;
+  const lb = document.getElementById('lightbox');
+  const inner = document.getElementById('lightbox-inner');
+  const caption = document.getElementById('lightbox-caption');
+  if(mediaType==='video'){
+    inner.innerHTML=`<video src="${src}" autoplay muted loop playsinline controls style="max-width:100%;max-height:90dvh;border-radius:10px;"></video>`;
+  } else {
+    inner.innerHTML=`<img src="${src}" alt="${name}">`;
+  }
+  caption.textContent = name || '';
+  lb.classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeLightbox(){
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-inner').innerHTML='';
+  document.body.style.overflow='';
+}
+// Close lightbox on Escape key
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLightbox(); });
+
 // ===== UTILS =====
 function closePanel(id){ document.getElementById(id).classList.remove('open'); }
 function showToast(msg){
@@ -1673,6 +1761,7 @@ function showToast(msg){
 }
 
 // Expose to global scope (needed for onclick= in HTML with ES modules)
+window.openLightbox=openLightbox; window.closeLightbox=closeLightbox;
 window.showView=showView; window.openCart=openCart; window.closePanel=closePanel;
 window.setFilter=setFilter; window.filterProducts=filterProducts;
 window.openDetail=openDetail; window.changeDetailQty=changeDetailQty;
