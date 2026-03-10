@@ -365,7 +365,45 @@
   }
   .admin-fab:hover{transform:scale(1.1);}
   .admin-fab.visible{display:flex;}
-  /* Variant editor in admin form */
+  /* ===== MEDIA (video + image) in cards & detail ===== */
+  .product-img video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
+  .detail-img video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;}
+  /* Video play-icon overlay on card */
+  .media-play-badge{
+    position:absolute;bottom:7px;right:7px;z-index:3;
+    background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);
+    border-radius:6px;padding:2px 7px;font-size:.6rem;font-weight:700;
+    color:#fff;letter-spacing:.5px;backdrop-filter:blur(4px);
+  }
+
+  /* ===== UPLOAD PROGRESS ===== */
+  .upload-progress-wrap{
+    display:none;flex-direction:column;gap:7px;
+    background:rgba(61,255,110,.05);border:1px solid rgba(61,255,110,.2);
+    border-radius:10px;padding:12px 14px;
+  }
+  .upload-progress-wrap.active{display:flex;}
+  .upload-progress-label{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:.75rem;color:var(--green);font-weight:700;letter-spacing:.3px;
+  }
+  .upload-progress-label .up-pct{
+    font-family:'Fredoka One',cursive;font-size:1rem;
+    text-shadow:var(--led-green);
+  }
+  .upload-progress-bar-track{
+    height:5px;background:var(--border);border-radius:3px;overflow:hidden;
+  }
+  .upload-progress-bar-fill{
+    height:100%;background:linear-gradient(90deg,var(--green),var(--gold));
+    border-radius:3px;width:0%;transition:width .25s ease;
+    box-shadow:0 0 8px rgba(61,255,110,.5);
+  }
+  .upload-status-row{font-size:.7rem;color:var(--muted);display:flex;align-items:center;gap:5px;}
+  .upload-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1s infinite;flex-shrink:0;}
+
+  /* Photo-upload area — video preview */
+  .photo-upload video{width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px;display:block;}
   .variants-editor{display:flex;flex-direction:column;gap:8px;}
   .variant-row{display:flex;gap:8px;align-items:center;}
   .variant-row input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:.85rem;font-family:inherit;outline:none;transition:border-color .2s;}
@@ -601,6 +639,7 @@
 // ===== FIREBASE SETUP =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 // ✅ Firebase Magic Trip House
 const firebaseConfig = {
@@ -613,6 +652,7 @@ const firebaseConfig = {
 };
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
 
 // ===== DEFAULT PRODUCTS =====
 const DEFAULT_PRODUCTS = [
@@ -659,7 +699,8 @@ let currentFilter = 'all';
 let detailQty = 1;
 let detailVariant = null; // { label, price } currently selected variant
 let editingProductId = null;
-let formPhoto = '';
+let formPhoto = '';      // public URL after Storage upload
+let formMediaType = 'image'; // 'image' | 'video'
 
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = 'titan2024';
@@ -786,6 +827,15 @@ function getMinPrice(p){
   return p.price || 0;
 }
 
+function mediaTag(p, context='card'){
+  if(!p.photo) return '';
+  if(p.mediaType==='video'){
+    return `<video src="${p.photo}" autoplay muted loop playsinline></video>
+            <div class="media-play-badge">▶ VIDEO</div>`;
+  }
+  return `<img src="${p.photo}" alt="${p.name}">`;
+}
+
 function renderProducts(){
   const search = document.getElementById('search-input').value.toLowerCase();
   const filtered = PRODUCTS.filter(p=>{
@@ -802,7 +852,7 @@ function renderProducts(){
   grid.innerHTML = filtered.map((p,idx)=>`
     <div class="product-card" onclick="openDetail(${idx})">
       <div class="product-img">
-        ${p.photo ? `<img src="${p.photo}" alt="${p.name}">` : ''}
+        ${mediaTag(p,'card')}
         <span class="emoji-fallback" ${p.photo?'style="display:none"':''}>${p.emoji||'🌿'}</span>
         <div class="product-badge ${p.badge}">${getBadgeLabel(p.badge)}</div>
       </div>
@@ -865,7 +915,11 @@ function openDetail(idx){
   document.getElementById('detail-content').innerHTML = `
     <div class="panel-handle"></div>
     <div class="detail-img">
-      ${p.photo?`<img src="${p.photo}" alt="${p.name}">`:''}
+      ${p.photo
+        ? (p.mediaType==='video'
+            ? `<video src="${p.photo}" autoplay muted loop playsinline></video>`
+            : `<img src="${p.photo}" alt="${p.name}">`)
+        : ''}
       <span class="de" ${p.photo?'style="display:none"':''}>${p.emoji||'🌿'}</span>
     </div>
     <div>
@@ -1433,22 +1487,41 @@ function openProductForm(id){
   editingProductId=id;
   const p = id ? PRODUCTS.find(x=>x.id===id) : null;
   formPhoto = p?.photo||'';
+  formMediaType = p?.mediaType||'image';
   // Init working variants copy
   formVariants = p?.variants ? p.variants.map(v=>({...v})) : [{label:'10g',price:0}];
+
+  const mediaPreview = formPhoto
+    ? (formMediaType==='video'
+        ? `<video src="${formPhoto}" muted loop playsinline style="width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px;display:block;"></video>`
+        : `<img id="photo-preview" src="${formPhoto}" style="display:block;width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px">`)
+    : `<img id="photo-preview" src="" style="display:none;width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px">`;
 
   const fc=document.getElementById('product-form-content');
   fc.innerHTML=`
     <div class="panel-handle"></div>
     <div class="panel-title">${p?'✏️ Modifica Prodotto':'➕ Nuovo Prodotto'}</div>
-    
+
+    <!-- MEDIA UPLOAD -->
     <div class="photo-upload" id="photo-upload-area" onclick="document.getElementById('photo-file').click()">
-      <input type="file" id="photo-file" accept="image/*" onchange="handlePhotoUpload(event)" style="display:none">
-      <img id="photo-preview" src="${formPhoto||''}" style="${formPhoto?'display:block':'display:none'};width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px">
+      <input type="file" id="photo-file" accept="image/*,video/mp4,video/mov,video/quicktime,video/webm" onchange="handlePhotoUpload(event)" style="display:none">
+      ${mediaPreview}
       <div id="photo-placeholder" style="${formPhoto?'display:none':''}">
         <div style="font-size:2rem;margin-bottom:6px">📷</div>
-        <div style="font-size:.82rem;color:var(--muted)">Carica foto prodotto</div>
+        <div style="font-size:.82rem;color:var(--muted)">Carica foto o video del prodotto</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:4px">JPG · PNG · WEBP · MP4 · MOV</div>
       </div>
-      ${formPhoto?`<div style="font-size:.75rem;color:var(--green);margin-top:6px">✅ Foto caricata — tocca per cambiare</div>`:''}
+      ${formPhoto?`<div style="font-size:.75rem;color:var(--green);margin-top:6px">✅ Media caricato — tocca per cambiare</div>`:''}
+    </div>
+
+    <!-- UPLOAD PROGRESS -->
+    <div class="upload-progress-wrap" id="upload-progress-wrap">
+      <div class="upload-progress-label">
+        <span><span class="upload-dot"></span> &nbsp;Caricamento su Storage...</span>
+        <span class="up-pct" id="up-pct">0%</span>
+      </div>
+      <div class="upload-progress-bar-track"><div class="upload-progress-bar-fill" id="up-bar"></div></div>
+      <div class="upload-status-row" id="up-status">Preparazione file...</div>
     </div>
 
     <div class="form-grid">
@@ -1480,36 +1553,99 @@ function openProductForm(id){
       <button class="add-variant-btn" onclick="addFormVariant()">＋ Aggiungi Taglio</button>
     </div>
 
-    <button class="checkout-btn" onclick="saveProduct()">💾 Salva Prodotto</button>
+    <button class="checkout-btn" id="save-product-btn" onclick="saveProduct()">💾 Salva Prodotto</button>
   `;
   renderVariantRows();
   document.getElementById('product-form-panel').classList.add('open');
 }
 
 function handlePhotoUpload(e){
-  const file=e.target.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    formPhoto=ev.target.result;
-    const preview=document.getElementById('photo-preview');
-    const placeholder=document.getElementById('photo-placeholder');
-    preview.src=formPhoto; preview.style.display='block';
-    placeholder.style.display='none';
-    // Add green confirmation text
-    const area=document.getElementById('photo-upload-area');
-    let conf=area.querySelector('.photo-conf');
-    if(!conf){ conf=document.createElement('div'); conf.className='photo-conf'; conf.style.cssText='font-size:.75rem;color:var(--green);margin-top:6px'; area.appendChild(conf); }
-    conf.textContent='✅ Foto pronta — tocca per cambiare';
-  };
-  reader.readAsDataURL(file);
+  const file = e.target.files[0]; if(!file) return;
+  const isVideo = file.type.startsWith('video/');
+  formMediaType = isVideo ? 'video' : 'image';
+
+  // Show local preview immediately
+  const area = document.getElementById('photo-upload-area');
+  const placeholder = document.getElementById('photo-placeholder');
+  if(placeholder) placeholder.style.display='none';
+
+  // Remove old preview node and insert correct element
+  area.querySelectorAll('img:not(#photo-file), video').forEach(n=>n.remove());
+  let previewEl;
+  if(isVideo){
+    previewEl = document.createElement('video');
+    previewEl.muted = true; previewEl.loop = true; previewEl.playsInline = true; previewEl.autoplay = true;
+    previewEl.style.cssText='width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px;display:block;';
+    previewEl.src = URL.createObjectURL(file);
+  } else {
+    previewEl = document.createElement('img');
+    previewEl.style.cssText='display:block;width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px';
+    previewEl.src = URL.createObjectURL(file);
+  }
+  area.insertBefore(previewEl, area.firstChild);
+
+  // Update confirmation text
+  let conf = area.querySelector('.photo-conf');
+  if(!conf){ conf=document.createElement('div'); conf.className='photo-conf'; conf.style.cssText='font-size:.75rem;color:var(--muted);margin-top:6px'; area.appendChild(conf); }
+  conf.textContent=`⏳ ${isVideo?'Video':'Foto'} pronto — upload in corso...`;
+
+  // Disable Save button during upload
+  const saveBtn = document.getElementById('save-product-btn');
+  if(saveBtn) saveBtn.disabled = true;
+
+  // Show progress widget
+  const progWrap = document.getElementById('upload-progress-wrap');
+  const progBar  = document.getElementById('up-bar');
+  const progPct  = document.getElementById('up-pct');
+  const progStat = document.getElementById('up-status');
+  if(progWrap) progWrap.classList.add('active');
+
+  // Upload to Firebase Storage
+  const ext = file.name.split('.').pop();
+  const path = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const storageRef = ref(storage, path);
+  const uploadTask = uploadBytesResumable(storageRef, file);
+
+  uploadTask.on('state_changed',
+    (snap) => {
+      const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+      if(progBar) progBar.style.width = pct+'%';
+      if(progPct) progPct.textContent = pct+'%';
+      if(progStat){
+        const kb = Math.round(snap.bytesTransferred/1024);
+        const tot = Math.round(snap.totalBytes/1024);
+        progStat.textContent = `${kb} KB / ${tot} KB — ${snap.state}`;
+      }
+    },
+    (err) => {
+      console.error('Upload error:', err);
+      if(progWrap) progWrap.classList.remove('active');
+      if(conf) conf.textContent='❌ Errore upload — riprova';
+      conf.style.color='var(--red)';
+      if(saveBtn) saveBtn.disabled = false;
+      showToast('❌ Errore upload file');
+    },
+    async () => {
+      const url = await getDownloadURL(uploadTask.snapshot.ref);
+      formPhoto = url;
+      if(progBar) progBar.style.width='100%';
+      if(progPct) progPct.textContent='100%';
+      if(progStat) progStat.textContent='✅ Upload completato!';
+      setTimeout(()=>{ if(progWrap) progWrap.classList.remove('active'); }, 1500);
+      if(conf){ conf.textContent=`✅ ${isVideo?'Video':'Foto'} caricata — tocca per cambiare`; conf.style.color='var(--green)'; }
+      if(saveBtn) saveBtn.disabled = false;
+    }
+  );
 }
 
 async function saveProduct(){
   const name=document.getElementById('f-name').value.trim();
   if(!name){ showToast('⚠️ Il nome è obbligatorio'); return; }
-  // Validate variants
   const variants = formVariants.filter(v=>v.label && v.price>0);
   if(!variants.length){ showToast('⚠️ Aggiungi almeno un taglio con prezzo'); return; }
+  // Block if upload still in progress (button should already be disabled, but double-check)
+  const saveBtn = document.getElementById('save-product-btn');
+  if(saveBtn && saveBtn.disabled){ showToast('⏳ Attendi il completamento dell\'upload'); return; }
   const cat=document.getElementById('f-cat').value;
   const tags=document.getElementById('f-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
   const prod={
@@ -1519,7 +1655,8 @@ async function saveProduct(){
     origin: document.getElementById('f-origin').value||'Unknown',
     desc: document.getElementById('f-desc').value||'',
     tags, variants,
-    photo: formPhoto
+    photo: formPhoto,
+    mediaType: formMediaType   // 'image' | 'video'
   };
   showToast('💾 Salvataggio...');
   await saveProductToFirebase(prod);
