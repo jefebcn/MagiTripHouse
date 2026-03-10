@@ -365,8 +365,48 @@
   }
   .admin-fab:hover{transform:scale(1.1);}
   .admin-fab.visible{display:flex;}
+  /* Variant editor in admin form */
+  .variants-editor{display:flex;flex-direction:column;gap:8px;}
+  .variant-row{display:flex;gap:8px;align-items:center;}
+  .variant-row input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:.85rem;font-family:inherit;outline:none;transition:border-color .2s;}
+  .variant-row input:focus{border-color:var(--green);}
+  .variant-row input::placeholder{color:var(--muted);}
+  .variant-del-btn{background:rgba(232,59,59,.12);border:1px solid rgba(232,59,59,.25);color:var(--red);border-radius:7px;width:32px;height:32px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s;}
+  .variant-del-btn:hover{background:rgba(232,59,59,.3);}
+  .add-variant-btn{background:var(--bg3);border:1.5px dashed rgba(61,255,110,.3);border-radius:9px;padding:9px;color:var(--green);font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.2s;width:100%;letter-spacing:.3px;}
+  .add-variant-btn:hover{border-color:var(--green);background:rgba(61,255,110,.06);}
+  .variants-header{display:flex;gap:6px;padding:0 0 2px;}
+  .variants-header span{flex:1;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700;}
+
   /* LED accent line at top of page */
   .led-line{height:2px;background:linear-gradient(90deg,transparent,var(--green),rgba(245,200,66,.6),var(--green),transparent);box-shadow:0 0 8px rgba(61,255,110,.4);}
+
+  /* Variant selector */
+  .variant-section{display:flex;flex-direction:column;gap:8px;}
+  .variant-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:700;}
+  .variant-buttons{display:flex;flex-wrap:wrap;gap:8px;}
+  .variant-btn{
+    background:var(--bg3);border:1.5px solid var(--border);border-radius:9px;
+    padding:9px 15px;color:var(--text);font-size:.82rem;font-weight:600;
+    cursor:pointer;transition:.2s;font-family:inherit;min-width:58px;text-align:center;
+  }
+  .variant-btn:hover{border-color:rgba(245,200,66,.5);color:var(--gold);}
+  .variant-btn.selected{
+    border-color:var(--gold);background:rgba(245,200,66,.1);color:var(--gold);
+    box-shadow:0 0 10px rgba(245,200,66,.25);
+  }
+  .detail-price-g{color:var(--muted);font-size:.75rem;margin-top:2px;}
+
+  /* Card "Scegli" button */
+  .choose-btn{
+    background:var(--bg3);border:1px solid rgba(61,255,110,.3);border-radius:8px;
+    padding:5px 10px;font-size:.7rem;font-weight:700;cursor:pointer;color:var(--green);
+    transition:.2s;font-family:inherit;white-space:nowrap;
+  }
+  .choose-btn:hover{background:rgba(61,255,110,.1);border-color:var(--green);}
+
+  /* Cart item variant tag */
+  .cart-item-variant{font-size:.68rem;color:var(--gold);margin-top:1px;}
 </style>
 </head>
 <body>
@@ -578,22 +618,34 @@ const db = getFirestore(firebaseApp);
 const DEFAULT_PRODUCTS = [
   {id:1,name:'DRYWORK',emoji:'🌿',badge:'premium',category:'premium',origin:'Italy',
    desc:'Classic Italian, the jewel of our catalog. Superior quality, intense and persistent aroma. Relaxing sweet effect.',
-   tags:['Indoor','Sativa','THC 22%','Floral'],price:90,unit:'10g',priceG:9,photo:''},
+   tags:['Indoor','Sativa','THC 22%','Floral'],
+   variants:[{label:'3.5g',price:35},{label:'7g',price:63},{label:'10g',price:90},{label:'25g',price:210}],
+   photo:''},
   {id:2,name:'CALISPAIN',emoji:'💎',badge:'premium',category:'premium',origin:'Spain',
    desc:'Premium from Spain. Unmistakable aroma, compact structure and abundant resin. For true connoisseurs.',
-   tags:['Indoor','Hybrid','THC 25%','Top Shelf'],price:480,unit:'50g',priceG:9.6,photo:''},
+   tags:['Indoor','Hybrid','THC 25%','Top Shelf'],
+   variants:[{label:'10g',price:96},{label:'25g',price:230},{label:'50g',price:480}],
+   photo:''},
   {id:3,name:'FROZENBUD',emoji:'❄️',badge:'frozen',category:'frozen',origin:'Netherlands',
    desc:'Frozen variety with terpenes preserved at low temperature. Fresh and crystalline flavor. Unique experience.',
-   tags:['Frozen','Indica','THC 20%','Ice Cured'],price:120,unit:'10g',priceG:12,photo:''},
+   tags:['Frozen','Indica','THC 20%','Ice Cured'],
+   variants:[{label:'3.5g',price:45},{label:'7g',price:84},{label:'10g',price:120}],
+   photo:''},
   {id:4,name:'MOONROCK',emoji:'🪨',badge:'hash',category:'hash',origin:'Morocco',
    desc:'Premium hash from Morocco. Traditional artisan processing, spiced and earthy aromas. Timeless classic.',
-   tags:['Hash','Pollen','THC 18%','Artisan'],price:60,unit:'10g',priceG:6,photo:''},
+   tags:['Hash','Pollen','THC 18%','Artisan'],
+   variants:[{label:'5g',price:30},{label:'10g',price:60},{label:'25g',price:140}],
+   photo:''},
   {id:5,name:'CBD RELAX',emoji:'🌼',badge:'cbd',category:'cbd',origin:'Italy',
    desc:'High concentration CBD. Zero THC, natural calming effect. Ideal for anxiety and stress. Certified and tested.',
-   tags:['CBD 15%','THC <0.2%','Organic','Certified'],price:45,unit:'10g',priceG:4.5,photo:''},
+   tags:['CBD 15%','THC <0.2%','Organic','Certified'],
+   variants:[{label:'10g',price:45},{label:'25g',price:105},{label:'50g',price:200}],
+   photo:''},
   {id:6,name:'AMNESIA',emoji:'🔥',badge:'new',category:'premium',origin:'Amsterdam',
    desc:'The iconic Amnesia Haze from Amsterdam. Citrus and spicy aroma, cerebral and creative effect. Legendary.',
-   tags:['Indoor','Sativa','THC 21%','Citrus'],price:100,unit:'10g',priceG:10,photo:''},
+   tags:['Indoor','Sativa','THC 21%','Citrus'],
+   variants:[{label:'3.5g',price:38},{label:'7g',price:70},{label:'10g',price:100},{label:'14g',price:140}],
+   photo:''},
 ];
 
 // ===== STATE =====
@@ -605,6 +657,7 @@ let isAdmin = (localStorage.getItem('tp_admin') === '1') &&
               (localStorage.getItem('tp_admin_user') === localStorage.getItem('tp_user'));
 let currentFilter = 'all';
 let detailQty = 1;
+let detailVariant = null; // { label, price } currently selected variant
 let editingProductId = null;
 let formPhoto = '';
 
@@ -728,6 +781,11 @@ function getBadgeLabel(b){
   return {premium:'💎 Premium',frozen:'🧊 Frozen',new:'✨ New',hash:'🪨 Hash',cbd:'🌿 CBD'}[b] || b;
 }
 
+function getMinPrice(p){
+  if(p.variants && p.variants.length) return Math.min(...p.variants.map(v=>v.price));
+  return p.price || 0;
+}
+
 function renderProducts(){
   const search = document.getElementById('search-input').value.toLowerCase();
   const filtered = PRODUCTS.filter(p=>{
@@ -752,8 +810,8 @@ function renderProducts(){
         <div class="product-name">${p.name}</div>
         <div class="product-desc">${p.desc.substring(0,58)}…</div>
         <div class="product-footer">
-          <div class="product-price">€${p.price} <span>from ${p.unit}</span></div>
-          <button class="add-btn" onclick="event.stopPropagation();addToCartByIndex(${idx},1)">+</button>
+          <div class="product-price">Da €${getMinPrice(p)} <span>${p.variants?p.variants.length+' tagli':''}</span></div>
+          <button class="choose-btn" onclick="event.stopPropagation();openDetail(${idx})">Scegli ›</button>
         </div>
       </div>
     </div>
@@ -776,6 +834,34 @@ function openDetail(idx){
   if(!p) return;
   detailQty = 1;
   const pid = p.id;
+  const variants = p.variants || [];
+  // Auto-select first variant
+  detailVariant = variants.length ? {...variants[0]} : null;
+
+  function renderDetailPrice(){
+    const price = detailVariant ? detailVariant.price : (p.price||0);
+    const label = detailVariant ? detailVariant.label : '';
+    const grams = parseFloat(label);
+    const pricePerG = (grams > 0) ? (price / grams).toFixed(2) : null;
+    const el = document.getElementById('detail-dyn-price');
+    if(el){
+      el.innerHTML = `€${price}<span id="detail-price-g" class="detail-price-g">${pricePerG ? ` · €${pricePerG}/g` : ''}</span>`;
+    }
+  }
+
+  function buildVariantButtons(){
+    return variants.map((v,vi)=>`
+      <button class="variant-btn ${vi===0?'selected':''}" id="vbtn-${vi}"
+        onclick="selectVariant(${vi},${JSON.stringify(variants).replace(/"/g,'&quot;')})">${v.label}</button>
+    `).join('');
+  }
+
+  const variantSection = variants.length ? `
+    <div class="variant-section">
+      <div class="variant-label">📦 Seleziona Formato</div>
+      <div class="variant-buttons" id="variant-buttons-wrap">${buildVariantButtons()}</div>
+    </div>` : '';
+
   document.getElementById('detail-content').innerHTML = `
     <div class="panel-handle"></div>
     <div class="detail-img">
@@ -784,14 +870,15 @@ function openDetail(idx){
     </div>
     <div>
       <div class="detail-name">${p.name}</div>
-      <div class="detail-origin">🌍 Originee: ${p.origin||''}</div>
+      <div class="detail-origin">🌍 Origine: ${p.origin||''}</div>
     </div>
     <div class="detail-desc">${p.desc||''}</div>
     <div class="detail-tags">${(p.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+    ${variantSection}
     <div class="detail-price-row">
       <div>
-        <div class="detail-price">€${p.price}</div>
-        <div class="detail-unit">from ${p.unit||'10g'} · €${p.priceG||0}/g</div>
+        <div class="detail-price" id="detail-dyn-price">€${detailVariant?detailVariant.price:(p.price||0)}</div>
+        <div class="detail-price-g" id="detail-price-g-sub"></div>
       </div>
       <div class="qty-selector">
         <button onclick="changeDetailQty(-1)">−</button>
@@ -799,31 +886,65 @@ function openDetail(idx){
         <button onclick="changeDetailQty(1)">+</button>
       </div>
     </div>
-    <button class="checkout-btn" onclick="addToCartById('${pid}',parseInt(document.getElementById('detail-qty').textContent));closePanel('detail-panel');showToast('✅ Aggiunto al carrello!')">🛒 Aggiungi al Carrello</button>
+    <button class="checkout-btn" id="detail-add-btn" onclick="addFromDetail('${pid}')">🛒 Aggiungi al Carrello</button>
   `;
+  renderDetailPrice();
   document.getElementById('detail-panel').classList.add('open');
 }
+
+function selectVariant(vi, variants){
+  detailVariant = {...variants[vi]};
+  // Update button styles
+  document.querySelectorAll('.variant-btn').forEach((btn,i)=>{
+    btn.classList.toggle('selected', i===vi);
+  });
+  // Update price display
+  const price = detailVariant.price;
+  const grams = parseFloat(detailVariant.label);
+  const pricePerG = (grams > 0) ? (price/grams).toFixed(2) : null;
+  const el = document.getElementById('detail-dyn-price');
+  if(el) el.innerHTML = `€${price}`;
+  const sub = document.getElementById('detail-price-g-sub');
+  if(sub) sub.textContent = pricePerG ? `€${pricePerG}/g · ${detailVariant.label}` : detailVariant.label;
+}
+
+function addFromDetail(pid){
+  pid = String(pid);
+  const qty = parseInt(document.getElementById('detail-qty').textContent)||1;
+  if(!detailVariant){ showToast('⚠️ Seleziona un formato'); return; }
+  addToCartById(pid, qty, detailVariant);
+  closePanel('detail-panel');
+  showToast('✅ Aggiunto al carrello!');
+}
+
 function changeDetailQty(d){ detailQty=Math.max(1,detailQty+d); document.getElementById('detail-qty').textContent=detailQty; }
 
 // ===== CART =====
+function cartKey(id, variantLabel){ return `${id}_${variantLabel}`; }
+
 function addToCartByIndex(idx, qty=1){
   const filtered = getFilteredProducts();
   const p = filtered[idx];
   if(!p) return;
-  addToCartById(String(p.id), qty);
+  // Use first variant by default
+  const v = (p.variants && p.variants.length) ? p.variants[0] : {label:'default', price: p.price||0};
+  addToCartById(String(p.id), qty, v);
 }
-function addToCartById(id, qty=1){
+function addToCartById(id, qty=1, variant){
   id = String(id);
-  const e=cart.find(x=>String(x.id)===id);
-  if(e) e.qty+=qty; else cart.push({id, qty});
+  const v = variant || {label:'default', price:0};
+  const key = cartKey(id, v.label);
+  const e = cart.find(x=>x.key===key);
+  if(e) e.qty+=qty;
+  else cart.push({key, id, variantLabel:v.label, variantPrice:v.price, qty});
   saveCart(); updateCartUI(); showToast('✅ Aggiunto al carrello!');
 }
 function addToCart(id, qty=1){ addToCartById(id, qty); }
-function changeQty(id,d){
-  id = String(id);
-  const item=cart.find(x=>String(x.id)===id); if(!item) return;
-  item.qty=Math.max(0,item.qty+d);
-  if(!item.qty) cart=cart.filter(x=>String(x.id)!==id);
+
+function changeQty(key, d){
+  const item = cart.find(x=>x.key===key); if(!item) return;
+  item.qty = Math.max(0, item.qty+d);
+  if(!item.qty) cart = cart.filter(x=>x.key!==key);
   saveCart(); updateCartUI(); renderCartPanel();
 }
 function saveCart(){ localStorage.setItem('tp_cart',JSON.stringify(cart)); }
@@ -846,14 +967,19 @@ function renderCartPanel(){
   let tot=0;
   list.innerHTML=cart.map(item=>{
     const p=PRODUCTS.find(x=>String(x.id)===String(item.id)); if(!p) return '';
-    tot+=p.price*item.qty;
+    const lineTotal = item.variantPrice * item.qty;
+    tot += lineTotal;
     return `<div class="cart-item">
       <div class="cart-item-thumb">${p.photo?`<img src="${p.photo}">`:(p.emoji||'🌿')}</div>
-      <div class="cart-item-info"><div class="cart-item-name">${p.name}</div><div class="cart-item-price">€${p.price} × ${p.unit}</div></div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${p.name}</div>
+        <div class="cart-item-variant">📦 Formato: ${item.variantLabel}</div>
+        <div class="cart-item-price">€${item.variantPrice} × ${item.variantLabel} = €${lineTotal}</div>
+      </div>
       <div class="cart-qty">
-        <button class="qty-btn" onclick="changeQty('${p.id}',-1)">−</button>
+        <button class="qty-btn" onclick="changeQty('${item.key}',-1)">−</button>
         <span class="qty-num">${item.qty}</span>
-        <button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button>
+        <button class="qty-btn" onclick="changeQty('${item.key}',1)">+</button>
       </div>
     </div>`;
   }).join('');
@@ -866,23 +992,20 @@ function renderCartPanel(){
 function placeOrder(){
   const note=document.getElementById('order-note').value;
 
-  // Build item lines
+  // Build item lines with variant
   const itemLines = cart.map(x=>{
     const p=PRODUCTS.find(px=>String(px.id)===String(x.id));
-    return p ? `${p.emoji||'🌿'} ${p.name} ×${x.qty} — €${p.price*x.qty}` : null;
+    return p ? `${p.emoji||'🌿'} ${p.name} [${x.variantLabel}] ×${x.qty} — €${x.variantPrice*x.qty}` : null;
   }).filter(Boolean);
 
-  const tot=cart.reduce((s,x)=>{
-    const p=PRODUCTS.find(px=>String(px.id)===String(x.id));
-    return s+(p?p.price*x.qty:0);
-  },0);
+  const tot=cart.reduce((s,x)=>s+(x.variantPrice*x.qty),0);
 
   const orderId='MTH-'+Date.now().toString(36).toUpperCase();
   const date=new Date().toLocaleDateString('it-IT');
 
   const o={
     id:orderId, date, status:'pending', note,
-    items:cart.map(x=>{const p=PRODUCTS.find(px=>String(px.id)===String(x.id));return p?`${p.name} ×${x.qty}`:'?';}).join(', '),
+    items:cart.map(x=>{const p=PRODUCTS.find(px=>String(px.id)===String(x.id));return p?`${p.name} ${x.variantLabel} ×${x.qty}`:'?';}).join(', '),
     total:tot
   };
   orders.unshift(o);
@@ -917,7 +1040,7 @@ function placeOrder(){
   renderOrders();
   showToast('🎉 Ordine pronto! #'+orderId);
 
-  // Open Telegram with pre-filled message — direct link (no setTimeout, avoids popup blocker)
+  // Open Telegram with pre-filled message
   const tgUrl = 'https://t.me/magichous8?text=' + encodeURIComponent(msg);
   window.location.href = tgUrl;
 }
@@ -1254,18 +1377,23 @@ function renderAdminList(){
   const list=document.getElementById('admin-list');
   if(!list) return;
   if(!PRODUCTS.length){ list.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:.85rem">Nessun prodotto</div>'; return; }
-  list.innerHTML=PRODUCTS.map(p=>`
+  list.innerHTML=PRODUCTS.map(p=>{
+    const variants = p.variants || [];
+    const minPrice = variants.length ? Math.min(...variants.map(v=>v.price)) : (p.price||0);
+    const variantInfo = variants.length ? `Da €${minPrice} · ${variants.length} tagli` : `€${p.price||0}`;
+    return `
     <div class="admin-item">
       <div class="admin-thumb">${p.photo?`<img src="${p.photo}">`:(p.emoji||'🌿')}</div>
       <div class="admin-item-info">
         <div class="admin-item-name">${p.name}</div>
-        <div class="admin-item-price">€${p.price} · ${p.unit}</div>
+        <div class="admin-item-price">${variantInfo}</div>
       </div>
       <div class="admin-item-actions">
         <button class="btn-edit" onclick="openProductForm('${p.id}')">Modifica</button>
         <button class="btn-del" onclick="deleteProduct('${p.id}')">Elimina</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function deleteProduct(id){
   if(!confirm('Eliminare questo prodotto?')) return;
@@ -1274,10 +1402,40 @@ function deleteProduct(id){
 }
 
 // ===== PRODUCT FORM =====
+let formVariants = []; // working copy of variants while editing
+
+function renderVariantRows(){
+  const wrap = document.getElementById('variants-editor');
+  if(!wrap) return;
+  wrap.innerHTML = formVariants.map((v,i)=>`
+    <div class="variant-row" id="vrow-${i}">
+      <input type="text"  placeholder="es. 10g"  value="${v.label}" oninput="updateFormVariant(${i},'label',this.value)" style="max-width:90px">
+      <input type="number" placeholder="Prezzo €" value="${v.price}" oninput="updateFormVariant(${i},'price',this.value)" min="0" step="0.5">
+      <button class="variant-del-btn" onclick="removeFormVariant(${i})" title="Rimuovi taglio">✕</button>
+    </div>`).join('');
+}
+function updateFormVariant(i, field, val){
+  formVariants[i][field] = field==='price' ? parseFloat(val)||0 : val;
+}
+function removeFormVariant(i){
+  formVariants.splice(i,1);
+  renderVariantRows();
+}
+function addFormVariant(){
+  formVariants.push({label:'', price:0});
+  renderVariantRows();
+  // Focus the new label input
+  const rows = document.querySelectorAll('.variant-row');
+  if(rows.length) rows[rows.length-1].querySelector('input')?.focus();
+}
+
 function openProductForm(id){
   editingProductId=id;
   const p = id ? PRODUCTS.find(x=>x.id===id) : null;
   formPhoto = p?.photo||'';
+  // Init working variants copy
+  formVariants = p?.variants ? p.variants.map(v=>({...v})) : [{label:'10g',price:0}];
+
   const fc=document.getElementById('product-form-content');
   fc.innerHTML=`
     <div class="panel-handle"></div>
@@ -1297,13 +1455,7 @@ function openProductForm(id){
       <div class="input-group full"><label>Nome Prodotto</label>
         <input type="text" id="f-name" value="${p?.name||''}" placeholder="e.g. AMNESIA HAZE"></div>
       <div class="input-group full"><label>Descrizione</label>
-        <textarea id="f-desc" rows="3" placeholder="Describe the product...">${p?.desc||''}</textarea></div>
-      <div class="input-group"><label>Price (€)</label>
-        <input type="number" id="f-price" value="${p?.price||''}" placeholder="e.g. 90"></div>
-      <div class="input-group"><label>Unità (es. 10g)</label>
-        <input type="text" id="f-unit" value="${p?.unit||''}" placeholder="10g"></div>
-      <div class="input-group"><label>Prezzo al grammo</label>
-        <input type="number" id="f-priceg" value="${p?.priceG||''}" placeholder="e.g. 9" step="0.1"></div>
+        <textarea id="f-desc" rows="3" placeholder="Descrivi il prodotto...">${p?.desc||''}</textarea></div>
       <div class="input-group"><label>Origine</label>
         <input type="text" id="f-origin" value="${p?.origin||''}" placeholder="e.g. Spain"></div>
       <div class="input-group"><label>Emoji</label>
@@ -1315,8 +1467,22 @@ function openProductForm(id){
       <div class="input-group full"><label>Tag (separati da virgola)</label>
         <input type="text" id="f-tags" value="${(p?.tags||[]).join(', ')}" placeholder="Indoor, Sativa, THC 22%"></div>
     </div>
+
+    <!-- VARIANT EDITOR -->
+    <div class="input-group">
+      <label>⚖️ Tagli & Prezzi</label>
+      <div class="variants-header">
+        <span style="max-width:90px">Taglio</span>
+        <span>Prezzo (€)</span>
+        <span style="width:32px"></span>
+      </div>
+      <div class="variants-editor" id="variants-editor"></div>
+      <button class="add-variant-btn" onclick="addFormVariant()">＋ Aggiungi Taglio</button>
+    </div>
+
     <button class="checkout-btn" onclick="saveProduct()">💾 Salva Prodotto</button>
   `;
+  renderVariantRows();
   document.getElementById('product-form-panel').classList.add('open');
 }
 
@@ -1340,8 +1506,10 @@ function handlePhotoUpload(e){
 
 async function saveProduct(){
   const name=document.getElementById('f-name').value.trim();
-  const price=parseFloat(document.getElementById('f-price').value);
-  if(!name||!price){ showToast('⚠️ Nome e prezzo sono obbligatori'); return; }
+  if(!name){ showToast('⚠️ Il nome è obbligatorio'); return; }
+  // Validate variants
+  const variants = formVariants.filter(v=>v.label && v.price>0);
+  if(!variants.length){ showToast('⚠️ Aggiungi almeno un taglio con prezzo'); return; }
   const cat=document.getElementById('f-cat').value;
   const tags=document.getElementById('f-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
   const prod={
@@ -1350,9 +1518,7 @@ async function saveProduct(){
     badge: cat, category: cat,
     origin: document.getElementById('f-origin').value||'Unknown',
     desc: document.getElementById('f-desc').value||'',
-    tags, price,
-    unit: document.getElementById('f-unit').value||'10g',
-    priceG: parseFloat(document.getElementById('f-priceg').value)||0,
+    tags, variants,
     photo: formPhoto
   };
   showToast('💾 Salvataggio...');
@@ -1373,11 +1539,13 @@ function showToast(msg){
 window.showView=showView; window.openCart=openCart; window.closePanel=closePanel;
 window.setFilter=setFilter; window.filterProducts=filterProducts;
 window.openDetail=openDetail; window.changeDetailQty=changeDetailQty;
+window.selectVariant=selectVariant; window.addFromDetail=addFromDetail;
 window.addToCart=addToCart; window.addToCartById=addToCartById; window.addToCartByIndex=addToCartByIndex;
 window.changeQty=changeQty; window.placeOrder=placeOrder;
 window.openLoginPanel=openLoginPanel; window.doLogin=doLogin; window.doLogout=doLogout;
 window.openProductForm=openProductForm; window.openAdminPanel=openAdminPanel; window.renderAdminList=renderAdminList;
-window.deleteProduct=deleteProduct; window.openProductForm=openProductForm;
+window.deleteProduct=deleteProduct;
+window.addFormVariant=addFormVariant; window.removeFormVariant=removeFormVariant; window.updateFormVariant=updateFormVariant;
 window.handlePhotoUpload=handlePhotoUpload; window.saveProduct=saveProduct;
 window.renderAffiliate=renderAffiliate; window.submitAffCode=submitAffCode;
 window.copyCode=copyCode; window.openAdminAffiliates=openAdminAffiliates;
