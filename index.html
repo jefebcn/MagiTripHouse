@@ -16,10 +16,13 @@
     --led-border: 0 0 6px rgba(61,255,110,.2);
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
-  /* Subtle green noise texture on bg */
+  body{background:linear-gradient(170deg,#06100a 0%,#080c08 45%,#070b07 100%);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+  /* Multi-orb ambient glow — atmospheric cannabis-shop neon feel */
   body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-    background:radial-gradient(ellipse at 50% 0%, rgba(61,255,110,.04) 0%, transparent 70%);
+    background:
+      radial-gradient(ellipse 70% 50% at -5% 8%,  rgba(61,255,110,.08) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 108% 88%, rgba(61,180,80,.06)  0%, transparent 60%),
+      radial-gradient(ellipse 50% 35% at 52% 105%, rgba(245,200,66,.05)  0%, transparent 55%);
   }
 
   /* ===== APP SHELL ===== */
@@ -60,6 +63,8 @@
   }  .header-right{display:flex;align-items:center;gap:10px;}
   .online-dot{display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;margin-right:4px;animation:pulse 2s infinite;box-shadow:var(--led-green);}
   @keyframes pulse{0%,100%{opacity:1;box-shadow:var(--led-green)}50%{opacity:.4;box-shadow:none}}
+  @keyframes cartBadgePop{0%{transform:scale(.4)}55%{transform:scale(1.35)}100%{transform:scale(1)}}
+  .cart-count.pop{animation:cartBadgePop .32s cubic-bezier(.36,.07,.19,.97) both;}
   .cart-btn{
     background:rgba(61,255,110,.07);border:1px solid rgba(61,255,110,.25);border-radius:10px;
     padding:8px 14px;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text);
@@ -129,15 +134,16 @@
 
   /* Products grid */
   .section-title{
-    padding:8px 16px 6px;font-family:'Fredoka One',cursive;font-size:.82rem;font-weight:400;
+    padding:8px 16px 6px;font-family:'Fredoka One',cursive;font-size:.92rem;font-weight:400;
     color:var(--green);text-transform:uppercase;letter-spacing:1.5px;text-shadow:var(--led-green);
   }
-  .products-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px 110px;}
+  .products-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px 130px;}
   .product-card{
     background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
     overflow:hidden;cursor:pointer;transition:border-color .25s,transform .2s,box-shadow .25s;
   }
   .product-card:hover{border-color:rgba(61,255,110,.5);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.5), 0 0 16px rgba(61,255,110,.1);}
+  .product-card:active{transform:scale(.96);box-shadow:0 2px 8px rgba(0,0,0,.6);}
   .product-img{
     aspect-ratio:1;background:var(--bg3);display:flex;align-items:center;justify-content:center;
     font-size:3.5rem;position:relative;overflow:hidden;
@@ -396,17 +402,23 @@
     box-shadow:var(--led-green);
   }
   .checkout-btn:hover{opacity:.9;transform:scale(.99);}
+  .checkout-btn:active{transform:scale(.97);}
   .checkout-btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;box-shadow:none;}
+  .checkout-btn{min-height:50px;}
 
-  /* Toast */
+  /* Toast — base + typed variants */
   #toast{
-    position:fixed;bottom:85px;left:50%;transform:translateX(-50%) translateY(16px);
-    background:#0a1a0c;border:1px solid var(--green);color:var(--green);border-radius:10px;
-    padding:10px 20px;font-weight:700;font-size:.82rem;z-index:999;opacity:0;transition:.3s;
+    position:fixed;bottom:85px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:#0a1a0c;border:1px solid var(--green);color:var(--green);border-radius:11px;
+    padding:10px 22px;font-weight:700;font-size:.82rem;z-index:999;opacity:0;
+    transition:opacity .25s, transform .25s;
     pointer-events:none;white-space:nowrap;box-shadow:var(--led-green);
     font-family:'Fredoka One',cursive;letter-spacing:.5px;
   }
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast.toast-error{background:#1a0606;border-color:var(--red);color:var(--red);box-shadow:0 0 12px rgba(232,59,59,.45);}
+  #toast.toast-warn{background:#1a1200;border-color:var(--gold);color:var(--gold);box-shadow:var(--led-gold);}
+  #toast.toast-info{background:#060f1a;border-color:var(--blue);color:var(--blue);box-shadow:0 0 12px rgba(59,130,246,.4);}
 
   textarea{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:inherit;font-size:.88rem;outline:none;resize:none;width:100%;}
   textarea:focus{border-color:rgba(61,255,110,.4);}
@@ -715,7 +727,7 @@
 <script type="module">
 // ===== FIREBASE SETUP =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 // ✅ Firebase Magic Trip House
@@ -767,8 +779,8 @@ const DEFAULT_PRODUCTS = [
 
 // ===== STATE =====
 let PRODUCTS = [];
-let cart = JSON.parse(localStorage.getItem('tp_cart') || '[]');
-let orders = JSON.parse(localStorage.getItem('tp_orders') || '[]');
+let cart   = (()=>{ try{ return JSON.parse(localStorage.getItem('tp_cart')||'[]'); }catch(e){ return []; } })();
+let orders = (()=>{ try{ return JSON.parse(localStorage.getItem('tp_orders')||'[]'); }catch(e){ return []; } })();
 let currentUser = localStorage.getItem('tp_user') || null;
 let isAdmin = (localStorage.getItem('tp_admin') === '1') &&
               (localStorage.getItem('tp_admin_user') === localStorage.getItem('tp_user'));
@@ -776,8 +788,9 @@ let currentFilter = 'all';
 let detailQty = 1;
 let detailVariant = null; // { label, price } currently selected variant
 let editingProductId = null;
-let formPhoto = '';      // public URL after Storage upload
-let formMediaType = 'image'; // 'image' | 'video'
+let formPhoto = '';
+let formMediaType = 'image';
+let _previewBlobUrl = null; // tracked so we can revoke on replacement
 
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = 'titan2024';
@@ -821,11 +834,22 @@ async function saveProductToFirebase(prod) {
   const id = editingProductId || String(Date.now());
   prod.id = id;
   prod.order = editingProductId ? (PRODUCTS.find(x=>x.id===editingProductId)?.order ?? 99) : Date.now();
-  await setDoc(doc(db, 'products', String(id)), prod);
+  try {
+    await setDoc(doc(db, 'products', String(id)), prod);
+  } catch(e) {
+    console.error('saveProduct error:', e);
+    showToast('❌ Errore salvataggio prodotto', 'error');
+    throw e;
+  }
 }
 
 async function deleteProductFromFirebase(id) {
-  await deleteDoc(doc(db, 'products', String(id)));
+  try {
+    await deleteDoc(doc(db, 'products', String(id)));
+  } catch(e) {
+    console.error('deleteProduct error:', e);
+    showToast('❌ Errore eliminazione', 'error');
+  }
 }
 
 function showLoadingGrid() {
@@ -923,7 +947,12 @@ function renderProducts(){
   document.getElementById('products-count').textContent = `${filtered.length} Prodott${filtered.length!==1?'i':'o'}`;
   const grid = document.getElementById('products-grid');
   if(!filtered.length){
-    grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px;font-size:.88rem">Nessun prodotto trovato 🌿</div>`;
+    const hasFilter = currentFilter!=='all' || search;
+    grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:44px 20px;font-size:.88rem">
+      <div style="font-size:2.2rem;margin-bottom:10px">🔍</div>
+      <div style="margin-bottom:${hasFilter?'14px':'0'}">Nessun prodotto trovato</div>
+      ${hasFilter?`<button onclick="setFilter('all');document.getElementById('search-input').value='';filterProducts()" style="background:rgba(61,255,110,.1);border:1px solid rgba(61,255,110,.3);border-radius:20px;padding:8px 18px;color:var(--green);font-size:.8rem;cursor:pointer;font-family:inherit;font-weight:700;transition:.2s">↺ Cancella filtri</button>`:''}
+    </div>`;
     return;
   }
   grid.innerHTML = filtered.map((p,idx)=>`
@@ -1046,7 +1075,7 @@ function selectVariant(vi, variants){
 function addFromDetail(pid){
   pid = String(pid);
   const qty = parseInt(document.getElementById('detail-qty').textContent)||1;
-  if(!detailVariant){ showToast('⚠️ Seleziona un formato'); return; }
+  if(!detailVariant){ showToast('⚠️ Seleziona un formato', 'warn'); return; }
   addToCartById(pid, qty, detailVariant);
   closePanel('detail-panel');
   showToast('✅ Aggiunto al carrello!');
@@ -1086,7 +1115,9 @@ function saveCart(){ localStorage.setItem('tp_cart',JSON.stringify(cart)); }
 function updateCartUI(){
   const total=cart.reduce((s,x)=>s+x.qty,0);
   const c=document.getElementById('cart-count');
+  const wasHidden = c.style.display==='none' || !c.style.display;
   c.textContent=total; c.style.display=total>0?'flex':'none';
+  if(total>0 && wasHidden){ c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
   document.getElementById('cart-label').textContent=total>0?`(${total})`:'Carrello';
 }
 function openCart(){ renderCartPanel(); document.getElementById('cart-panel').classList.add('open'); }
@@ -1112,7 +1143,7 @@ function renderCartPanel(){
         <div class="cart-item-price">€${item.variantPrice} × ${item.variantLabel} = €${lineTotal}</div>
       </div>
       <div class="cart-qty">
-        <button class="qty-btn" onclick="changeQty('${item.key}',-1)">−</button>
+        <button class="qty-btn" onclick="changeQty('${item.key}',-1)" ${item.qty<=1?'disabled style="opacity:.35;cursor:not-allowed"':''}>−</button>
         <span class="qty-num">${item.qty}</span>
         <button class="qty-btn" onclick="changeQty('${item.key}',1)">+</button>
       </div>
@@ -1133,9 +1164,10 @@ function placeOrder(){
     return p ? `${p.emoji||'🌿'} ${p.name} [${x.variantLabel}] ×${x.qty} — €${x.variantPrice*x.qty}` : null;
   }).filter(Boolean);
 
-  const tot=cart.reduce((s,x)=>s+(x.variantPrice*x.qty),0);
+  const tot=cart.reduce((s,x)=>s+((x.variantPrice||0)*(x.qty||0)),0);
 
-  const orderId='MTH-'+Date.now().toString(36).toUpperCase();
+  // Unique order ID with random suffix to prevent collisions
+  const orderId='MTH-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,5).toUpperCase();
   const date=new Date().toLocaleDateString('it-IT');
 
   const o={
@@ -1145,6 +1177,16 @@ function placeOrder(){
   };
   orders.unshift(o);
   localStorage.setItem('tp_orders',JSON.stringify(orders));
+
+  // Persist order to Firestore for admin visibility & audit trail
+  const cartSnapshot = cart.map(x=>({id:x.id, label:x.variantLabel, price:x.variantPrice, qty:x.qty}));
+  setDoc(doc(db,'orders',orderId),{
+    ...o,
+    user: currentUser||'Anonymous',
+    items_detail: cartSnapshot,
+    referredBy: localStorage.getItem('tp_ref')||null,
+    createdAt: Date.now()
+  }).catch(e=>console.warn('Order Firestore sync failed:',e));
 
   // 📲 Telegram WebApp native (if inside Telegram)
   if (window.Telegram?.WebApp) {
@@ -1283,15 +1325,15 @@ async function initAffiliate(username) {
 
 async function submitAffCode() {
   const input = document.getElementById('aff-code-input').value.trim().toUpperCase();
-  if (!input || input.length !== 6) { showToast('⚠️ Codice non valido (6 caratteri)'); return; }
-  if (!currentUser) { showToast('⚠️ Devi accedere prima'); return; }
-  if (!myAffData) { showToast('⚠️ Errore, riprova'); return; }
+  if (!input || input.length !== 6) { showToast('⚠️ Codice non valido (6 caratteri)', 'warn'); return; }
+  if (!currentUser) { showToast('⚠️ Devi accedere prima', 'warn'); return; }
+  if (!myAffData) { showToast('⚠️ Errore, riprova', 'warn'); return; }
 
   // Blocco 1: già ha un referrer
-  if (myAffData.referredBy) { showToast('⚠️ Hai già un affiliato registrato'); return; }
+  if (myAffData.referredBy) { showToast('⚠️ Hai già un affiliato registrato', 'warn'); return; }
 
   // Blocco 2: sta inserendo il proprio codice
-  if (input === myAffData.code) { showToast('⚠️ Non puoi usare il tuo stesso codice!'); return; }
+  if (input === myAffData.code) { showToast('⚠️ Non puoi usare il tuo stesso codice!', 'warn'); return; }
 
   // Blocco 3: trova chi possiede questo codice
   showToast('🔍 Verifica in corso...');
@@ -1299,14 +1341,14 @@ async function submitAffCode() {
   let referrerDoc = null;
   allSnap.forEach(d => { if (d.data().code === input) referrerDoc = d; });
 
-  if (!referrerDoc) { showToast('❌ Codice non trovato'); return; }
+  if (!referrerDoc) { showToast('❌ Codice non trovato', 'error'); return; }
 
   const referrerData = referrerDoc.data();
   const referrerUsername = referrerDoc.id;
 
   // Blocco 4: il referrer ha già impostato l'utente corrente come suo referrer (circolare)
   if (referrerData.referredBy === currentUser) {
-    showToast('❌ Riferimento circolare non consentito!'); return;
+    showToast('❌ Riferimento circolare non consentito!', 'error'); return;
   }
 
   // Blocco 5: il referrer stesso è stato invitato da qualcuno che è stato invitato da me (catena)
@@ -1314,7 +1356,7 @@ async function submitAffCode() {
   if (referrerData.referredBy) {
     const grandSnap = await getDoc(doc(db, 'affiliates', referrerData.referredBy));
     if (grandSnap.exists() && grandSnap.data().referredBy === currentUser) {
-      showToast('❌ Catena circolare non consentita!'); return;
+      showToast('❌ Catena circolare non consentita!', 'error'); return;
     }
   }
 
@@ -1473,7 +1515,7 @@ function openLoginPanel(){ closePanel('login-panel'); document.getElementById('l
 async function doLogin(){
   const u=document.getElementById('login-user').value.trim();
   const p=document.getElementById('login-pass').value.trim();
-  if(!u||!p){ showToast('⚠️ Inserisci username e password'); return; }
+  if(!u||!p){ showToast('⚠️ Inserisci username e password', 'warn'); return; }
   currentUser=u;
   localStorage.setItem('tp_user',u);
   if(u===ADMIN_USER&&p===ADMIN_PASS){
@@ -1656,16 +1698,21 @@ function handlePhotoUpload(e){
 
   // Remove old preview node and insert correct element
   area.querySelectorAll('img:not(#photo-file), video').forEach(n=>n.remove());
+  // Free previous blob URL to avoid memory leaks
+  if(_previewBlobUrl){ URL.revokeObjectURL(_previewBlobUrl); _previewBlobUrl = null; }
+  const objUrl = URL.createObjectURL(file);
+  _previewBlobUrl = objUrl;
+
   let previewEl;
   if(isVideo){
     previewEl = document.createElement('video');
     previewEl.muted = true; previewEl.loop = true; previewEl.playsInline = true; previewEl.autoplay = true;
     previewEl.style.cssText='width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px;display:block;';
-    previewEl.src = URL.createObjectURL(file);
+    previewEl.src = objUrl;
   } else {
     previewEl = document.createElement('img');
     previewEl.style.cssText='display:block;width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px';
-    previewEl.src = URL.createObjectURL(file);
+    previewEl.src = objUrl;
   }
   area.insertBefore(previewEl, area.firstChild);
 
@@ -1708,7 +1755,7 @@ function handlePhotoUpload(e){
       if(conf) conf.textContent='❌ Errore upload — riprova';
       conf.style.color='var(--red)';
       if(saveBtn) saveBtn.disabled = false;
-      showToast('❌ Errore upload file');
+      showToast('❌ Errore upload file', 'error');
     },
     async () => {
       const url = await getDownloadURL(uploadTask.snapshot.ref);
@@ -1725,9 +1772,9 @@ function handlePhotoUpload(e){
 
 async function saveProduct(){
   const name=document.getElementById('f-name').value.trim();
-  if(!name){ showToast('⚠️ Il nome è obbligatorio'); return; }
+  if(!name){ showToast('⚠️ Il nome è obbligatorio', 'warn'); return; }
   const variants = formVariants.filter(v=>v.label && v.price>0);
-  if(!variants.length){ showToast('⚠️ Aggiungi almeno un taglio con prezzo'); return; }
+  if(!variants.length){ showToast('⚠️ Aggiungi almeno un taglio con prezzo', 'warn'); return; }
   // Block if upload still in progress (button should already be disabled, but double-check)
   const saveBtn = document.getElementById('save-product-btn');
   if(saveBtn && saveBtn.disabled){ showToast('⏳ Attendi il completamento dell\'upload'); return; }
@@ -1782,16 +1829,28 @@ async function moveProduct(id, dir){
   if(!neighbor) return;
   const myOrder = PRODUCTS[idx].order ?? idx;
   const neighborOrder = neighbor.order ?? (idx + dir);
-  await setDoc(doc(db, 'products', String(PRODUCTS[idx].id)), {...PRODUCTS[idx], order: neighborOrder});
-  await setDoc(doc(db, 'products', String(neighbor.id)), {...neighbor, order: myOrder});
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'products', String(PRODUCTS[idx].id)), {...PRODUCTS[idx], order: neighborOrder});
+  batch.set(doc(db, 'products', String(neighbor.id)), {...neighbor, order: myOrder});
+  try {
+    await batch.commit();
+  } catch(e) {
+    console.error('moveProduct error:', e);
+    showToast('❌ Errore riordinamento', 'error');
+  }
 }
 
 // ===== UTILS =====
 function closePanel(id){ document.getElementById(id).classList.remove('open'); }
-function showToast(msg){
+function showToast(msg, type='success'){
   const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2500);
+  t.className=''; // clear all type classes
+  t.textContent=msg;
+  if(type==='error') t.classList.add('toast-error');
+  else if(type==='warn') t.classList.add('toast-warn');
+  else if(type==='info') t.classList.add('toast-info');
+  t.classList.add('show');
+  setTimeout(()=>{ t.classList.remove('show'); }, type==='error'?3500:2800);
 }
 
 // Expose to global scope (needed for onclick= in HTML with ES modules)
