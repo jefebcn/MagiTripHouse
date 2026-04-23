@@ -812,7 +812,7 @@ const firebaseConfig = {
 };
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
-const storage = getStorage(firebaseApp);
+const storage = getStorage(firebaseApp, `gs://${firebaseConfig.storageBucket}`);
 
 // ===== DEFAULT PRODUCTS =====
 const DEFAULT_PRODUCTS = [
@@ -1833,12 +1833,34 @@ function handlePhotoUpload(e){
       }
     },
     (err) => {
-      console.error('Upload error:', err);
+      console.error('Upload error code:', err.code, err.message);
       if(progWrap) progWrap.classList.remove('active');
-      if(conf) conf.textContent='❌ Errore upload — riprova';
-      conf.style.color='var(--red)';
+      // Map Firebase Storage error codes to Italian messages
+      const errorMessages = {
+        'storage/unauthorized':   '❌ Permessi Firebase negati — aggiungi le regole Storage',
+        'storage/canceled':       '⚠️ Upload annullato',
+        'storage/quota-exceeded': '❌ Quota Firebase Storage esaurita',
+        'storage/retry-limit-exceeded': '❌ Timeout — verifica la connessione',
+        'storage/invalid-checksum':     '❌ File corrotto — riprova',
+        'storage/unknown':        '❌ Errore sconosciuto: ' + (err.code||''),
+      };
+      const msg = errorMessages[err.code] || ('❌ Errore upload: ' + (err.code||err.message||'sconosciuto'));
+      if(conf){ conf.textContent = msg; conf.style.color='var(--red)'; }
       if(saveBtn) saveBtn.disabled = false;
-      showToast('❌ Errore upload file', 'error');
+      showToast(msg, 'error');
+      // If it's a permissions error, show extra guidance
+      if(err.code === 'storage/unauthorized'){
+        setTimeout(()=>{
+          const area = document.getElementById('photo-upload-area');
+          if(area && !area.querySelector('.storage-fix-hint')){
+            const hint = document.createElement('div');
+            hint.className = 'storage-fix-hint';
+            hint.style.cssText = 'font-size:.7rem;color:var(--gold);background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.25);border-radius:8px;padding:8px 10px;margin-top:8px;line-height:1.5';
+            hint.innerHTML = '⚙️ <b>Fix:</b> Vai su Firebase Console → Storage → Rules e incolla:<br><code style="font-size:.65rem;color:var(--green)">allow read, write: if true;</code>';
+            area.appendChild(hint);
+          }
+        }, 200);
+      }
     },
     async () => {
       const url = await getDownloadURL(uploadTask.snapshot.ref);
