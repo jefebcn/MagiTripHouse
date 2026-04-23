@@ -361,6 +361,8 @@
   .btn-edit:hover{background:rgba(59,130,246,.3);}
   .btn-del{background:rgba(232,59,59,.15);color:var(--red);border:1px solid rgba(232,59,59,.3);border-radius:7px;padding:5px 10px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.2s;}
   .btn-del:hover{background:rgba(232,59,59,.3);}
+  .btn-move{background:rgba(245,200,66,.1);color:var(--gold);border:1px solid rgba(245,200,66,.3);border-radius:7px;padding:5px 8px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.2s;line-height:1;}
+  .btn-move:hover{background:rgba(245,200,66,.25);}
   .btn-add-product{
     background:var(--bg3);border:2px dashed var(--border);border-radius:12px;
     padding:14px;font-size:.88rem;font-weight:600;color:var(--muted);cursor:pointer;
@@ -434,6 +436,16 @@
     color:#fff;letter-spacing:.5px;backdrop-filter:blur(4px);
   }
 
+  /* ===== ESAURITO BADGE ===== */
+  .badge-esaurito{
+    position:absolute;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.52);border-radius:inherit;
+    font-size:.75rem;font-weight:900;color:#ff4444;letter-spacing:1.5px;
+    border:2px solid rgba(255,68,68,.55);
+  }
+  .card-esaurito .product-img{filter:grayscale(.4);}
+  .card-esaurito .product-name{color:var(--muted);}
+
   /* ===== UPLOAD PROGRESS ===== */
   .upload-progress-wrap{
     display:none;flex-direction:column;gap:7px;
@@ -460,8 +472,8 @@
   .upload-status-row{font-size:.7rem;color:var(--muted);display:flex;align-items:center;gap:5px;}
   .upload-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1s infinite;flex-shrink:0;}
 
-  /* Photo-upload area — video preview */
-  .photo-upload video{width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px;display:block;}
+  /* Photo-upload area — video preview (pointer-events:none so clicks pass through to the parent picker) */
+  .photo-upload video{width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:8px;display:block;pointer-events:none;}
   .variants-editor{display:flex;flex-direction:column;gap:8px;}
   .variant-row{display:flex;gap:8px;align-items:center;}
   .variant-row input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:.85rem;font-family:inherit;outline:none;transition:border-color .2s;}
@@ -915,18 +927,19 @@ function renderProducts(){
     return;
   }
   grid.innerHTML = filtered.map((p,idx)=>`
-    <div class="product-card" onclick="openDetail(${idx})">
+    <div class="product-card${p.stock===0?' card-esaurito':''}" onclick="openDetail(${idx})">
       <div class="product-img">
         ${mediaTag(p,'card')}
         <span class="emoji-fallback" ${p.photo?'style="display:none"':''}>${p.emoji||'🌿'}</span>
         <div class="product-badge ${p.badge}">${getBadgeLabel(p.badge)}</div>
+        ${p.stock===0?'<div class="badge-esaurito">ESAURITO</div>':''}
       </div>
       <div class="product-info">
         <div class="product-name">${p.name}</div>
         <div class="product-desc">${p.desc.substring(0,58)}…</div>
         <div class="product-footer">
           <div class="product-price">Da €${getMinPrice(p)} <span>${p.variants?p.variants.length+' tagli':''}</span></div>
-          <button class="choose-btn" onclick="event.stopPropagation();openDetail(${idx})">Scegli ›</button>
+          <button class="choose-btn" ${p.stock===0?'disabled style="opacity:.45;pointer-events:none"':''} onclick="event.stopPropagation();openDetail(${idx})">Scegli ›</button>
         </div>
       </div>
     </div>
@@ -1005,7 +1018,10 @@ function openDetail(idx){
         <button onclick="changeDetailQty(1)">+</button>
       </div>
     </div>
-    <button class="checkout-btn" id="detail-add-btn" onclick="addFromDetail('${pid}')">🛒 Aggiungi al Carrello</button>
+    ${p.stock===0
+      ? `<button class="checkout-btn" disabled style="opacity:.45;pointer-events:none">❌ Prodotto Esaurito</button>`
+      : `<button class="checkout-btn" id="detail-add-btn" onclick="addFromDetail('${pid}')">🛒 Aggiungi al Carrello</button>`
+    }
   `;
   renderDetailPrice();
   document.getElementById('detail-panel').classList.add('open');
@@ -1502,12 +1518,14 @@ function renderAdminList(){
     const variantInfo = variants.length ? `Da €${minPrice} · ${variants.length} tagli` : `€${p.price||0}`;
     return `
     <div class="admin-item">
-      <div class="admin-thumb">${p.photo?`<img src="${p.photo}">`:(p.emoji||'🌿')}</div>
+      <div class="admin-thumb">${p.photo?(p.mediaType==='video'?`<div style="background:#111;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;border-radius:8px">▶</div>`:`<img src="${p.photo}">`):(p.emoji||'🌿')}</div>
       <div class="admin-item-info">
         <div class="admin-item-name">${p.name}</div>
-        <div class="admin-item-price">${variantInfo}</div>
+        <div class="admin-item-price">${variantInfo}${p.stock===0?' · <span style="color:var(--red);font-weight:700">ESAURITO</span>':(p.stock!=null?' · 📦 '+p.stock:'')}</div>
       </div>
       <div class="admin-item-actions">
+        <button class="btn-move" onclick="moveProduct('${p.id}',-1)" title="Sposta su">↑</button>
+        <button class="btn-move" onclick="moveProduct('${p.id}',1)" title="Sposta giù">↓</button>
         <button class="btn-edit" onclick="openProductForm('${p.id}')">Modifica</button>
         <button class="btn-del" onclick="deleteProduct('${p.id}')">Elimina</button>
       </div>
@@ -1604,6 +1622,8 @@ function openProductForm(id){
         </select></div>
       <div class="input-group full"><label>Tag (separati da virgola)</label>
         <input type="text" id="f-tags" value="${(p?.tags||[]).join(', ')}" placeholder="Indoor, Sativa, THC 22%"></div>
+      <div class="input-group"><label>📦 Giacenza (vuoto = illimitata)</label>
+        <input type="number" id="f-stock" value="${p?.stock!=null?p.stock:''}" placeholder="es. 10" min="0" step="1"></div>
     </div>
 
     <!-- VARIANT EDITOR -->
@@ -1713,6 +1733,7 @@ async function saveProduct(){
   if(saveBtn && saveBtn.disabled){ showToast('⏳ Attendi il completamento dell\'upload'); return; }
   const cat=document.getElementById('f-cat').value;
   const tags=document.getElementById('f-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  const stockVal = document.getElementById('f-stock').value;
   const prod={
     name: name.toUpperCase(),
     emoji: document.getElementById('f-emoji').value||'🌿',
@@ -1721,7 +1742,8 @@ async function saveProduct(){
     desc: document.getElementById('f-desc').value||'',
     tags, variants,
     photo: formPhoto,
-    mediaType: formMediaType   // 'image' | 'video'
+    mediaType: formMediaType,
+    stock: stockVal!=='' ? parseInt(stockVal) : null
   };
   showToast('💾 Salvataggio...');
   await saveProductToFirebase(prod);
@@ -1752,6 +1774,18 @@ function closeLightbox(){
 // Close lightbox on Escape key
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLightbox(); });
 
+// ===== PRODUCT REORDER =====
+async function moveProduct(id, dir){
+  const idx = PRODUCTS.findIndex(p => p.id === id);
+  if(idx < 0) return;
+  const neighbor = PRODUCTS[idx + dir];
+  if(!neighbor) return;
+  const myOrder = PRODUCTS[idx].order ?? idx;
+  const neighborOrder = neighbor.order ?? (idx + dir);
+  await setDoc(doc(db, 'products', String(PRODUCTS[idx].id)), {...PRODUCTS[idx], order: neighborOrder});
+  await setDoc(doc(db, 'products', String(neighbor.id)), {...neighbor, order: myOrder});
+}
+
 // ===== UTILS =====
 function closePanel(id){ document.getElementById(id).classList.remove('open'); }
 function showToast(msg){
@@ -1773,6 +1807,7 @@ window.openProductForm=openProductForm; window.openAdminPanel=openAdminPanel; wi
 window.deleteProduct=deleteProduct;
 window.addFormVariant=addFormVariant; window.removeFormVariant=removeFormVariant; window.updateFormVariant=updateFormVariant;
 window.handlePhotoUpload=handlePhotoUpload; window.saveProduct=saveProduct;
+window.moveProduct=moveProduct;
 window.renderAffiliate=renderAffiliate; window.submitAffCode=submitAffCode;
 window.copyCode=copyCode; window.openAdminAffiliates=openAdminAffiliates;
 </script>
