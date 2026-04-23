@@ -527,6 +527,58 @@
 
   /* Cart item variant tag */
   .cart-item-variant{font-size:.68rem;color:var(--gold);margin-top:1px;}
+
+  /* ===== SKELETON LOADING ===== */
+  @keyframes skeleton-shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+  .skeleton-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .skeleton-img{padding-bottom:100%;background:var(--bg3);position:relative;}
+  .skeleton-info{padding:11px;display:flex;flex-direction:column;gap:8px;}
+  .skeleton-line{height:10px;border-radius:5px;}
+  .skeleton-shine{
+    background:linear-gradient(90deg,var(--bg3) 0%,rgba(61,255,110,.07) 50%,var(--bg3) 100%);
+    background-size:800px 100%;animation:skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+  @media(prefers-reduced-motion:reduce){.skeleton-shine{animation:none;}}
+
+  /* ===== CARD ENTRANCE ANIMATION ===== */
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+  .product-card{will-change:transform;animation:fadeInUp .35s ease both;}
+  @media(prefers-reduced-motion:reduce){.product-card{animation:none;}}
+
+  /* ===== ADMIN ORDERS PANEL ===== */
+  .admin-orders-list{display:flex;flex-direction:column;gap:12px;}
+  .order-admin-item{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;}
+  .order-admin-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .order-admin-id{font-family:'Fredoka One',cursive;font-size:.9rem;color:var(--green);text-shadow:var(--led-green);}
+  .order-admin-meta{font-size:.7rem;color:var(--muted);margin-top:2px;}
+  .order-admin-total{font-family:'Fredoka One',cursive;font-size:1.25rem;color:var(--gold);text-shadow:var(--led-gold);flex-shrink:0;}
+  .order-admin-items{font-size:.76rem;color:var(--muted);line-height:1.55;}
+  .order-admin-note{font-size:.73rem;color:var(--muted);background:var(--bg);border-radius:7px;padding:7px 10px;border-left:2px solid var(--gold);}
+  .order-status-wrap{display:flex;gap:6px;flex-wrap:wrap;}
+  .status-btn{border-radius:20px;padding:5px 11px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--bg);color:var(--muted);transition:.2s;white-space:nowrap;}
+  .status-btn:hover{border-color:var(--muted);}
+  .status-btn.active-pending{background:rgba(255,107,53,.15);color:var(--orange);border-color:rgba(255,107,53,.4);}
+  .status-btn.active-shipped{background:rgba(59,130,246,.15);color:var(--blue);border-color:rgba(59,130,246,.4);}
+  .status-btn.active-delivered{background:rgba(61,255,110,.12);color:var(--green);border-color:rgba(61,255,110,.4);}
+  .btn-contact-tg{width:100%;padding:9px;border-radius:9px;font-family:inherit;font-size:.78rem;font-weight:700;cursor:pointer;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);color:var(--blue);transition:.2s;text-align:center;}
+  .btn-contact-tg:hover{background:rgba(59,130,246,.22);}
+
+  /* ===== DRAG-DROP PHOTO UPLOAD ===== */
+  .photo-upload{transition:border-color .2s,background .2s,transform .2s;}
+  .photo-upload.drag-over{border-color:var(--green)!important;background:rgba(61,255,110,.07)!important;transform:scale(1.02);}
+
+  /* ===== SHARE & LOW STOCK ===== */
+  .share-btn{
+    flex:1;padding:12px;border-radius:10px;font-family:inherit;font-size:.85rem;font-weight:700;
+    cursor:pointer;background:rgba(61,255,110,.07);border:1px solid rgba(61,255,110,.25);
+    color:var(--green);transition:.2s;
+  }
+  .share-btn:hover{background:rgba(61,255,110,.15);}
+  .low-stock-warn{font-size:.65rem;color:var(--orange);font-weight:700;margin-top:2px;}
+
+  /* ===== SWIPE HANDLE EXPANDED HIT AREA ===== */
+  .panel-handle{cursor:grab;padding:8px 0;margin:-8px auto -14px;}
+  .panel-handle:active{cursor:grabbing;}
 </style>
 </head>
 <body>
@@ -686,6 +738,14 @@
       <div class="panel-title">⚙️ Gestisci Prodotti</div>
     </div>
     <button class="btn-add-product" onclick="openProductForm(null)">＋ Aggiungi Prodotto</button>
+    <div style="background:rgba(61,255,110,.06);border:1px solid rgba(61,255,110,.22);border-radius:12px;padding:12px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openAdminOrders()">
+      <span style="font-size:1.4rem">📋</span>
+      <div>
+        <div style="font-family:'Fredoka One',cursive;font-size:.92rem;color:var(--green)">Gestione Ordini</div>
+        <div style="font-size:.72rem;color:var(--muted)">Visualizza e aggiorna ordini</div>
+      </div>
+      <span style="margin-left:auto;color:var(--muted)">›</span>
+    </div>
     <div style="background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.25);border-radius:12px;padding:12px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openAdminAffiliates()">
       <span style="font-size:1.4rem">🤝</span>
       <div>
@@ -695,6 +755,17 @@
       <span style="margin-left:auto;color:var(--muted)">›</span>
     </div>
     <div class="admin-list" id="admin-list"></div>
+  </div>
+</div>
+
+<!-- ADMIN ORDERS PANEL -->
+<div class="panel" id="admin-orders-panel">
+  <div class="panel-overlay" onclick="closePanel('admin-orders-panel')"></div>
+  <div class="panel-content">
+    <div class="panel-handle"></div>
+    <div class="panel-title">📋 Gestione Ordini</div>
+    <div style="font-size:.75rem;color:var(--muted)">Aggiorna lo stato e contatta i clienti</div>
+    <div class="admin-orders-list" id="admin-orders-list"></div>
   </div>
 </div>
 
@@ -790,7 +861,8 @@ let detailVariant = null; // { label, price } currently selected variant
 let editingProductId = null;
 let formPhoto = '';
 let formMediaType = 'image';
-let _previewBlobUrl = null; // tracked so we can revoke on replacement
+let _previewBlobUrl = null;
+let _productsUnsubscribe = null; // ref to Firestore onSnapshot unsubscribe
 
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = 'titan2024';
@@ -799,8 +871,8 @@ const ADMIN_PASS = 'titan2024';
 async function loadProductsFromFirebase() {
   try {
     showLoadingGrid();
-    // Real-time listener senza orderBy per evitare errori di indice
-    onSnapshot(collection(db, 'products'), (snapshot) => {
+    if(_productsUnsubscribe){ _productsUnsubscribe(); }
+    _productsUnsubscribe = onSnapshot(collection(db, 'products'), (snapshot) => {
       if (snapshot.empty) {
         seedDefaultProducts();
       } else {
@@ -853,11 +925,15 @@ async function deleteProductFromFirebase(id) {
 }
 
 function showLoadingGrid() {
-  document.getElementById('products-grid').innerHTML = `
-    <div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px">
-      <div style="font-size:2rem;margin-bottom:8px;animation:pulse 1s infinite">⚡</div>
-      Caricamento prodotti...
-    </div>`;
+  document.getElementById('products-grid').innerHTML = Array(6).fill(0).map(()=>`
+    <div class="skeleton-card">
+      <div class="skeleton-img skeleton-shine"></div>
+      <div class="skeleton-info">
+        <div class="skeleton-line skeleton-shine" style="width:80%"></div>
+        <div class="skeleton-line skeleton-shine" style="width:60%"></div>
+        <div class="skeleton-line skeleton-shine" style="width:45%;margin-top:2px"></div>
+      </div>
+    </div>`).join('');
 }
 
 // ===== INIT =====
@@ -876,8 +952,9 @@ window.onload = async () => {
   renderOrders();
   renderAccount();
   buildMarquee();
-  // Se già loggato, inizializza affiliato in background
   if (currentUser) initAffiliate(currentUser);
+  // Initialize swipe-to-close on all panels
+  ['cart-panel','detail-panel','login-panel','admin-panel','admin-orders-panel','admin-aff-panel','product-form-panel'].forEach(initSwipeToClose);
 };
 
 function buildMarquee(){
@@ -941,7 +1018,7 @@ function renderProducts(){
   const search = document.getElementById('search-input').value.toLowerCase();
   const filtered = PRODUCTS.filter(p=>{
     const matchCat = currentFilter==='all' || p.category===currentFilter || p.badge===currentFilter;
-    const matchSearch = !search || p.name.toLowerCase().includes(search) || p.desc.toLowerCase().includes(search) || p.origin.toLowerCase().includes(search);
+    const matchSearch = !search || p.name.toLowerCase().includes(search) || p.desc.toLowerCase().includes(search) || p.origin.toLowerCase().includes(search) || (p.tags||[]).some(t=>t.toLowerCase().includes(search));
     return matchCat && matchSearch;
   });
   document.getElementById('products-count').textContent = `${filtered.length} Prodott${filtered.length!==1?'i':'o'}`;
@@ -956,7 +1033,7 @@ function renderProducts(){
     return;
   }
   grid.innerHTML = filtered.map((p,idx)=>`
-    <div class="product-card${p.stock===0?' card-esaurito':''}" onclick="openDetail(${idx})">
+    <div class="product-card${p.stock===0?' card-esaurito':''}" onclick="openDetail(${idx})" style="animation-delay:${Math.min(idx,8)*0.05}s">
       <div class="product-img">
         ${mediaTag(p,'card')}
         <span class="emoji-fallback" ${p.photo?'style="display:none"':''}>${p.emoji||'🌿'}</span>
@@ -980,7 +1057,7 @@ function getFilteredProducts(){
   const search = document.getElementById('search-input').value.toLowerCase();
   return PRODUCTS.filter(p=>{
     const matchCat = currentFilter==='all' || p.category===currentFilter || p.badge===currentFilter;
-    const matchSearch = !search || p.name.toLowerCase().includes(search) || p.desc.toLowerCase().includes(search) || p.origin.toLowerCase().includes(search);
+    const matchSearch = !search || p.name.toLowerCase().includes(search) || p.desc.toLowerCase().includes(search) || p.origin.toLowerCase().includes(search) || (p.tags||[]).some(t=>t.toLowerCase().includes(search));
     return matchCat && matchSearch;
   });
 }
@@ -1051,6 +1128,9 @@ function openDetail(idx){
       ? `<button class="checkout-btn" disabled style="opacity:.45;pointer-events:none">❌ Prodotto Esaurito</button>`
       : `<button class="checkout-btn" id="detail-add-btn" onclick="addFromDetail('${pid}')">🛒 Aggiungi al Carrello</button>`
     }
+    <div style="display:flex;gap:8px">
+      <button class="share-btn" onclick="shareProduct('${pid}')">📤 Condividi</button>
+    </div>
   `;
   renderDetailPrice();
   document.getElementById('detail-panel').classList.add('open');
@@ -1078,7 +1158,7 @@ function addFromDetail(pid){
   if(!detailVariant){ showToast('⚠️ Seleziona un formato', 'warn'); return; }
   addToCartById(pid, qty, detailVariant);
   closePanel('detail-panel');
-  showToast('✅ Aggiunto al carrello!');
+  showToast('✅ Aggiunto al carrello!'); haptic(60);
 }
 
 function changeDetailQty(d){ detailQty=Math.max(1,detailQty+d); document.getElementById('detail-qty').textContent=detailQty; }
@@ -1101,7 +1181,7 @@ function addToCartById(id, qty=1, variant){
   const e = cart.find(x=>x.key===key);
   if(e) e.qty+=qty;
   else cart.push({key, id, variantLabel:v.label, variantPrice:v.price, qty});
-  saveCart(); updateCartUI(); showToast('✅ Aggiunto al carrello!');
+  saveCart(); updateCartUI(); showToast('✅ Aggiunto al carrello!'); haptic(60);
 }
 function addToCart(id, qty=1){ addToCartById(id, qty); }
 
@@ -1135,12 +1215,15 @@ function renderCartPanel(){
     const p=PRODUCTS.find(x=>String(x.id)===String(item.id)); if(!p) return '';
     const lineTotal = item.variantPrice * item.qty;
     tot += lineTotal;
+    const stockWarn = (p.stock!=null && p.stock>0 && p.stock<=5)
+      ? `<div class="low-stock-warn">⚠️ Rimangono solo ${p.stock} pezzi!</div>` : '';
     return `<div class="cart-item">
-      <div class="cart-item-thumb">${p.photo?`<img src="${p.photo}">`:(p.emoji||'🌿')}</div>
+      <div class="cart-item-thumb">${p.photo?(p.mediaType==='video'?`<div style="background:#111;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;border-radius:8px">▶</div>`:`<img src="${p.photo}">`):(p.emoji||'🌿')}</div>
       <div class="cart-item-info">
         <div class="cart-item-name">${p.name}</div>
         <div class="cart-item-variant">📦 Formato: ${item.variantLabel}</div>
         <div class="cart-item-price">€${item.variantPrice} × ${item.variantLabel} = €${lineTotal}</div>
+        ${stockWarn}
       </div>
       <div class="cart-qty">
         <button class="qty-btn" onclick="changeQty('${item.key}',-1)" ${item.qty<=1?'disabled style="opacity:.35;cursor:not-allowed"':''}>−</button>
@@ -1215,7 +1298,7 @@ function placeOrder(){
   cart=[]; saveCart(); updateCartUI();
   closePanel('cart-panel');
   renderOrders();
-  showToast('🎉 Ordine pronto! #'+orderId);
+  showToast('🎉 Ordine pronto! #'+orderId); haptic([80,40,80]);
 
   // Open Telegram with pre-filled message
   const tgUrl = 'https://t.me/magichous8?text=' + encodeURIComponent(msg);
@@ -1628,7 +1711,7 @@ function openProductForm(id){
     <div class="panel-title">${p?'✏️ Modifica Prodotto':'➕ Nuovo Prodotto'}</div>
 
     <!-- MEDIA UPLOAD -->
-    <div class="photo-upload" id="photo-upload-area" onclick="document.getElementById('photo-file').click()">
+    <div class="photo-upload" id="photo-upload-area" onclick="document.getElementById('photo-file').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');handlePhotoUpload({target:{files:event.dataTransfer.files}})" >
       <input type="file" id="photo-file" accept="image/*,video/mp4,video/mov,video/quicktime,video/webm" onchange="handlePhotoUpload(event)" style="display:none">
       ${mediaPreview}
       <div id="photo-placeholder" style="${formPhoto?'display:none':''}">
@@ -1853,6 +1936,118 @@ function showToast(msg, type='success'){
   setTimeout(()=>{ t.classList.remove('show'); }, type==='error'?3500:2800);
 }
 
+// ===== HAPTIC FEEDBACK =====
+function haptic(ms=50){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
+
+// ===== PRODUCT SHARE =====
+async function shareProduct(id){
+  const p = PRODUCTS.find(x=>String(x.id)===String(id));
+  if(!p) return;
+  const minP = getMinPrice(p);
+  const text = `🌿 *${p.name}*\n${p.desc}\n\nDa €${minP} — Magic Trip House\n👉 @magichous8`;
+  if(navigator.share){
+    try{ await navigator.share({title: p.name, text}); return; }catch(e){}
+  }
+  // Fallback: copy to clipboard
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('📋 Link copiato!', 'info');
+  } catch(e){
+    window.open('https://t.me/magichous8','_blank');
+  }
+}
+
+// ===== ADMIN ORDERS =====
+async function openAdminOrders(){
+  document.getElementById('admin-orders-panel').classList.add('open');
+  const list = document.getElementById('admin-orders-list');
+  list.innerHTML = `<div style="text-align:center;padding:32px;color:var(--muted)">
+    <div style="font-size:2rem;margin-bottom:8px;animation:pulse 1s infinite">⏳</div>Caricamento ordini...
+  </div>`;
+  try {
+    const snap = await getDocs(collection(db,'orders'));
+    if(snap.empty){
+      list.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);font-size:.85rem">Nessun ordine ancora 📭</div>';
+      return;
+    }
+    const data = snap.docs.map(d=>d.data()).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    list.innerHTML = data.map(o=>{
+      const statusLabel = {pending:'⏳ In Attesa',shipped:'📦 Spedito',delivered:'✅ Consegnato'};
+      return `<div class="order-admin-item" id="oi-${o.id}">
+        <div class="order-admin-header">
+          <div>
+            <div class="order-admin-id">#${o.id}</div>
+            <div class="order-admin-meta">${o.date||''} · ${o.user||'Anonimo'}</div>
+          </div>
+          <div class="order-admin-total">€${o.total||0}</div>
+        </div>
+        <div class="order-admin-items">${o.items||''}</div>
+        ${o.note?`<div class="order-admin-note">📝 ${o.note}</div>`:''}
+        <div class="order-status-wrap">
+          ${['pending','shipped','delivered'].map(s=>`
+            <button class="status-btn${o.status===s?' active-'+s:''}" onclick="updateOrderStatus('${o.id}','${s}')">
+              ${statusLabel[s]}
+            </button>`).join('')}
+        </div>
+        ${(o.user && o.user!=='Anonymous' && o.user!=='Anonimo')
+          ?`<button class="btn-contact-tg" onclick="window.open('https://t.me/${encodeURIComponent(o.user)}','_blank')">💬 Contatta @${o.user} su Telegram</button>`
+          :''}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    console.error('openAdminOrders error:', e);
+    list.innerHTML='<div style="text-align:center;padding:32px;color:var(--red);font-size:.85rem">❌ Errore caricamento ordini</div>';
+  }
+}
+
+async function updateOrderStatus(orderId, status){
+  try{
+    await setDoc(doc(db,'orders',orderId),{status},{merge:true});
+    // Update buttons in UI without full re-render
+    const item = document.getElementById('oi-'+orderId);
+    if(item){
+      item.querySelectorAll('.status-btn').forEach(btn=>{
+        btn.className='status-btn';
+        const s = btn.getAttribute('onclick').match(/'(\w+)'\)$/)?.[1];
+        if(s===status) btn.classList.add('active-'+s);
+      });
+    }
+    showToast('✅ Stato aggiornato');
+    haptic(40);
+  } catch(e){
+    showToast('❌ Errore aggiornamento stato', 'error');
+  }
+}
+
+// ===== SWIPE TO CLOSE PANELS =====
+function initSwipeToClose(panelId){
+  const panel = document.getElementById(panelId);
+  if(!panel) return;
+  const handle = panel.querySelector('.panel-handle');
+  const content = panel.querySelector('.panel-content');
+  if(!content) return;
+  let startY=0, isDragging=false, moved=0;
+  const target = handle || content;
+  target.addEventListener('touchstart', e=>{
+    startY = e.touches[0].clientY; isDragging=true; moved=0;
+    content.style.transition='none';
+  },{passive:true});
+  document.addEventListener('touchmove', e=>{
+    if(!isDragging) return;
+    moved = Math.max(0, e.touches[0].clientY - startY);
+    if(moved>0){ content.style.transform=`translateX(-50%) translateY(${moved}px)`; content.style.opacity=String(1-moved/350); }
+  },{passive:true});
+  document.addEventListener('touchend', ()=>{
+    if(!isDragging) return;
+    isDragging=false;
+    content.style.transition='';
+    content.style.transform='';
+    content.style.opacity='';
+    if(moved>80){ closePanel(panelId); haptic(30); }
+    moved=0;
+  },{passive:true});
+}
+
 // Expose to global scope (needed for onclick= in HTML with ES modules)
 window.openLightbox=openLightbox; window.closeLightbox=closeLightbox;
 window.showView=showView; window.openCart=openCart; window.closePanel=closePanel;
@@ -1869,6 +2064,8 @@ window.handlePhotoUpload=handlePhotoUpload; window.saveProduct=saveProduct;
 window.moveProduct=moveProduct;
 window.renderAffiliate=renderAffiliate; window.submitAffCode=submitAffCode;
 window.copyCode=copyCode; window.openAdminAffiliates=openAdminAffiliates;
+window.openAdminOrders=openAdminOrders; window.updateOrderStatus=updateOrderStatus;
+window.shareProduct=shareProduct;
 </script>
 </body>
 </html>
