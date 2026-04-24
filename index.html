@@ -101,6 +101,26 @@
     border:1px solid rgba(245,200,66,.3);color:var(--gold);
     box-shadow:0 0 20px rgba(245,200,66,.08), inset 0 1px 0 rgba(245,200,66,.1);
   }
+  .banner-channel{
+    background:linear-gradient(135deg,#0d1a2e,#0a1525);
+    border:1px solid rgba(59,130,246,.45);color:#7ab8f5;
+    box-shadow:0 0 22px rgba(59,130,246,.12), inset 0 1px 0 rgba(59,130,246,.12);
+    cursor:pointer;position:relative;overflow:hidden;transition:.18s;
+    text-decoration:none;display:flex;
+  }
+  .banner-channel::before{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(90deg,transparent,rgba(59,130,246,.07),transparent);
+    animation:shimmer 3s ease-in-out infinite;
+  }
+  .banner-channel:hover{border-color:rgba(59,130,246,.7);box-shadow:0 0 30px rgba(59,130,246,.2);}
+  .banner-channel:active{transform:scale(.99);}
+  .banner-disclaimer{
+    background:linear-gradient(135deg,#1e0e00,#2e1500);
+    border:1px solid rgba(255,107,53,.35);color:var(--orange);
+    box-shadow:0 0 18px rgba(255,107,53,.08), inset 0 1px 0 rgba(255,107,53,.1);
+  }
+  .banner-disclaimer b{color:#ffcf99;}
   .banner-sub{font-size:.72rem;font-weight:400;opacity:.85;margin-top:2px;}
   .banner-icon{font-size:1.6rem;flex-shrink:0;}
 
@@ -631,13 +651,20 @@
         <div class="banner-sub">📦 Consegna in 24/48h · Packaging discreto garantito 🇮🇹</div>
       </div>
     </div>
-    <div class="banner banner-vip">
-      <div class="banner-icon">💎</div>
-      <div>
-        <div>PER CLIENTI ABITUALI PREZZI TOP</div>
-        <div class="banner-sub">⭐ Fedeltà premiata — ad ogni ordine, sempre</div>
+    <a class="banner banner-channel" href="https://t.me/+x-k20v41qKk0NGJk" target="_blank" rel="noopener">
+      <div class="banner-icon">📢</div>
+      <div style="flex:1">
+        <div>ACCEDI AL NUOVO CANALE PRINCIPALE</div>
+        <div class="banner-sub">Tocca per entrare nel canale ufficiale aggiornato →</div>
       </div>
-      <span style="font-size:1.4rem;margin-left:auto">🔥</span>
+      <span style="font-size:1.3rem;margin-left:auto;opacity:.8">✈️</span>
+    </a>
+    <div class="banner banner-disclaimer">
+      <div class="banner-icon">⚠️</div>
+      <div>
+        <div>ACCOUNT PRINCIPALE LIMITATO</div>
+        <div class="banner-sub">Per scriverci salva prima il contatto <b>@magichous8</b></div>
+      </div>
     </div>
 
     <!-- Marquee -->
