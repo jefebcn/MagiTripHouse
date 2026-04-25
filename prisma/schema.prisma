@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String   @default("premium")
+  tags        String[]
+  variants    Json
+  stock       Int?
+  imageUrl    String?
+  mediaType   String?
+  emoji       String   @default("🌿")
+  badge       String?
+  origin      String?
+  sortOrder   Int      @default(99)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Order {
+  id         String   @id
+  userId     String
+  status     String   @default("pending")
+  total      Float
+  items      Json
+  note       String?
+  referredBy String?
+  createdAt  DateTime @default(now())
+}
+
+model Affiliate {
+  id         String    @id @default(cuid())
+  username   String    @unique
+  code       String    @unique
+  referredBy String?
+  referredAt DateTime?
+  joinedAt   DateTime  @default(now())
+}
+
+model NewsFeed {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  emoji       String   @default("📢")
+  productLink String?
+  createdAt   DateTime @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
