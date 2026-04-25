@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useUIStore } from '@/store/uiStore'
 import BottomNav from '@/components/layout/BottomNav'
 import AnnouncementBanner from '@/components/layout/AnnouncementBanner'
@@ -204,5 +205,3 @@ function AffiliatesView() {
   )
 }
 
-// React import for useState/useEffect in inline views
-import React from 'react'
