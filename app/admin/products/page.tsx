@@ -131,27 +131,69 @@ export default function AdminProducts() {
           </div>
 
           {/* Media upload */}
-          <div>
-            <div style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>
               Foto / Video
             </div>
+
+            {/* Preview */}
+            {form.imageUrl && (
+              <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden' }}>
+                {form.mediaType === 'video'
+                  ? <video src={form.imageUrl} style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  : <img src={form.imageUrl} alt="" style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} />
+                }
+                <button
+                  onClick={() => setForm((f) => ({ ...f, imageUrl: '', mediaType: 'image' }))}
+                  style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: 20, color: '#fff', fontSize: '.72rem', padding: '4px 9px', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  ✕ Rimuovi
+                </button>
+              </div>
+            )}
+
+            {/* File upload */}
             <div
               onClick={() => fileRef.current?.click()}
               style={{
-                border: '2px dashed rgba(61,255,110,.3)', borderRadius: 12, padding: 20,
+                border: '2px dashed rgba(61,255,110,.3)', borderRadius: 12, padding: 16,
                 textAlign: 'center', cursor: 'pointer', color: 'var(--muted)', fontSize: '.85rem',
               }}
             >
-              {form.imageUrl ? (
-                form.mediaType === 'video'
-                  ? <video src={form.imageUrl} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
-                  // eslint-disable-next-line @next/next/no-img-element
-                  : <img src={form.imageUrl} alt="" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
-              ) : (
-                <div>{uploading ? `Upload ${uploadProgress}%` : '📸 Tap per caricare'}</div>
-              )}
+              {uploading ? `⏳ Upload ${uploadProgress}%` : '📸 Carica nuovo file'}
             </div>
             <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={handleUpload} />
+
+            {/* Paste URL */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted)', fontSize: '.75rem' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              oppure incolla URL
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            </div>
+            <input
+              type="url"
+              placeholder="https://firebasestorage.googleapis.com/..."
+              value={form.imageUrl}
+              onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['image', 'video'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setForm((f) => ({ ...f, mediaType: t }))}
+                  style={{
+                    flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 600,
+                    background: form.mediaType === t ? 'rgba(61,255,110,.15)' : 'var(--bg3)',
+                    color: form.mediaType === t ? 'var(--green)' : 'var(--muted)',
+                    border: `1px solid ${form.mediaType === t ? 'rgba(61,255,110,.4)' : 'var(--border)'}`,
+                  }}
+                >
+                  {t === 'image' ? '🖼 Immagine' : '🎬 Video'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {inp('Nome prodotto', 'name')}
