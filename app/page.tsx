@@ -74,17 +74,97 @@ export default function Home() {
 // ---- Inline simple views ----
 
 function NewsView() {
+  const [subscribed, setSubscribed] = React.useState(false)
+  const [subLoading, setSubLoading] = React.useState(false)
+  const [hasPush, setHasPush] = React.useState(false)
+
+  React.useEffect(() => {
+    const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
+    setHasPush(supported)
+    if (supported) {
+      navigator.serviceWorker.ready.then((reg) =>
+        reg.pushManager.getSubscription().then((sub) => setSubscribed(!!sub))
+      )
+    }
+  }, [])
+
+  async function toggleSub() {
+    setSubLoading(true)
+    try {
+      const reg = await navigator.serviceWorker.ready
+      if (subscribed) {
+        const sub = await reg.pushManager.getSubscription()
+        if (sub) {
+          await sub.unsubscribe()
+          await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
+        }
+        setSubscribed(false)
+      } else {
+        const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+        const padding = '='.repeat((4 - (key.length % 4)) % 4)
+        const base64 = (key + padding).replace(/-/g, '+').replace(/_/g, '/')
+        const raw = window.atob(base64)
+        const arr = new Uint8Array(raw.length)
+        for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i)
+        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr })
+        await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
+        setSubscribed(true)
+      }
+    } catch { /* permission denied */ }
+    setSubLoading(false)
+  }
+
   return (
-    <div>
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', marginBottom: 16, letterSpacing: '.3px' }}>
-        📢 Novità
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {/* Channel header */}
+      <div style={{
+        background: 'linear-gradient(135deg, var(--bg2), var(--bg3))',
+        border: '1px solid rgba(61,255,110,.2)',
+        borderRadius: 'var(--radius)', padding: '20px 18px 18px',
+        marginBottom: 16,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+            background: 'rgba(61,255,110,.12)', border: '2px solid rgba(61,255,110,.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem',
+            boxShadow: '0 0 16px rgba(61,255,110,.15)',
+          }}>📡</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', letterSpacing: '.3px' }}>
+              Canale MagiTripHouse
+            </div>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 3 }}>
+              Novità, offerte e aggiornamenti esclusivi
+            </div>
+          </div>
+        </div>
+
+        {hasPush && (
+          <button
+            onClick={toggleSub}
+            disabled={subLoading}
+            style={{
+              marginTop: 14, width: '100%', padding: '11px',
+              borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
+              fontSize: '.85rem', cursor: 'pointer', transition: '.2s',
+              background: subscribed ? 'rgba(61,255,110,.12)' : 'rgba(61,255,110,.18)',
+              border: `1px solid rgba(61,255,110,${subscribed ? '.25' : '.45'})`,
+              color: subscribed ? 'var(--muted)' : 'var(--green)',
+            }}
+          >
+            {subLoading ? '...' : subscribed ? '🔕 Iscritto · Tocca per disiscriverti' : '🔔 Iscriviti alle notifiche'}
+          </button>
+        )}
       </div>
-      <NewsGrid />
+
+      {/* Feed */}
+      <NewsFeed />
     </div>
   )
 }
 
-function NewsGrid() {
+function NewsFeed() {
   const [news, setNews] = React.useState<NewsItem[]>([])
   const [loading, setLoading] = React.useState(true)
 
@@ -95,44 +175,67 @@ function NewsGrid() {
       .catch(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={{ color: 'var(--muted)', textAlign: 'center', padding: 32 }}>Caricamento...</div>
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {[1, 2, 3].map((i) => (
+        <div key={i} style={{ background: 'var(--card)', borderRadius: 'var(--radius)', height: 90, opacity: .5, animation: 'skeleton-shine 1.4s infinite' }} />
+      ))}
+    </div>
+  )
+
   if (!news.length) return (
-    <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>
-      <div style={{ fontSize: '3rem', marginBottom: 8 }}>📭</div>
-      <div>Nessuna novità per ora</div>
+    <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>
+      <div style={{ fontSize: '3rem', marginBottom: 10 }}>📭</div>
+      <div style={{ fontSize: '.88rem' }}>Nessun messaggio ancora</div>
+      <div style={{ fontSize: '.75rem', marginTop: 6, opacity: .6 }}>Iscriviti per ricevere le prime novità</div>
     </div>
   )
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {news.map((item, i) => (
         <div
           key={item.id}
           style={{
-            gridColumn: i === 0 ? '1 / -1' : undefined,
-            background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)',
-            borderRadius: 'var(--radius)', padding: 16,
-            animation: 'fadeInUp .35s ease both', animationDelay: `${i * 0.06}s`,
+            background: 'var(--card)', border: '1px solid rgba(61,255,110,.1)',
+            borderRadius: 'var(--radius)', padding: '16px 16px 14px',
+            animation: 'fadeInUp .3s ease both', animationDelay: `${i * 0.05}s`,
+            position: 'relative', overflow: 'hidden',
           }}
         >
-          <div style={{ fontSize: i === 0 ? '2rem' : '1.5rem', marginBottom: 8 }}>{item.emoji}</div>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: i === 0 ? '1.1rem' : '.9rem', marginBottom: 6 }}>
-            {item.title}
+          {/* left accent bar */}
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
+            background: 'linear-gradient(180deg, var(--green), rgba(61,255,110,.2))',
+          }} />
+          <div style={{ paddingLeft: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+              <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>{item.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', letterSpacing: '.2px' }}>
+                  {item.title}
+                </div>
+                <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 1 }}>
+                  {new Date(item.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            </div>
+            <div style={{ color: '#c8e6cb', fontSize: '.82rem', lineHeight: 1.65 }}>{item.content}</div>
+            {item.productLink && (
+              <a
+                href={item.productLink}
+                target="_blank"
+                rel="noopener"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  marginTop: 10, color: 'var(--green)', fontSize: '.78rem',
+                  fontWeight: 700, textDecoration: 'none',
+                }}
+              >
+                🛒 Scopri il prodotto →
+              </a>
+            )}
           </div>
-          <div style={{ color: 'var(--muted)', fontSize: '.78rem', lineHeight: 1.55 }}>{item.content}</div>
-          <div style={{ fontSize: '.65rem', color: 'var(--muted)', marginTop: 8, opacity: .7 }}>
-            {new Date(item.createdAt).toLocaleDateString('it-IT')}
-          </div>
-          {item.productLink && (
-            <a
-              href={item.productLink}
-              target="_blank"
-              rel="noopener"
-              style={{ display: 'inline-block', marginTop: 10, color: 'var(--green)', fontSize: '.75rem', fontWeight: 700 }}
-            >
-              Scopri →
-            </a>
-          )}
         </div>
       ))}
     </div>
