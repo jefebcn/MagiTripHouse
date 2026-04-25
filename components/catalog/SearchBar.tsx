@@ -5,7 +5,7 @@ export default function SearchBar() {
   const { search, setSearch } = useUIStore()
   return (
     <div style={{
-      margin: '8px 16px', display: 'flex', alignItems: 'center', gap: 10,
+      margin: '10px 16px 16px', display: 'flex', alignItems: 'center', gap: 10,
       background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12,
       padding: '10px 14px',
     }}>

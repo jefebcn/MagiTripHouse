@@ -77,29 +77,27 @@ function NewsView() {
   const [subscribed, setSubscribed] = React.useState(false)
   const [subLoading, setSubLoading] = React.useState(false)
   const [hasPush, setHasPush] = React.useState(false)
+  const [memberCount, setMemberCount] = React.useState<number | null>(null)
+  const [inside, setInside] = React.useState(false)
 
   React.useEffect(() => {
+    fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
     const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
     setHasPush(supported)
     if (supported) {
       navigator.serviceWorker.ready.then((reg) =>
-        reg.pushManager.getSubscription().then((sub) => setSubscribed(!!sub))
+        reg.pushManager.getSubscription().then((sub) => {
+          if (sub) { setSubscribed(true); setInside(true) }
+        })
       )
     }
   }, [])
 
-  async function toggleSub() {
+  async function joinChannel() {
     setSubLoading(true)
     try {
-      const reg = await navigator.serviceWorker.ready
-      if (subscribed) {
-        const sub = await reg.pushManager.getSubscription()
-        if (sub) {
-          await sub.unsubscribe()
-          await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
-        }
-        setSubscribed(false)
-      } else {
+      if (hasPush) {
+        const reg = await navigator.serviceWorker.ready
         const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
         const padding = '='.repeat((4 - (key.length % 4)) % 4)
         const base64 = (key + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -109,56 +107,110 @@ function NewsView() {
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr })
         await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
         setSubscribed(true)
+        setMemberCount(c => (c ?? 0) + 1)
       }
-    } catch { /* permission denied */ }
+    } catch { /* permission denied — entra comunque in view-only */ }
+    setInside(true)
     setSubLoading(false)
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* Channel header */}
-      <div style={{
-        background: 'linear-gradient(135deg, var(--bg2), var(--bg3))',
-        border: '1px solid rgba(61,255,110,.2)',
-        borderRadius: 'var(--radius)', padding: '20px 18px 18px',
-        marginBottom: 16,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{
-            width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
-            background: 'rgba(61,255,110,.12)', border: '2px solid rgba(61,255,110,.3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem',
-            boxShadow: '0 0 16px rgba(61,255,110,.15)',
-          }}>📡</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', letterSpacing: '.3px' }}>
-              Canale MagiTripHouse
-            </div>
-            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 3 }}>
-              Novità, offerte e aggiornamenti esclusivi
-            </div>
-          </div>
-        </div>
+  async function leaveChannel() {
+    try {
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.getSubscription()
+      if (sub) {
+        await sub.unsubscribe()
+        await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
+        setMemberCount(c => Math.max(0, (c ?? 1) - 1))
+      }
+    } catch { /* noop */ }
+    setSubscribed(false)
+    setInside(false)
+  }
 
-        {hasPush && (
-          <button
-            onClick={toggleSub}
-            disabled={subLoading}
-            style={{
-              marginTop: 14, width: '100%', padding: '11px',
-              borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
-              fontSize: '.85rem', cursor: 'pointer', transition: '.2s',
-              background: subscribed ? 'rgba(61,255,110,.12)' : 'rgba(61,255,110,.18)',
-              border: `1px solid rgba(61,255,110,${subscribed ? '.25' : '.45'})`,
-              color: subscribed ? 'var(--muted)' : 'var(--green)',
-            }}
-          >
-            {subLoading ? '...' : subscribed ? '🔕 Iscritto · Tocca per disiscriverti' : '🔔 Iscriviti alle notifiche'}
-          </button>
-        )}
+  /* ---- LANDING del canale ---- */
+  if (!inside) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 32, gap: 0 }}>
+      {/* Avatar canale */}
+      <div style={{
+        width: 88, height: 88, borderRadius: '50%',
+        background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.35), rgba(61,255,110,.08))',
+        border: '2px solid rgba(61,255,110,.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '2.6rem', boxShadow: '0 0 32px rgba(61,255,110,.2)',
+        marginBottom: 18,
+      }}>📡</div>
+
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', letterSpacing: '.4px', textAlign: 'center' }}>
+        MagiTripHouse
+      </div>
+      <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 6, textAlign: 'center' }}>
+        Canale ufficiale · Novità, offerte & aggiornamenti esclusivi
       </div>
 
-      {/* Feed */}
+      {/* Contatore iscritti */}
+      <div style={{
+        marginTop: 18, display: 'flex', alignItems: 'center', gap: 8,
+        background: 'var(--bg3)', border: '1px solid var(--border)',
+        borderRadius: 20, padding: '8px 18px',
+      }}>
+        <span style={{ fontSize: '1rem' }}>👥</span>
+        <span style={{ fontWeight: 700, fontSize: '.9rem', color: 'var(--green)' }}>
+          {memberCount ?? '—'}
+        </span>
+        <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>iscritti</span>
+      </div>
+
+      <button
+        onClick={joinChannel}
+        disabled={subLoading}
+        style={{
+          marginTop: 28, padding: '14px 40px',
+          borderRadius: 14, fontFamily: 'inherit', fontWeight: 700,
+          fontSize: '1rem', cursor: 'pointer', transition: '.2s',
+          background: 'rgba(61,255,110,.18)', border: '1.5px solid rgba(61,255,110,.5)',
+          color: 'var(--green)', boxShadow: '0 0 20px rgba(61,255,110,.15)',
+        }}
+      >
+        {subLoading ? '...' : '📡 Entra nel Canale'}
+      </button>
+
+      <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 12, textAlign: 'center', opacity: .7 }}>
+        Attiva le notifiche per non perderti nulla
+      </div>
+    </div>
+  )
+
+  /* ---- INTERNO del canale ---- */
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {/* Header interno */}
+      <div style={{
+        background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.15)',
+        borderRadius: 'var(--radius)', padding: '16px 18px',
+        display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20,
+      }}>
+        <div style={{
+          width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+          background: 'rgba(61,255,110,.12)', border: '1.5px solid rgba(61,255,110,.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem',
+        }}>📡</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem' }}>MagiTripHouse</div>
+          <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
+            👥 {memberCount ?? '—'} iscritti · {subscribed ? '🔔 Notifiche attive' : '🔕 Solo lettura'}
+          </div>
+        </div>
+        <button
+          onClick={leaveChannel}
+          style={{
+            background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.25)',
+            borderRadius: 20, padding: '6px 14px', color: 'var(--red)',
+            fontFamily: 'inherit', fontSize: '.72rem', fontWeight: 700, cursor: 'pointer',
+          }}
+        >Esci</button>
+      </div>
+
       <NewsFeed />
     </div>
   )

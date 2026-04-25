@@ -4,7 +4,7 @@ import { useCartStore } from '@/store/cartStore'
 
 const TABS = [
   { id: 'catalog',    label: 'Catalogo',  icon: '☰' },
-  { id: 'news',       label: 'Novità',    icon: '📢' },
+  { id: 'news',       label: 'Canale',    icon: '📡' },
   { id: 'orders',     label: 'Ordini',    icon: '📋' },
   { id: 'affiliates', label: 'Affiliati', icon: '👥' },
   { id: 'account',    label: 'Account',   icon: '👤' },

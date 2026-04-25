@@ -14,7 +14,7 @@ export default function CategoryFilter() {
   const { filter, setFilter } = useUIStore()
   return (
     <div style={{
-      display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 16px 4px',
+      display: 'flex', gap: 8, overflowX: 'auto', padding: '18px 16px 8px',
       scrollbarWidth: 'none',
     }}>
       {CATEGORIES.map((cat) => {
