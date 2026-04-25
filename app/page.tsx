@@ -173,26 +173,202 @@ function OrdersView() {
 
 interface OrderItem { id: string; total: number; date: string }
 
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const output = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; i++) output[i] = rawData.charCodeAt(i)
+  return output
+}
+
 function AccountView() {
   const { user } = useTelegram()
+  const [name, setName] = React.useState('')
+  const [editing, setEditing] = React.useState(false)
+  const [inputVal, setInputVal] = React.useState('')
+  const [pushEnabled, setPushEnabled] = React.useState(false)
+  const [pushLoading, setPushLoading] = React.useState(false)
+  const [hasSW, setHasSW] = React.useState(false)
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem('tp_user') ?? ''
+    const displayName = saved || user || ''
+    setName(displayName)
+    setInputVal(displayName)
+    const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
+    setHasSW(supported)
+    if (supported) {
+      navigator.serviceWorker.ready.then((reg) =>
+        reg.pushManager.getSubscription().then((sub) => setPushEnabled(!!sub))
+      )
+    }
+  }, [user])
+
+  function saveName() {
+    const t = inputVal.trim()
+    if (t) { localStorage.setItem('tp_user', t); setName(t) }
+    setEditing(false)
+  }
+
+  async function togglePush() {
+    setPushLoading(true)
+    try {
+      const reg = await navigator.serviceWorker.ready
+      if (pushEnabled) {
+        const sub = await reg.pushManager.getSubscription()
+        if (sub) {
+          await sub.unsubscribe()
+          await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
+        }
+        setPushEnabled(false)
+      } else {
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) })
+        await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
+        setPushEnabled(true)
+      }
+    } catch { /* permission denied or not supported */ }
+    setPushLoading(false)
+  }
+
+  const initial = name ? name[0].toUpperCase() : '?'
+  const hasName = !!name
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+      {/* Avatar + nome */}
       <div style={{
         background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)',
-        borderRadius: 'var(--radius)', padding: 24, textAlign: 'center',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+        borderRadius: 'var(--radius)', padding: '28px 20px 20px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
       }}>
         <div style={{
-          width: 70, height: 70, borderRadius: '50%', background: 'var(--green)',
+          width: 82, height: 82, borderRadius: '50%', flexShrink: 0,
+          background: hasName ? 'var(--green)' : 'var(--bg3)',
+          border: hasName ? 'none' : '2px dashed var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '2rem', fontWeight: 800, color: '#000',
-          fontFamily: "'Fredoka One', cursive", boxShadow: 'var(--led-green)',
+          fontSize: '2.4rem', fontWeight: 800, color: '#000',
+          fontFamily: "'Fredoka One', cursive",
+          boxShadow: hasName ? 'var(--led-green)' : 'none',
         }}>
-          {user ? user[0].toUpperCase() : '?'}
+          {initial}
         </div>
-        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem' }}>
-          {user || 'Utente'}
+
+        {editing ? (
+          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+            <input
+              autoFocus
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && saveName()}
+              placeholder="Il tuo nome o username..."
+              style={{
+                flex: 1, background: 'var(--bg3)', borderRadius: 10, outline: 'none',
+                border: '1px solid rgba(61,255,110,.4)', padding: '11px 14px',
+                color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit',
+              }}
+            />
+            <button onClick={saveName} style={{
+              background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.4)',
+              borderRadius: 10, padding: '0 18px', color: 'var(--green)',
+              fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer', fontSize: '1.1rem',
+            }}>✓</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', letterSpacing: '.3px' }}>
+              {name || 'Ospite'}
+            </div>
+            <button
+              onClick={() => { setEditing(true); setInputVal(name) }}
+              style={{
+                background: 'var(--bg3)', border: '1px solid var(--border)',
+                borderRadius: 20, padding: '7px 18px', color: 'var(--muted)',
+                fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
+              }}
+            >
+              {hasName ? '✏️ Modifica nome' : '👤 Imposta il tuo nome'}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Push notifications */}
+      {hasSW && (
+        <div style={{
+          background: 'var(--card)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)', padding: '16px 18px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '.9rem' }}>🔔 Notifiche Push</div>
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: 3 }}>
+              {pushEnabled ? 'Attive · ricevi news e offerte' : 'Disattive · tocca per abilitare'}
+            </div>
+          </div>
+          <button
+            onClick={togglePush}
+            disabled={pushLoading}
+            style={{
+              width: 50, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer',
+              background: pushEnabled ? 'var(--green)' : 'var(--bg3)',
+              position: 'relative', transition: '.25s', flexShrink: 0,
+              boxShadow: pushEnabled ? '0 0 12px rgba(61,255,110,.4)' : 'none',
+            }}
+          >
+            <div style={{
+              width: 22, height: 22, borderRadius: '50%', background: '#fff',
+              position: 'absolute', top: 3, transition: '.25s',
+              left: pushEnabled ? 25 : 3,
+              boxShadow: '0 1px 4px rgba(0,0,0,.3)',
+            }} />
+          </button>
         </div>
+      )}
+
+      {/* Telegram contatto */}
+      <a href="https://t.me/magichous8" target="_blank" rel="noopener" style={{
+        background: 'var(--card)', border: '1px solid rgba(59,130,246,.25)',
+        borderRadius: 'var(--radius)', padding: '16px 18px',
+        display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'var(--text)',
+      }}>
+        <div style={{
+          width: 46, height: 46, borderRadius: '50%', background: 'rgba(59,130,246,.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0,
+        }}>✈️</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: '.9rem' }}>Scrivici su Telegram</div>
+          <div style={{ fontSize: '.75rem', color: '#3b82f6', marginTop: 3 }}>@magichous8</div>
+        </div>
+        <span style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>›</span>
+      </a>
+
+      {/* Canale ufficiale */}
+      <a href="https://t.me/+x-k20v41qKk0NGJk" target="_blank" rel="noopener" style={{
+        background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)',
+        borderRadius: 'var(--radius)', padding: '16px 18px',
+        display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'var(--text)',
+      }}>
+        <div style={{
+          width: 46, height: 46, borderRadius: '50%', background: 'rgba(61,255,110,.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0,
+        }}>📢</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: '.9rem' }}>Canale Ufficiale</div>
+          <div style={{ fontSize: '.75rem', color: 'var(--green)', marginTop: 3 }}>Novità & Offerte esclusive</div>
+        </div>
+        <span style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>›</span>
+      </a>
+
+      {/* Disclaimer */}
+      <div style={{
+        background: 'rgba(232,59,59,.07)', border: '1px solid rgba(232,59,59,.2)',
+        borderRadius: 'var(--radius)', padding: '14px 16px',
+        fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6,
+      }}>
+        ⚠️ Account limitato? Salva prima il contatto <span style={{ color: 'var(--red)', fontWeight: 700 }}>@magichous8</span> prima di scrivere.
       </div>
     </div>
   )
