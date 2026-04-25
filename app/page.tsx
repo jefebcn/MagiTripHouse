@@ -25,14 +25,18 @@ function LedLine() {
 }
 
 export default function Home() {
-  const { view } = useUIStore()
-  useTelegram() // init TG WebApp
+  const { view, isLoggedIn, setView } = useUIStore()
+  useTelegram()
+
+  // Redirect gated views to account/login if not logged in
+  const gated = (content: React.ReactNode) =>
+    isLoggedIn ? content : <AuthGate />
 
   return (
     <main style={{ minHeight: '100dvh', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
       <LedLine />
 
-      {/* Catalog view */}
+      {/* Catalog — always visible */}
       <div style={{ display: view === 'catalog' ? 'block' : 'none' }}>
         <Header />
         <AnnouncementBanner />
@@ -42,27 +46,26 @@ export default function Home() {
         <ProductGrid />
       </div>
 
-      {/* News view */}
+      {/* Canale */}
       <div style={{ display: view === 'news' ? 'block' : 'none', padding: '16px 16px 100px' }}>
-        <NewsView />
+        {gated(<NewsView />)}
       </div>
 
-      {/* Orders view */}
+      {/* Ordini */}
       <div style={{ display: view === 'orders' ? 'block' : 'none', padding: '16px 16px 100px' }}>
-        <OrdersView />
+        {gated(<OrdersView />)}
       </div>
 
-      {/* Account view */}
+      {/* Account */}
       <div style={{ display: view === 'account' ? 'block' : 'none', padding: '16px 16px 100px' }}>
-        <AccountView />
+        {isLoggedIn ? <AccountView /> : <AuthView />}
       </div>
 
-      {/* Affiliates view */}
+      {/* Affiliati */}
       <div style={{ display: view === 'affiliates' ? 'block' : 'none', padding: '16px 16px 100px' }}>
-        <AffiliatesView />
+        {gated(<AffiliatesView />)}
       </div>
 
-      {/* Panels + overlays */}
       <CartDrawer />
       <ProductDetail />
       <Lightbox />
@@ -338,8 +341,7 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 function AccountView() {
-  const { user } = useTelegram()
-  const [name, setName] = React.useState('')
+  const { userName, login, logout } = useUIStore()
   const [editing, setEditing] = React.useState(false)
   const [inputVal, setInputVal] = React.useState('')
   const [pushEnabled, setPushEnabled] = React.useState(false)
@@ -347,10 +349,7 @@ function AccountView() {
   const [hasSW, setHasSW] = React.useState(false)
 
   React.useEffect(() => {
-    const saved = localStorage.getItem('tp_user') ?? ''
-    const displayName = saved || user || ''
-    setName(displayName)
-    setInputVal(displayName)
+    setInputVal(userName)
     const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
     setHasSW(supported)
     if (supported) {
@@ -358,11 +357,11 @@ function AccountView() {
         reg.pushManager.getSubscription().then((sub) => setPushEnabled(!!sub))
       )
     }
-  }, [user])
+  }, [userName])
 
   function saveName() {
     const t = inputVal.trim()
-    if (t) { localStorage.setItem('tp_user', t); setName(t) }
+    if (t) login(t)
     setEditing(false)
   }
 
@@ -387,8 +386,7 @@ function AccountView() {
     setPushLoading(false)
   }
 
-  const initial = name ? name[0].toUpperCase() : '?'
-  const hasName = !!name
+  const initial = userName ? userName[0].toUpperCase() : '?'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -401,12 +399,11 @@ function AccountView() {
       }}>
         <div style={{
           width: 82, height: 82, borderRadius: '50%', flexShrink: 0,
-          background: hasName ? 'var(--green)' : 'var(--bg3)',
-          border: hasName ? 'none' : '2px dashed var(--border)',
+          background: 'var(--green)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '2.4rem', fontWeight: 800, color: '#000',
           fontFamily: "'Fredoka One', cursive",
-          boxShadow: hasName ? 'var(--led-green)' : 'none',
+          boxShadow: 'var(--led-green)',
         }}>
           {initial}
         </div>
@@ -434,18 +431,26 @@ function AccountView() {
         ) : (
           <>
             <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', letterSpacing: '.3px' }}>
-              {name || 'Ospite'}
+              {userName}
             </div>
-            <button
-              onClick={() => { setEditing(true); setInputVal(name) }}
-              style={{
-                background: 'var(--bg3)', border: '1px solid var(--border)',
-                borderRadius: 20, padding: '7px 18px', color: 'var(--muted)',
-                fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
-              }}
-            >
-              {hasName ? '✏️ Modifica nome' : '👤 Imposta il tuo nome'}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => { setEditing(true); setInputVal(userName) }}
+                style={{
+                  background: 'var(--bg3)', border: '1px solid var(--border)',
+                  borderRadius: 20, padding: '7px 18px', color: 'var(--muted)',
+                  fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
+                }}
+              >✏️ Modifica nome</button>
+              <button
+                onClick={logout}
+                style={{
+                  background: 'rgba(232,59,59,.08)', border: '1px solid rgba(232,59,59,.25)',
+                  borderRadius: 20, padding: '7px 14px', color: 'var(--red)',
+                  fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
+                }}
+              >Esci</button>
+            </div>
           </>
         )}
       </div>
@@ -525,6 +530,105 @@ function AccountView() {
       }}>
         ⚠️ Account limitato? Salva prima il contatto <span style={{ color: 'var(--red)', fontWeight: 700 }}>@magichous8</span> prima di scrivere.
       </div>
+    </div>
+  )
+}
+
+/* ---- Auth components ---- */
+
+function AuthView() {
+  const { login } = useUIStore()
+  const [input, setInput] = React.useState('')
+  const [mode, setMode] = React.useState<'login' | 'register'>('register')
+  const [error, setError] = React.useState('')
+
+  function submit() {
+    const name = input.trim()
+    if (!name || name.length < 2) { setError('Inserisci almeno 2 caratteri'); return }
+    login(name)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 24, gap: 0 }}>
+      <div style={{
+        width: 78, height: 78, borderRadius: '50%',
+        background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.25), rgba(61,255,110,.06))',
+        border: '2px solid rgba(61,255,110,.35)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '2.2rem', marginBottom: 18, boxShadow: '0 0 24px rgba(61,255,110,.15)',
+      }}>👤</div>
+
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', marginBottom: 6 }}>
+        {mode === 'register' ? 'Crea Account' : 'Bentornato'}
+      </div>
+      <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: 28, textAlign: 'center' }}>
+        {mode === 'register'
+          ? 'Registrati per accedere al Canale, Ordini e Affiliati'
+          : 'Inserisci il tuo username per accedere'}
+      </div>
+
+      <div style={{ width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <input
+          autoFocus
+          value={input}
+          onChange={(e) => { setInput(e.target.value); setError('') }}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          placeholder="Il tuo nome o username..."
+          style={{
+            background: 'var(--bg3)', borderRadius: 12, outline: 'none',
+            border: `1px solid ${error ? 'rgba(232,59,59,.5)' : 'rgba(61,255,110,.3)'}`,
+            padding: '13px 16px', color: 'var(--text)', fontSize: '.95rem',
+            fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
+          }}
+        />
+        {error && <div style={{ fontSize: '.75rem', color: 'var(--red)', marginTop: -4 }}>{error}</div>}
+        <button
+          onClick={submit}
+          style={{
+            padding: '14px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
+            fontSize: '1rem', cursor: 'pointer', transition: '.2s',
+            background: 'rgba(61,255,110,.18)', border: '1.5px solid rgba(61,255,110,.5)',
+            color: 'var(--green)', boxShadow: '0 0 16px rgba(61,255,110,.12)',
+          }}
+        >
+          {mode === 'register' ? '🚀 Registrati' : '🔑 Accedi'}
+        </button>
+        <button
+          onClick={() => { setMode(mode === 'register' ? 'login' : 'register'); setError('') }}
+          style={{
+            background: 'none', border: 'none', color: 'var(--muted)',
+            fontSize: '.78rem', cursor: 'pointer', fontFamily: 'inherit', padding: 4,
+          }}
+        >
+          {mode === 'register' ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function AuthGate() {
+  const { setView } = useUIStore()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 60, gap: 0 }}>
+      <div style={{ fontSize: '3.5rem', marginBottom: 16, opacity: .7 }}>🔒</div>
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', marginBottom: 8 }}>
+        Accesso richiesto
+      </div>
+      <div style={{ fontSize: '.82rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 28, maxWidth: 240 }}>
+        Registrati o accedi con il tuo account per vedere questa sezione
+      </div>
+      <button
+        onClick={() => setView('account')}
+        style={{
+          padding: '13px 36px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
+          fontSize: '.95rem', cursor: 'pointer',
+          background: 'rgba(61,255,110,.18)', border: '1.5px solid rgba(61,255,110,.5)',
+          color: 'var(--green)', boxShadow: '0 0 16px rgba(61,255,110,.12)',
+        }}
+      >
+        👤 Vai all&apos;Account
+      </button>
     </div>
   )
 }
