@@ -4,6 +4,7 @@ import { useUIStore } from '@/store/uiStore'
 import BottomNav from '@/components/layout/BottomNav'
 import AnnouncementBanner from '@/components/layout/AnnouncementBanner'
 import Marquee from '@/components/layout/Marquee'
+import Header from '@/components/layout/Header'
 import CategoryFilter from '@/components/catalog/CategoryFilter'
 import SearchBar from '@/components/catalog/SearchBar'
 import ProductGrid from '@/components/catalog/ProductGrid'
@@ -33,6 +34,7 @@ export default function Home() {
 
       {/* Catalog view */}
       <div style={{ display: view === 'catalog' ? 'block' : 'none' }}>
+        <Header />
         <AnnouncementBanner />
         <Marquee />
         <CategoryFilter />
