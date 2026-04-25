@@ -23,8 +23,10 @@ interface UIState {
   // Auth
   userName: string
   userHandle: string
+  userRole: string
+  sessionToken: string
   isLoggedIn: boolean
-  login: (name: string, handle: string) => void
+  login: (name: string, handle: string, role: string, token: string) => void
   logout: () => void
 }
 
@@ -50,13 +52,23 @@ export const useUIStore = create<UIState>()(
       // Auth
       userName: '',
       userHandle: '',
+      userRole: '',
+      sessionToken: '',
       isLoggedIn: false,
-      login: (name, handle) => set({ userName: name, userHandle: handle, isLoggedIn: true }),
-      logout: () => set({ userName: '', userHandle: '', isLoggedIn: false, view: 'catalog' }),
+      login: (name, handle, role, token) =>
+        set({ userName: name, userHandle: handle, userRole: role, sessionToken: token, isLoggedIn: true }),
+      logout: () =>
+        set({ userName: '', userHandle: '', userRole: '', sessionToken: '', isLoggedIn: false, view: 'catalog' }),
     }),
     {
       name: 'tp_ui',
-      partialize: (s) => ({ userName: s.userName, userHandle: s.userHandle, isLoggedIn: s.isLoggedIn }),
+      partialize: (s) => ({
+        userName: s.userName,
+        userHandle: s.userHandle,
+        userRole: s.userRole,
+        sessionToken: s.sessionToken,
+        isLoggedIn: s.isLoggedIn,
+      }),
     }
   )
 )

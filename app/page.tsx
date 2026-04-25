@@ -79,9 +79,19 @@ export default function Home() {
   )
 }
 
+const inputStyle = (hasError?: boolean): React.CSSProperties => ({
+  background: 'var(--bg3)', borderRadius: 12, outline: 'none',
+  border: `1px solid ${hasError ? 'rgba(232,59,59,.5)' : 'rgba(61,255,110,.25)'}`,
+  padding: '13px 16px', color: 'var(--text)', fontSize: '.93rem',
+  fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
+})
+
 // ---- Inline simple views ----
 
 function NewsView() {
+  const { userRole, sessionToken } = useUIStore()
+  const isAdmin = userRole === 'admin'
+
   const [subscribed, setSubscribed] = React.useState(false)
   const [subLoading, setSubLoading] = React.useState(false)
   const [hasPush, setHasPush] = React.useState(false)
@@ -90,6 +100,16 @@ function NewsView() {
   const [pwaBannerDismissed, setPwaBannerDismissed] = React.useState(false)
   const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(null)
   const [isStandalone, setIsStandalone] = React.useState(false)
+
+  // Admin compose
+  const [composing, setComposing] = React.useState(false)
+  const [postEmoji, setPostEmoji] = React.useState('📢')
+  const [postTitle, setPostTitle] = React.useState('')
+  const [postContent, setPostContent] = React.useState('')
+  const [postLink, setPostLink] = React.useState('')
+  const [postLoading, setPostLoading] = React.useState(false)
+  const [postError, setPostError] = React.useState('')
+  const [newsFeed, setNewsFeed] = React.useState<NewsItem[] | null>(null)
 
   React.useEffect(() => {
     fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
@@ -294,12 +314,91 @@ function NewsView() {
         </div>
       )}
 
-      <NewsFeed />
+      {/* Admin compose panel */}
+      {isAdmin && (
+        <div style={{ marginBottom: 16 }}>
+          {!composing ? (
+            <button
+              onClick={() => setComposing(true)}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 12,
+                background: 'rgba(61,255,110,.1)', border: '1.5px dashed rgba(61,255,110,.4)',
+                color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700,
+                fontSize: '.9rem', cursor: 'pointer',
+              }}
+            >✏️ Pubblica nel canale</button>
+          ) : (
+            <div style={{
+              background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.25)',
+              borderRadius: 'var(--radius)', padding: '16px',
+              display: 'flex', flexDirection: 'column', gap: 10,
+            }}>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: 'var(--green)', marginBottom: 2 }}>
+                📝 Nuovo messaggio
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input placeholder="Emoji" value={postEmoji}
+                  onChange={e => setPostEmoji(e.target.value)}
+                  style={{ ...inputStyle(), width: 60, flexShrink: 0, textAlign: 'center', fontSize: '1.2rem' }} />
+                <input placeholder="Titolo" value={postTitle}
+                  onChange={e => setPostTitle(e.target.value)}
+                  style={{ ...inputStyle(), flex: 1 }} />
+              </div>
+              <textarea placeholder="Contenuto del messaggio..." value={postContent}
+                onChange={e => setPostContent(e.target.value)}
+                rows={4}
+                style={{
+                  ...inputStyle(), resize: 'vertical', lineHeight: 1.55,
+                  fontFamily: 'inherit', fontSize: '.88rem',
+                }} />
+              <input placeholder="Link prodotto (opzionale)" value={postLink}
+                onChange={e => setPostLink(e.target.value)}
+                style={inputStyle()} />
+              {postError && <div style={{ fontSize: '.75rem', color: 'var(--red)' }}>⚠️ {postError}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={async () => {
+                    if (!postTitle.trim() || !postContent.trim()) { setPostError('Titolo e contenuto obbligatori'); return }
+                    setPostLoading(true); setPostError('')
+                    try {
+                      const res = await fetch('/api/news', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+                        body: JSON.stringify({ emoji: postEmoji, title: postTitle.trim(), content: postContent.trim(), productLink: postLink.trim() || null }),
+                      })
+                      const item = await res.json()
+                      if (!res.ok) { setPostError(item.error ?? 'Errore'); setPostLoading(false); return }
+                      setNewsFeed(prev => [item, ...(prev ?? [])])
+                      setComposing(false); setPostTitle(''); setPostContent(''); setPostLink(''); setPostEmoji('📢')
+                    } catch { setPostError('Errore di rete') }
+                    setPostLoading(false)
+                  }}
+                  disabled={postLoading}
+                  style={{
+                    flex: 1, padding: '12px', borderRadius: 10, fontFamily: 'inherit', fontWeight: 700,
+                    fontSize: '.9rem', cursor: postLoading ? 'default' : 'pointer',
+                    background: 'rgba(61,255,110,.18)', border: '1px solid rgba(61,255,110,.45)', color: 'var(--green)',
+                  }}
+                >{postLoading ? '...' : '🚀 Pubblica'}</button>
+                <button
+                  onClick={() => { setComposing(false); setPostError('') }}
+                  style={{
+                    padding: '12px 16px', borderRadius: 10, fontFamily: 'inherit',
+                    background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer',
+                  }}
+                >Annulla</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <NewsFeed externalItems={newsFeed} />
     </div>
   )
 }
 
-function NewsFeed() {
+function NewsFeed({ externalItems }: { externalItems?: NewsItem[] | null }) {
   const [news, setNews] = React.useState<NewsItem[]>([])
   const [loading, setLoading] = React.useState(true)
 
@@ -310,6 +409,8 @@ function NewsFeed() {
       .catch(() => setLoading(false))
   }, [])
 
+  const displayNews = externalItems ?? news
+
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {[1, 2, 3].map((i) => (
@@ -318,7 +419,7 @@ function NewsFeed() {
     </div>
   )
 
-  if (!news.length) return (
+  if (!loading && !displayNews.length) return (
     <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>
       <div style={{ fontSize: '3rem', marginBottom: 10 }}>📭</div>
       <div style={{ fontSize: '.88rem' }}>Nessun messaggio ancora</div>
@@ -328,7 +429,7 @@ function NewsFeed() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {news.map((item, i) => (
+      {displayNews.map((item, i) => (
         <div
           key={item.id}
           style={{
@@ -421,7 +522,7 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 function AccountView() {
-  const { userName, userHandle, login, logout } = useUIStore()
+  const { userName, userHandle, userRole, sessionToken, login, logout } = useUIStore()
   const [editing, setEditing] = React.useState(false)
   const [inputVal, setInputVal] = React.useState('')
   const [pushEnabled, setPushEnabled] = React.useState(false)
@@ -441,7 +542,7 @@ function AccountView() {
 
   function saveName() {
     const t = inputVal.trim()
-    if (t) login(t, userHandle)
+    if (t) login(t, userHandle, userRole, sessionToken)
     setEditing(false)
   }
 
@@ -617,62 +718,26 @@ function AccountView() {
   )
 }
 
-/* ---- Auth utilities (client-side, SHA-256 via Web Crypto) ---- */
-
-async function hashPwd(pw: string) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-interface StoredAccount { name: string; handle: string; hash: string }
-
-function getAccounts(): StoredAccount[] {
-  try { return JSON.parse(localStorage.getItem('tp_accounts') ?? '[]') } catch { return [] }
-}
-
-async function doRegister(name: string, handle: string, password: string) {
-  const accounts = getAccounts()
-  if (accounts.some(a => a.handle.toLowerCase() === handle.toLowerCase()))
-    return { ok: false, error: 'Username già in uso' }
-  accounts.push({ name, handle, hash: await hashPwd(password) })
-  localStorage.setItem('tp_accounts', JSON.stringify(accounts))
-  return { ok: true }
-}
-
-async function doLogin(handle: string, password: string) {
-  const account = getAccounts().find(a => a.handle.toLowerCase() === handle.toLowerCase())
-  if (!account) return { ok: false, error: 'Username non trovato' }
-  if (await hashPwd(password) !== account.hash) return { ok: false, error: 'Password errata' }
-  return { ok: true, name: account.name }
-}
-
 /* ---- Auth components ---- */
-
-const inputStyle = (hasError?: boolean): React.CSSProperties => ({
-  background: 'var(--bg3)', borderRadius: 12, outline: 'none',
-  border: `1px solid ${hasError ? 'rgba(232,59,59,.5)' : 'rgba(61,255,110,.25)'}`,
-  padding: '13px 16px', color: 'var(--text)', fontSize: '.93rem',
-  fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
-})
 
 function AuthView() {
   const { login } = useUIStore()
   const [mode, setMode] = React.useState<'register' | 'login'>('register')
 
-  // Register fields
   const [regName, setRegName] = React.useState('')
   const [regHandle, setRegHandle] = React.useState('')
   const [regPwd, setRegPwd] = React.useState('')
   const [regPwd2, setRegPwd2] = React.useState('')
+  const [adminCode, setAdminCode] = React.useState('')
+  const [showAdmin, setShowAdmin] = React.useState(false)
 
-  // Login fields
   const [logHandle, setLogHandle] = React.useState('')
   const [logPwd, setLogPwd] = React.useState('')
 
   const [error, setError] = React.useState('')
   const [loading, setLoading] = React.useState(false)
 
-  function reset() { setError(''); setLoading(false) }
+  function reset() { setError('') }
 
   async function handleRegister() {
     if (!regName.trim() || regName.trim().length < 2) return setError('Inserisci il tuo nome (min. 2 caratteri)')
@@ -681,27 +746,40 @@ function AuthView() {
     if (regPwd.length < 6) return setError('Password troppo corta (min. 6 caratteri)')
     if (regPwd !== regPwd2) return setError('Le password non coincidono')
     setLoading(true)
-    const res = await doRegister(regName.trim(), regHandle.trim(), regPwd)
+    try {
+      const res = await fetch('/api/users/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: regName.trim(), handle: regHandle.trim(), password: regPwd, adminCode }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Errore di registrazione'); setLoading(false); return }
+      login(data.name, data.handle, data.role, data.token)
+    } catch { setError('Errore di rete. Riprova.') }
     setLoading(false)
-    if (!res.ok) return setError(res.error!)
-    login(regName.trim(), regHandle.trim())
   }
 
   async function handleLogin() {
     if (!logHandle.trim()) return setError('Inserisci username')
     if (!logPwd) return setError('Inserisci password')
     setLoading(true)
-    const res = await doLogin(logHandle.trim(), logPwd)
+    try {
+      const res = await fetch('/api/users/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: logHandle.trim(), password: logPwd }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Credenziali non valide'); setLoading(false); return }
+      login(data.name, data.handle, data.role, data.token)
+    } catch { setError('Errore di rete. Riprova.') }
     setLoading(false)
-    if (!res.ok) return setError(res.error!)
-    login(res.name!, logHandle.trim())
   }
 
   function switchMode(m: 'register' | 'login') { setMode(m); reset() }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 20 }}>
-      {/* Avatar */}
       <div style={{
         width: 74, height: 74, borderRadius: '50%',
         background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.22), rgba(61,255,110,.05))',
@@ -723,26 +801,35 @@ function AuthView() {
         {mode === 'register' ? (
           <>
             <input placeholder="Nome" value={regName}
-              onChange={e => { setRegName(e.target.value); setError('') }}
+              onChange={e => { setRegName(e.target.value); reset() }}
               style={inputStyle()} autoComplete="name" />
             <input placeholder="Username (es. mario_97)" value={regHandle}
-              onChange={e => { setRegHandle(e.target.value.replace(/\s/g, '')); setError('') }}
+              onChange={e => { setRegHandle(e.target.value.replace(/\s/g, '')); reset() }}
               style={inputStyle()} autoComplete="username" />
             <input type="password" placeholder="Password (min. 6 caratteri)" value={regPwd}
-              onChange={e => { setRegPwd(e.target.value); setError('') }}
+              onChange={e => { setRegPwd(e.target.value); reset() }}
               style={inputStyle()} autoComplete="new-password" />
             <input type="password" placeholder="Conferma password" value={regPwd2}
-              onChange={e => { setRegPwd2(e.target.value); setError('') }}
+              onChange={e => { setRegPwd2(e.target.value); reset() }}
               onKeyDown={e => e.key === 'Enter' && handleRegister()}
               style={inputStyle(!!error && regPwd2 !== regPwd)} autoComplete="new-password" />
+            {showAdmin && (
+              <input placeholder="Codice admin (opzionale)" value={adminCode}
+                onChange={e => setAdminCode(e.target.value)}
+                style={inputStyle()} autoComplete="off" />
+            )}
+            <button onClick={() => setShowAdmin(v => !v)}
+              style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '.7rem', cursor: 'pointer', textAlign: 'left', padding: '0 2px' }}>
+              {showAdmin ? '▲ Nascondi codice admin' : '▼ Ho un codice admin'}
+            </button>
           </>
         ) : (
           <>
             <input placeholder="Username" value={logHandle}
-              onChange={e => { setLogHandle(e.target.value.replace(/\s/g, '')); setError('') }}
+              onChange={e => { setLogHandle(e.target.value.replace(/\s/g, '')); reset() }}
               style={inputStyle()} autoComplete="username" />
             <input type="password" placeholder="Password" value={logPwd}
-              onChange={e => { setLogPwd(e.target.value); setError('') }}
+              onChange={e => { setLogPwd(e.target.value); reset() }}
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
               style={inputStyle()} autoComplete="current-password" />
           </>

@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { verifyToken } from '@/lib/session'
 import { sendPushToAll } from '@/lib/push'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const news = await prisma.newsFeed.findMany({ orderBy: { createdAt: 'desc' } })
@@ -9,8 +12,15 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Accept either NextAuth admin session or app Bearer token with role=admin
+  const nextSession = await auth()
+  if (!nextSession) {
+    const bearer = req.headers.get('authorization')?.replace('Bearer ', '')
+    if (!bearer) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+    const payload = await verifyToken(bearer)
+    if (!payload || payload.role !== 'admin')
+      return NextResponse.json({ error: 'Accesso negato' }, { status: 403 })
+  }
 
   const body = await req.json()
   const item = await prisma.newsFeed.create({
@@ -22,7 +32,6 @@ export async function POST(req: Request) {
     },
   })
 
-  // Fire push notification to all subscribers
   try {
     await sendPushToAll({
       title: `${item.emoji} ${item.title}`,
@@ -30,9 +39,22 @@ export async function POST(req: Request) {
       url:   '/news',
       emoji: item.emoji,
     })
-  } catch {
-    // Push failure shouldn't fail the news creation
-  }
+  } catch { /* push failure doesn't fail news creation */ }
 
   return NextResponse.json(item, { status: 201 })
+}
+
+export async function DELETE(req: Request) {
+  const nextSession = await auth()
+  if (!nextSession) {
+    const bearer = req.headers.get('authorization')?.replace('Bearer ', '')
+    if (!bearer) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+    const payload = await verifyToken(bearer)
+    if (!payload || payload.role !== 'admin')
+      return NextResponse.json({ error: 'Accesso negato' }, { status: 403 })
+  }
+
+  const { id } = await req.json()
+  await prisma.newsFeed.delete({ where: { id } })
+  return NextResponse.json({ ok: true })
 }
