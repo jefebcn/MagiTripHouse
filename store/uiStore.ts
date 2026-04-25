@@ -22,8 +22,9 @@ interface UIState {
   setSearch: (s: string) => void
   // Auth
   userName: string
+  userHandle: string
   isLoggedIn: boolean
-  login: (name: string) => void
+  login: (name: string, handle: string) => void
   logout: () => void
 }
 
@@ -48,13 +49,14 @@ export const useUIStore = create<UIState>()(
       setSearch: (search) => set({ search }),
       // Auth
       userName: '',
+      userHandle: '',
       isLoggedIn: false,
-      login: (name) => set({ userName: name, isLoggedIn: true }),
-      logout: () => set({ userName: '', isLoggedIn: false, view: 'catalog' }),
+      login: (name, handle) => set({ userName: name, userHandle: handle, isLoggedIn: true }),
+      logout: () => set({ userName: '', userHandle: '', isLoggedIn: false, view: 'catalog' }),
     }),
     {
       name: 'tp_ui',
-      partialize: (s) => ({ userName: s.userName, isLoggedIn: s.isLoggedIn }),
+      partialize: (s) => ({ userName: s.userName, userHandle: s.userHandle, isLoggedIn: s.isLoggedIn }),
     }
   )
 )

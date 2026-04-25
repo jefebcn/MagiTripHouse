@@ -421,7 +421,7 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 function AccountView() {
-  const { userName, login, logout } = useUIStore()
+  const { userName, userHandle, login, logout } = useUIStore()
   const [editing, setEditing] = React.useState(false)
   const [inputVal, setInputVal] = React.useState('')
   const [pushEnabled, setPushEnabled] = React.useState(false)
@@ -441,7 +441,7 @@ function AccountView() {
 
   function saveName() {
     const t = inputVal.trim()
-    if (t) login(t)
+    if (t) login(t, userHandle)
     setEditing(false)
   }
 
@@ -513,6 +513,9 @@ function AccountView() {
             <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', letterSpacing: '.3px' }}>
               {userName}
             </div>
+            {userHandle && (
+              <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: -6 }}>@{userHandle}</div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => { setEditing(true); setInputVal(userName) }}
@@ -614,70 +617,162 @@ function AccountView() {
   )
 }
 
+/* ---- Auth utilities (client-side, SHA-256 via Web Crypto) ---- */
+
+async function hashPwd(pw: string) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+interface StoredAccount { name: string; handle: string; hash: string }
+
+function getAccounts(): StoredAccount[] {
+  try { return JSON.parse(localStorage.getItem('tp_accounts') ?? '[]') } catch { return [] }
+}
+
+async function doRegister(name: string, handle: string, password: string) {
+  const accounts = getAccounts()
+  if (accounts.some(a => a.handle.toLowerCase() === handle.toLowerCase()))
+    return { ok: false, error: 'Username già in uso' }
+  accounts.push({ name, handle, hash: await hashPwd(password) })
+  localStorage.setItem('tp_accounts', JSON.stringify(accounts))
+  return { ok: true }
+}
+
+async function doLogin(handle: string, password: string) {
+  const account = getAccounts().find(a => a.handle.toLowerCase() === handle.toLowerCase())
+  if (!account) return { ok: false, error: 'Username non trovato' }
+  if (await hashPwd(password) !== account.hash) return { ok: false, error: 'Password errata' }
+  return { ok: true, name: account.name }
+}
+
 /* ---- Auth components ---- */
+
+const inputStyle = (hasError?: boolean): React.CSSProperties => ({
+  background: 'var(--bg3)', borderRadius: 12, outline: 'none',
+  border: `1px solid ${hasError ? 'rgba(232,59,59,.5)' : 'rgba(61,255,110,.25)'}`,
+  padding: '13px 16px', color: 'var(--text)', fontSize: '.93rem',
+  fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
+})
 
 function AuthView() {
   const { login } = useUIStore()
-  const [input, setInput] = React.useState('')
-  const [mode, setMode] = React.useState<'login' | 'register'>('register')
-  const [error, setError] = React.useState('')
+  const [mode, setMode] = React.useState<'register' | 'login'>('register')
 
-  function submit() {
-    const name = input.trim()
-    if (!name || name.length < 2) { setError('Inserisci almeno 2 caratteri'); return }
-    login(name)
+  // Register fields
+  const [regName, setRegName] = React.useState('')
+  const [regHandle, setRegHandle] = React.useState('')
+  const [regPwd, setRegPwd] = React.useState('')
+  const [regPwd2, setRegPwd2] = React.useState('')
+
+  // Login fields
+  const [logHandle, setLogHandle] = React.useState('')
+  const [logPwd, setLogPwd] = React.useState('')
+
+  const [error, setError] = React.useState('')
+  const [loading, setLoading] = React.useState(false)
+
+  function reset() { setError(''); setLoading(false) }
+
+  async function handleRegister() {
+    if (!regName.trim() || regName.trim().length < 2) return setError('Inserisci il tuo nome (min. 2 caratteri)')
+    if (!regHandle.trim() || regHandle.trim().length < 3) return setError('Username troppo corto (min. 3 caratteri)')
+    if (!/^[a-zA-Z0-9_]+$/.test(regHandle.trim())) return setError('Username: solo lettere, numeri e _')
+    if (regPwd.length < 6) return setError('Password troppo corta (min. 6 caratteri)')
+    if (regPwd !== regPwd2) return setError('Le password non coincidono')
+    setLoading(true)
+    const res = await doRegister(regName.trim(), regHandle.trim(), regPwd)
+    setLoading(false)
+    if (!res.ok) return setError(res.error!)
+    login(regName.trim(), regHandle.trim())
   }
 
+  async function handleLogin() {
+    if (!logHandle.trim()) return setError('Inserisci username')
+    if (!logPwd) return setError('Inserisci password')
+    setLoading(true)
+    const res = await doLogin(logHandle.trim(), logPwd)
+    setLoading(false)
+    if (!res.ok) return setError(res.error!)
+    login(res.name!, logHandle.trim())
+  }
+
+  function switchMode(m: 'register' | 'login') { setMode(m); reset() }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 24, gap: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 20 }}>
+      {/* Avatar */}
       <div style={{
-        width: 78, height: 78, borderRadius: '50%',
-        background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.25), rgba(61,255,110,.06))',
-        border: '2px solid rgba(61,255,110,.35)',
+        width: 74, height: 74, borderRadius: '50%',
+        background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.22), rgba(61,255,110,.05))',
+        border: '2px solid rgba(61,255,110,.3)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '2.2rem', marginBottom: 18, boxShadow: '0 0 24px rgba(61,255,110,.15)',
+        fontSize: '2rem', marginBottom: 16, boxShadow: '0 0 20px rgba(61,255,110,.12)',
       }}>👤</div>
 
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', marginBottom: 6 }}>
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', marginBottom: 4 }}>
         {mode === 'register' ? 'Crea Account' : 'Bentornato'}
       </div>
-      <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: 28, textAlign: 'center' }}>
+      <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginBottom: 24, textAlign: 'center' }}>
         {mode === 'register'
           ? 'Registrati per accedere al Canale, Ordini e Affiliati'
-          : 'Inserisci il tuo username per accedere'}
+          : 'Accedi con le tue credenziali'}
       </div>
 
-      <div style={{ width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <input
-          autoFocus
-          value={input}
-          onChange={(e) => { setInput(e.target.value); setError('') }}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          placeholder="Il tuo nome o username..."
-          style={{
-            background: 'var(--bg3)', borderRadius: 12, outline: 'none',
-            border: `1px solid ${error ? 'rgba(232,59,59,.5)' : 'rgba(61,255,110,.3)'}`,
-            padding: '13px 16px', color: 'var(--text)', fontSize: '.95rem',
-            fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
-          }}
-        />
-        {error && <div style={{ fontSize: '.75rem', color: 'var(--red)', marginTop: -4 }}>{error}</div>}
+      <div style={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {mode === 'register' ? (
+          <>
+            <input placeholder="Nome" value={regName}
+              onChange={e => { setRegName(e.target.value); setError('') }}
+              style={inputStyle()} autoComplete="name" />
+            <input placeholder="Username (es. mario_97)" value={regHandle}
+              onChange={e => { setRegHandle(e.target.value.replace(/\s/g, '')); setError('') }}
+              style={inputStyle()} autoComplete="username" />
+            <input type="password" placeholder="Password (min. 6 caratteri)" value={regPwd}
+              onChange={e => { setRegPwd(e.target.value); setError('') }}
+              style={inputStyle()} autoComplete="new-password" />
+            <input type="password" placeholder="Conferma password" value={regPwd2}
+              onChange={e => { setRegPwd2(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleRegister()}
+              style={inputStyle(!!error && regPwd2 !== regPwd)} autoComplete="new-password" />
+          </>
+        ) : (
+          <>
+            <input placeholder="Username" value={logHandle}
+              onChange={e => { setLogHandle(e.target.value.replace(/\s/g, '')); setError('') }}
+              style={inputStyle()} autoComplete="username" />
+            <input type="password" placeholder="Password" value={logPwd}
+              onChange={e => { setLogPwd(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              style={inputStyle()} autoComplete="current-password" />
+          </>
+        )}
+
+        {error && (
+          <div style={{ fontSize: '.75rem', color: 'var(--red)', marginTop: -2, paddingLeft: 4 }}>
+            ⚠️ {error}
+          </div>
+        )}
+
         <button
-          onClick={submit}
+          onClick={mode === 'register' ? handleRegister : handleLogin}
+          disabled={loading}
           style={{
             padding: '14px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
-            fontSize: '1rem', cursor: 'pointer', transition: '.2s',
-            background: 'rgba(61,255,110,.18)', border: '1.5px solid rgba(61,255,110,.5)',
-            color: 'var(--green)', boxShadow: '0 0 16px rgba(61,255,110,.12)',
+            fontSize: '1rem', cursor: loading ? 'default' : 'pointer', transition: '.2s',
+            background: loading ? 'rgba(61,255,110,.08)' : 'rgba(61,255,110,.18)',
+            border: '1.5px solid rgba(61,255,110,.5)',
+            color: 'var(--green)', boxShadow: '0 0 16px rgba(61,255,110,.1)', marginTop: 4,
           }}
         >
-          {mode === 'register' ? '🚀 Registrati' : '🔑 Accedi'}
+          {loading ? '...' : mode === 'register' ? '🚀 Crea Account' : '🔑 Accedi'}
         </button>
+
         <button
-          onClick={() => { setMode(mode === 'register' ? 'login' : 'register'); setError('') }}
+          onClick={() => switchMode(mode === 'register' ? 'login' : 'register')}
           style={{
             background: 'none', border: 'none', color: 'var(--muted)',
-            fontSize: '.78rem', cursor: 'pointer', fontFamily: 'inherit', padding: 4,
+            fontSize: '.78rem', cursor: 'pointer', fontFamily: 'inherit', padding: '6px 4px',
           }}
         >
           {mode === 'register' ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
