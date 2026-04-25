@@ -6,6 +6,15 @@ export const metadata: Metadata = {
   title: 'MagiTripHouse',
   description: 'Catalogo CBD Premium',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'MagiTripHouse',
+    statusBarStyle: 'black-translucent',
+  },
+  icons: {
+    apple: '/logo.png',
+    icon: '/logo.png',
+  },
 }
 
 export const viewport: Viewport = {

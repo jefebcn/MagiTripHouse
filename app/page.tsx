@@ -13,6 +13,11 @@ import ProductDetail from '@/components/panels/ProductDetail'
 import Lightbox from '@/components/panels/Lightbox'
 import { useTelegram } from '@/hooks/useTelegram'
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
 // LED accent line
 function LedLine() {
   return (
@@ -82,6 +87,9 @@ function NewsView() {
   const [hasPush, setHasPush] = React.useState(false)
   const [memberCount, setMemberCount] = React.useState<number | null>(null)
   const [inside, setInside] = React.useState(false)
+  const [pwaBannerDismissed, setPwaBannerDismissed] = React.useState(false)
+  const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(null)
+  const [isStandalone, setIsStandalone] = React.useState(false)
 
   React.useEffect(() => {
     fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
@@ -94,6 +102,17 @@ function NewsView() {
         })
       )
     }
+    // Check if already installed as PWA
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
+    const dismissed = sessionStorage.getItem('pwa_banner_dismissed') === '1'
+    setPwaBannerDismissed(dismissed)
+    // Capture install prompt
+    const handler = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
   async function joinChannel() {
@@ -184,14 +203,29 @@ function NewsView() {
     </div>
   )
 
+  async function installPwa() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      if (outcome === 'accepted') setDeferredPrompt(null)
+    }
+  }
+
+  function dismissPwaBanner() {
+    sessionStorage.setItem('pwa_banner_dismissed', '1')
+    setPwaBannerDismissed(true)
+  }
+
   /* ---- INTERNO del canale ---- */
+  const showPwaBanner = !isStandalone && !pwaBannerDismissed
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Header interno */}
       <div style={{
         background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.15)',
         borderRadius: 'var(--radius)', padding: '16px 18px',
-        display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20,
+        display: 'flex', alignItems: 'center', gap: 14, marginBottom: showPwaBanner ? 14 : 20,
       }}>
         <div style={{
           width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
@@ -213,6 +247,52 @@ function NewsView() {
           }}
         >Esci</button>
       </div>
+
+      {/* PWA install banner */}
+      {showPwaBanner && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(61,255,110,.1), rgba(245,200,66,.07))',
+          border: '1px solid rgba(61,255,110,.3)',
+          borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 18,
+          position: 'relative',
+        }}>
+          <button
+            onClick={dismissPwaBanner}
+            style={{
+              position: 'absolute', top: 10, right: 12, background: 'none', border: 'none',
+              color: 'var(--muted)', fontSize: '1rem', cursor: 'pointer', lineHeight: 1,
+            }}
+          >✕</button>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', paddingRight: 20 }}>
+            <span style={{ fontSize: '1.8rem', lineHeight: 1, flexShrink: 0 }}>📲</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: 4, color: 'var(--green)' }}>
+                Installa l&apos;app sul telefono!
+              </div>
+              <div style={{ fontSize: '.78rem', color: '#c8e6cb', lineHeight: 1.55 }}>
+                Aggiungi MagiTripHouse alla schermata Home per accedere subito al canale e non perderti nessuna novità.
+                Poi attiva le notifiche push per ricevere aggiornamenti in tempo reale.
+              </div>
+              {deferredPrompt ? (
+                <button
+                  onClick={installPwa}
+                  style={{
+                    marginTop: 10, padding: '8px 18px', borderRadius: 10,
+                    background: 'rgba(61,255,110,.2)', border: '1px solid rgba(61,255,110,.45)',
+                    color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700,
+                    fontSize: '.8rem', cursor: 'pointer',
+                  }}
+                >📲 Installa ora</button>
+              ) : (
+                <div style={{ marginTop: 8, fontSize: '.73rem', color: 'var(--muted)', opacity: .85 }}>
+                  iOS: tocca <strong style={{ color: 'var(--text)' }}>Condividi</strong> → <strong style={{ color: 'var(--text)' }}>Aggiungi a Home</strong>
+                  <br />Android: menu browser → <strong style={{ color: 'var(--text)' }}>Aggiungi a schermata Home</strong>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <NewsFeed />
     </div>
