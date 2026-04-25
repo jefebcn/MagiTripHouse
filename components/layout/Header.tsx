@@ -13,8 +13,8 @@ export default function Header() {
       <Image
         src="/logo.png"
         alt="Magic Trip House"
-        width={220}
-        height={110}
+        width={185}
+        height={93}
         style={{ objectFit: 'contain', filter: 'drop-shadow(0 0 18px rgba(61,255,110,.35))' }}
         priority
       />

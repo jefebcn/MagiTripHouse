@@ -2,7 +2,7 @@
 
 export default function AnnouncementBanner() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px 0' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px 14px' }}>
 
       {/* Disclaimer account limitato */}
       <div style={{
