@@ -24,10 +24,12 @@ interface UIState {
   userName: string
   userHandle: string
   userRole: string
+  userAvatar: string
   sessionToken: string
   isLoggedIn: boolean
   login: (name: string, handle: string, role: string, token: string) => void
   logout: () => void
+  setUserAvatar: (url: string) => void
   // Channel
   channelJoined: boolean
   setChannelJoined: (v: boolean) => void
@@ -56,12 +58,14 @@ export const useUIStore = create<UIState>()(
       userName: '',
       userHandle: '',
       userRole: '',
+      userAvatar: '',
       sessionToken: '',
       isLoggedIn: false,
       login: (name, handle, role, token) =>
         set({ userName: name, userHandle: handle, userRole: role, sessionToken: token, isLoggedIn: true }),
       logout: () =>
-        set({ userName: '', userHandle: '', userRole: '', sessionToken: '', isLoggedIn: false, view: 'catalog' }),
+        set({ userName: '', userHandle: '', userRole: '', userAvatar: '', sessionToken: '', isLoggedIn: false, view: 'catalog' }),
+      setUserAvatar: (userAvatar) => set({ userAvatar }),
       // Channel
       channelJoined: false,
       setChannelJoined: (channelJoined) => set({ channelJoined }),
@@ -72,6 +76,7 @@ export const useUIStore = create<UIState>()(
         userName: s.userName,
         userHandle: s.userHandle,
         userRole: s.userRole,
+        userAvatar: s.userAvatar,
         sessionToken: s.sessionToken,
         isLoggedIn: s.isLoggedIn,
         channelJoined: s.channelJoined,

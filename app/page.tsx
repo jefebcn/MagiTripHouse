@@ -440,6 +440,7 @@ function urlBase64ToUint8Array(base64String: string) {
 
 interface MeData {
   joinedAt: string
+  avatarUrl: string | null
   affiliate: { code: string; referredBy: string | null; referralCount: number } | null
   channelMember: boolean
 }
@@ -467,11 +468,15 @@ function PushToggle({ enabled, loading, onToggle }: { enabled: boolean; loading:
 }
 
 function AccountView() {
-  const { userName, userHandle, userRole, sessionToken, login, logout, setView } = useUIStore()
+  const { userName, userHandle, userRole, userAvatar, sessionToken, login, logout, setView, setUserAvatar } = useUIStore()
 
   // Inline edit name
   const [editingName, setEditingName] = React.useState(false)
   const [nameVal, setNameVal] = React.useState('')
+
+  // Avatar upload
+  const avatarInputRef = React.useRef<HTMLInputElement>(null)
+  const [avatarLoading, setAvatarLoading] = React.useState(false)
 
   // Push
   const [pushEnabled, setPushEnabled] = React.useState(false)
@@ -507,9 +512,33 @@ function AccountView() {
 
     if (sessionToken) {
       fetch('/api/me', { headers: { Authorization: `Bearer ${sessionToken}` } })
-        .then(r => r.json()).then(setMeData).catch(() => {})
+        .then(r => r.json())
+        .then((d: MeData) => {
+          setMeData(d)
+          if (d.avatarUrl && d.avatarUrl !== userAvatar) setUserAvatar(d.avatarUrl)
+        })
+        .catch(() => {})
     }
-  }, [userName, sessionToken])
+  }, [userName, sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) return
+    setAvatarLoading(true)
+    try {
+      const { upload } = await import('@vercel/blob/client')
+      const filename = `avatars/${userHandle}-${Date.now()}.${file.name.split('.').pop()}`
+      const blob = await upload(filename, file, { access: 'public', handleUploadUrl: '/api/upload' })
+      await fetch('/api/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        body: JSON.stringify({ avatarUrl: blob.url }),
+      })
+      setUserAvatar(blob.url)
+    } catch { /* upload failed silently */ }
+    finally { setAvatarLoading(false); if (avatarInputRef.current) avatarInputRef.current.value = '' }
+  }
 
   function saveName() {
     const t = nameVal.trim()
@@ -598,16 +627,40 @@ function AccountView() {
           pointerEvents: 'none',
         }} />
 
-        {/* Avatar */}
-        <div style={{
-          width: 88, height: 88, borderRadius: '50%',
-          background: 'linear-gradient(135deg,var(--green),var(--green2))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '2.6rem', fontWeight: 800, color: '#000',
-          fontFamily: "'Fredoka One', cursive",
-          boxShadow: '0 0 0 4px rgba(61,255,110,.15), var(--led-green)',
-        }}>
-          {initial}
+        {/* Avatar — tap to change */}
+        <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => !avatarLoading && avatarInputRef.current?.click()}>
+          <div style={{
+            width: 88, height: 88, borderRadius: '50%', overflow: 'hidden',
+            background: 'linear-gradient(135deg,var(--green),var(--green2))',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '2.6rem', fontWeight: 800, color: '#000',
+            fontFamily: "'Fredoka One', cursive",
+            boxShadow: '0 0 0 4px rgba(61,255,110,.15), var(--led-green)',
+            flexShrink: 0,
+          }}>
+            {userAvatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={userAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : initial}
+          </div>
+          {/* Camera overlay */}
+          <div style={{
+            position: 'absolute', bottom: 0, right: 0,
+            width: 26, height: 26, borderRadius: '50%',
+            background: avatarLoading ? 'rgba(61,255,110,.3)' : 'var(--bg2)',
+            border: '2px solid var(--bg)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '.75rem', transition: '.2s',
+          }}>
+            {avatarLoading ? '⏳' : '📷'}
+          </div>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleAvatarChange}
+          />
         </div>
 
         {/* Name / edit */}

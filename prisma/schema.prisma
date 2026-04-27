@@ -77,5 +77,6 @@ model User {
   handle    String   @unique
   hash      String
   role      String   @default("user")
+  avatarUrl String?
   createdAt DateTime @default(now())
 }

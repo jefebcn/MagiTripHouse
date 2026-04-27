@@ -25,9 +25,29 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     joinedAt: user.createdAt,
+    avatarUrl: user.avatarUrl ?? null,
     affiliate: affiliate
       ? { code: affiliate.code, referredBy: affiliate.referredBy, referralCount, joinedAt: affiliate.joinedAt }
       : null,
     channelMember: !!channelMember,
   })
+}
+
+// Update profile (avatarUrl, name)
+export async function PATCH(req: Request) {
+  const bearer = req.headers.get('authorization')?.replace('Bearer ', '')
+  if (!bearer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const payload = await verifyToken(bearer)
+  if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+
+  const body = await req.json()
+  const data: { avatarUrl?: string; name?: string } = {}
+  if (typeof body.avatarUrl === 'string') data.avatarUrl = body.avatarUrl
+  if (typeof body.name === 'string' && body.name.trim()) data.name = body.name.trim()
+
+  if (!Object.keys(data).length)
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+
+  const user = await prisma.user.update({ where: { id: payload.id }, data })
+  return NextResponse.json({ ok: true, avatarUrl: user.avatarUrl ?? null, name: user.name })
 }
