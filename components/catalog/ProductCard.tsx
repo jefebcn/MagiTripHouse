@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import Image from 'next/image'
 import type { Product } from '@/hooks/useProducts'
 import { useUIStore } from '@/store/uiStore'
@@ -28,6 +29,7 @@ interface Props { product: Product; index: number }
 
 export default function ProductCard({ product: p, index }: Props) {
   const { setDetailProduct } = useUIStore()
+  const [pressed, setPressed] = React.useState(false)
   const minPrice = getMinPrice(p)
   const isExhausted = p.stock === 0
   const badgeStyle = p.badge ? (BADGE_COLORS[p.badge] ?? { bg: 'rgba(0,0,0,.7)', color: '#fff', border: 'rgba(255,255,255,.2)' }) : null
@@ -35,18 +37,22 @@ export default function ProductCard({ product: p, index }: Props) {
   return (
     <div
       onClick={() => setDetailProduct(p)}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
       style={{
         background: 'var(--card)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
         overflow: 'hidden',
         cursor: 'pointer',
-        transition: '.2s',
+        transition: 'transform .15s, box-shadow .15s',
         willChange: 'transform',
         animation: `fadeInUp .35s ease both`,
         animationDelay: `${index * 0.05}s`,
         opacity: isExhausted ? .6 : 1,
-        boxShadow: '0 2px 12px rgba(0,0,0,.35)',
+        transform: pressed ? 'scale(.97)' : 'scale(1)',
+        boxShadow: pressed ? '0 1px 6px rgba(0,0,0,.3)' : '0 2px 12px rgba(0,0,0,.35)',
       }}
     >
       {/* Media */}
@@ -116,39 +122,43 @@ export default function ProductCard({ product: p, index }: Props) {
       </div>
 
       {/* Info */}
-      <div style={{ padding: '10px 11px 12px' }}>
+      <div style={{
+        padding: '12px 13px 14px',
+        borderTop: '1px solid rgba(61,255,110,.07)',
+      }}>
         <div style={{
-          fontFamily: "'Fredoka One', cursive", fontSize: '.92rem',
-          fontWeight: 400, letterSpacing: '.2px', marginBottom: 2,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          color: 'var(--text)',
+          fontFamily: "'Fredoka One', cursive", fontSize: '1rem',
+          fontWeight: 400, letterSpacing: '.2px', marginBottom: 4,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          color: 'var(--text)', lineHeight: 1.25,
         }}>
           {p.name}
         </div>
         {p.origin && (
-          <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: 7 }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 6 }}>
             🌍 {p.origin}
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
           {minPrice > 0 ? (
             <div style={{
-              fontFamily: "'Fredoka One', cursive", fontSize: '1.08rem',
+              fontFamily: "'Fredoka One', cursive", fontSize: '1.18rem',
               color: 'var(--green)', textShadow: 'var(--led-green)',
               letterSpacing: '.2px',
             }}>
               da €{minPrice}
             </div>
           ) : (
-            <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Vedi tagli</div>
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>Vedi tagli</div>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); setDetailProduct(p) }}
             style={{
               background: 'linear-gradient(135deg,var(--green),var(--green2))',
               border: 'none',
-              borderRadius: 8, padding: '5px 12px',
-              fontSize: '.7rem', fontWeight: 700,
+              borderRadius: 8, padding: '6px 14px',
+              fontSize: '.78rem', fontWeight: 700,
               cursor: 'pointer', color: '#000',
               fontFamily: "'Fredoka One', cursive",
               transition: '.15s',
