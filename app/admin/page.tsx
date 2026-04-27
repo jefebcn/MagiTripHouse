@@ -4,8 +4,9 @@ import { signOut } from '@/lib/auth'
 const SECTIONS = [
   { href: '/admin/products',   icon: '📦', title: 'Prodotti',  desc: 'Aggiungi, modifica, elimina prodotti' },
   { href: '/admin/orders',     icon: '📋', title: 'Ordini',    desc: 'Gestisci gli ordini ricevuti' },
-  { href: '/admin/news',       icon: '📢', title: 'Novità',    desc: 'Pubblica aggiornamenti e news' },
-  { href: '/admin/affiliates', icon: '👥', title: 'Affiliati', desc: 'Elenco referral e codici' },
+  { href: '/admin/news',       icon: '📢', title: 'Canale',    desc: 'Pubblica messaggi, foto e notifiche push' },
+  { href: '/admin/members',    icon: '👤', title: 'Membri',    desc: 'Chi è entrato nel canale · reset password' },
+  { href: '/admin/affiliates', icon: '🤝', title: 'Affiliati', desc: 'Elenco referral e codici' },
 ]
 
 export default function AdminDashboard() {

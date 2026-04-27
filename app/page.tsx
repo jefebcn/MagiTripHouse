@@ -89,8 +89,7 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
 // ---- Inline simple views ----
 
 function NewsView() {
-  const { userRole, sessionToken } = useUIStore()
-  const isAdmin = userRole === 'admin'
+  const { sessionToken } = useUIStore()
 
   const [subscribed, setSubscribed] = React.useState(false)
   const [memberCount, setMemberCount] = React.useState<number | null>(null)
@@ -98,20 +97,6 @@ function NewsView() {
   const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(null)
   const [isStandalone, setIsStandalone] = React.useState(false)
   const [pwaBannerDismissed, setPwaBannerDismissed] = React.useState(false)
-
-  // Admin compose
-  const [composing, setComposing] = React.useState(false)
-  const [postEmoji, setPostEmoji] = React.useState('📢')
-  const [postTitle, setPostTitle] = React.useState('')
-  const [postContent, setPostContent] = React.useState('')
-  const [postLink, setPostLink] = React.useState('')
-  const [postImage, setPostImage] = React.useState('')
-  const [postLoading, setPostLoading] = React.useState(false)
-  const [postError, setPostError] = React.useState('')
-  const [extraItems, setExtraItems] = React.useState<NewsItem[]>([])
-  const [showMembers, setShowMembers] = React.useState(false)
-  const [members, setMembers] = React.useState<{id:string;handle:string;name:string;joinedAt:string}[]>([])
-  const [totalUsers, setTotalUsers] = React.useState(0)
 
   React.useEffect(() => {
     fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
@@ -174,32 +159,6 @@ function NewsView() {
     }
     setSubscribed(false)
     setInside(false)
-  }
-
-  async function publishPost() {
-    if (!postTitle.trim() || !postContent.trim()) { setPostError('Titolo e contenuto obbligatori'); return }
-    setPostLoading(true); setPostError('')
-    try {
-      const res = await fetch('/api/news', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-        body: JSON.stringify({ emoji: postEmoji, title: postTitle.trim(), content: postContent.trim(), imageUrl: postImage.trim() || null, productLink: postLink.trim() || null }),
-      })
-      const item = await res.json()
-      if (!res.ok) { setPostError(item.error ?? 'Errore'); setPostLoading(false); return }
-      setExtraItems(prev => [item, ...prev])
-      setComposing(false); setPostTitle(''); setPostContent(''); setPostLink(''); setPostImage(''); setPostEmoji('📢')
-    } catch { setPostError('Errore di rete') }
-    setPostLoading(false)
-  }
-
-  async function fetchMembers() {
-    try {
-      const res = await fetch('/api/channel/members', { headers: { 'Authorization': `Bearer ${sessionToken}` } })
-      const data = await res.json()
-      setMembers(data.members ?? [])
-      setTotalUsers(data.total ?? 0)
-    } catch { /* noop */ }
   }
 
   /* ─── LANDING ─── */
@@ -283,22 +242,6 @@ function NewsView() {
             {memberCount ?? '—'} iscritti · {subscribed ? '🔔 notifiche attive' : '🔕 solo lettura'}
           </div>
         </div>
-        {isAdmin && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => { setComposing(v => !v); setShowMembers(false) }} style={{
-              background: composing ? 'rgba(232,59,59,.1)' : 'rgba(61,255,110,.1)',
-              border: `1px solid ${composing ? 'rgba(232,59,59,.3)' : 'rgba(61,255,110,.3)'}`,
-              borderRadius: 20, padding: '5px 10px', color: composing ? 'var(--red)' : 'var(--green)',
-              fontFamily: 'inherit', fontSize: '.7rem', fontWeight: 700, cursor: 'pointer',
-            }}>{composing ? '✕' : '✏️'}</button>
-            <button onClick={() => { setShowMembers(v => !v); setComposing(false); if (!showMembers) fetchMembers() }} style={{
-              background: showMembers ? 'rgba(59,130,246,.15)' : 'rgba(59,130,246,.08)',
-              border: '1px solid rgba(59,130,246,.3)',
-              borderRadius: 20, padding: '5px 10px', color: '#3b82f6',
-              fontFamily: 'inherit', fontSize: '.7rem', fontWeight: 700, cursor: 'pointer',
-            }}>👥</button>
-          </div>
-        )}
       </div>
 
       {/* PWA banner */}
@@ -327,86 +270,13 @@ function NewsView() {
         </div>
       )}
 
-      {/* Admin members panel */}
-      {showMembers && (
-        <div style={{
-          margin: '12px 12px 0',
-          background: 'var(--bg2)', border: '1px solid rgba(59,130,246,.2)',
-          borderRadius: 14, padding: '14px',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: '#3b82f6' }}>
-              👥 Membri del canale
-            </div>
-            <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>
-              {members.length} entrati · {totalUsers} registrati
-            </div>
-          </div>
-          {members.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.8rem', padding: '16px 0' }}>
-              Nessun membro ancora
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
-              {members.map(m => (
-                <div key={m.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'var(--bg3)', borderRadius: 10, padding: '8px 12px',
-                }}>
-                  <div style={{
-                    width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-                    background: 'var(--green)', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: '1rem', fontWeight: 800, color: '#000',
-                  }}>{m.name[0].toUpperCase()}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
-                    <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>@{m.handle}</div>
-                  </div>
-                  <ResetBtn handle={m.handle} sessionToken={sessionToken} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Admin compose panel */}
-      {composing && (
-        <div style={{
-          margin: '12px 12px 0',
-          background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.2)',
-          borderRadius: 14, padding: '14px',
-          display: 'flex', flexDirection: 'column', gap: 9,
-        }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input placeholder="📢" value={postEmoji} onChange={e => setPostEmoji(e.target.value)}
-              style={{ ...inputStyle(), width: 52, textAlign: 'center', fontSize: '1.2rem', padding: '10px 6px' }} />
-            <input placeholder="Titolo del messaggio" value={postTitle} onChange={e => setPostTitle(e.target.value)}
-              style={{ ...inputStyle(), flex: 1 }} />
-          </div>
-          <textarea placeholder="Scrivi il messaggio..." value={postContent}
-            onChange={e => setPostContent(e.target.value)} rows={4}
-            style={{ ...inputStyle(), resize: 'vertical', fontFamily: 'inherit', fontSize: '.88rem', lineHeight: 1.55 }} />
-          <input placeholder="URL immagine (opzionale)" value={postImage}
-            onChange={e => setPostImage(e.target.value)} style={inputStyle()} />
-          <input placeholder="Link prodotto (opzionale)" value={postLink}
-            onChange={e => setPostLink(e.target.value)} style={inputStyle()} />
-          {postError && <div style={{ fontSize: '.73rem', color: 'var(--red)' }}>⚠️ {postError}</div>}
-          <button onClick={publishPost} disabled={postLoading} style={{
-            padding: '12px', borderRadius: 10, fontFamily: 'inherit', fontWeight: 700,
-            fontSize: '.9rem', cursor: postLoading ? 'default' : 'pointer',
-            background: 'rgba(61,255,110,.18)', border: '1px solid rgba(61,255,110,.45)', color: 'var(--green)',
-          }}>{postLoading ? '...' : '🚀 Pubblica nel canale'}</button>
-        </div>
-      )}
-
       {/* Feed messaggi */}
-      <ChannelFeed extraItems={extraItems} sessionToken={sessionToken} isAdmin={isAdmin} />
+      <ChannelFeed />
     </div>
   )
 }
 
-function ChannelFeed({ extraItems, sessionToken, isAdmin }: { extraItems: NewsItem[]; sessionToken: string; isAdmin: boolean }) {
+function ChannelFeed() {
   const [news, setNews] = React.useState<NewsItem[]>([])
   const [loading, setLoading] = React.useState(true)
 
@@ -417,13 +287,6 @@ function ChannelFeed({ extraItems, sessionToken, isAdmin }: { extraItems: NewsIt
       .catch(() => setLoading(false))
   }, [])
 
-  async function deletePost(id: string) {
-    await fetch('/api/news', { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ id }) })
-    setNews(prev => prev.filter(n => n.id !== id))
-  }
-
-  const allItems = [...extraItems, ...news.filter(n => !extraItems.find(e => e.id === n.id))]
-
   if (loading) return (
     <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
       {[1, 2, 3].map(i => (
@@ -432,7 +295,7 @@ function ChannelFeed({ extraItems, sessionToken, isAdmin }: { extraItems: NewsIt
     </div>
   )
 
-  if (!allItems.length) return (
+  if (!news.length) return (
     <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '60px 24px' }}>
       <div style={{ fontSize: '3rem', marginBottom: 12 }}>📭</div>
       <div style={{ fontSize: '.9rem', fontWeight: 600 }}>Nessun messaggio ancora</div>
@@ -442,13 +305,13 @@ function ChannelFeed({ extraItems, sessionToken, isAdmin }: { extraItems: NewsIt
 
   return (
     <div style={{ padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {allItems.map((item, i) => {
+      {news.map((item, i) => {
         const dt = new Date(item.createdAt)
         const today = new Date(); const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
         const isToday = dt.toDateString() === today.toDateString()
         const isYest = dt.toDateString() === yesterday.toDateString()
         const dateLabel = isToday ? 'Oggi' : isYest ? 'Ieri' : dt.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })
-        const prevItem = allItems[i - 1]
+        const prevItem = news[i - 1]
         const prevDt = prevItem ? new Date(prevItem.createdAt) : null
         const showDate = !prevDt || prevDt.toDateString() !== dt.toDateString()
 
@@ -487,12 +350,6 @@ function ChannelFeed({ extraItems, sessionToken, isAdmin }: { extraItems: NewsIt
                 <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--green)', flex: 1 }}>
                   MagiTripHouse
                 </span>
-                {isAdmin && (
-                  <button onClick={() => deletePost(item.id)} style={{
-                    background: 'none', border: 'none', color: 'rgba(232,59,59,.5)',
-                    cursor: 'pointer', fontSize: '.75rem', padding: '0 2px',
-                  }}>🗑</button>
-                )}
               </div>
 
               {/* Post content */}
@@ -772,54 +629,6 @@ function AccountView() {
       }}>
         ⚠️ Account limitato? Salva prima il contatto <span style={{ color: 'var(--red)', fontWeight: 700 }}>@magichous8</span> prima di scrivere.
       </div>
-    </div>
-  )
-}
-
-/* ---- Admin reset password button (inside members list) ---- */
-
-function ResetBtn({ handle, sessionToken }: { handle: string; sessionToken: string }) {
-  const [open, setOpen] = React.useState(false)
-  const [pwd, setPwd] = React.useState('')
-  const [status, setStatus] = React.useState<'idle' | 'ok' | 'err'>('idle')
-  const [loading, setLoading] = React.useState(false)
-
-  async function reset() {
-    if (pwd.length < 6) return
-    setLoading(true)
-    try {
-      const res = await fetch('/api/users/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-        body: JSON.stringify({ handle, newPassword: pwd }),
-      })
-      setStatus(res.ok ? 'ok' : 'err')
-    } catch { setStatus('err') }
-    setLoading(false)
-    if (status === 'ok') { setOpen(false); setPwd('') }
-  }
-
-  if (!open) return (
-    <button onClick={() => setOpen(true)} style={{
-      background: 'rgba(245,200,66,.08)', border: '1px solid rgba(245,200,66,.25)',
-      borderRadius: 20, padding: '4px 10px', color: '#f5c842',
-      fontFamily: 'inherit', fontSize: '.65rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0,
-    }}>🔑 Reset</button>
-  )
-
-  return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-      <input type="password" placeholder="Nuova pwd" value={pwd} onChange={e => setPwd(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && reset()}
-        style={{ width: 100, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 8px', color: 'var(--text)', fontSize: '.72rem', fontFamily: 'inherit', outline: 'none' }} />
-      <button onClick={reset} disabled={loading || pwd.length < 6} style={{
-        background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.3)',
-        borderRadius: 8, padding: '4px 8px', color: 'var(--green)',
-        fontFamily: 'inherit', fontSize: '.65rem', fontWeight: 700, cursor: 'pointer',
-      }}>{loading ? '...' : status === 'ok' ? '✓' : 'Salva'}</button>
-      <button onClick={() => { setOpen(false); setPwd(''); setStatus('idle') }} style={{
-        background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.8rem',
-      }}>✕</button>
     </div>
   )
 }
