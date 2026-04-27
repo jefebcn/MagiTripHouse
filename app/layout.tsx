@@ -12,8 +12,8 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
   },
   icons: {
-    apple: '/app-icon.png',
-    icon: '/app-icon.png',
+    apple: '/IMG_2768.jpeg',
+    icon: '/IMG_2768.jpeg',
   },
 }
 
