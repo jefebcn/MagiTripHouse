@@ -23,6 +23,7 @@ export default function AdminProducts() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function load() {
@@ -76,20 +77,31 @@ export default function AdminProducts() {
 
   async function handleSave() {
     setSaving(true)
-    const body = {
-      ...form,
-      tags: typeof form.tags === 'string' ? (form.tags as string).split(',').map((t: string) => t.trim()).filter(Boolean) : form.tags,
-      stock: form.stock !== null && form.stock !== undefined ? Number(form.stock) : null,
+    setSaveError('')
+    try {
+      const body = {
+        ...form,
+        tags: typeof form.tags === 'string' ? (form.tags as string).split(',').map((t: string) => t.trim()).filter(Boolean) : form.tags,
+        stock: form.stock !== null && form.stock !== undefined ? Number(form.stock) : null,
+      }
+      const res = editing
+        ? await fetch(`/api/products/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSaveError(data.error ?? `Errore ${res.status}`)
+        setSaving(false)
+        return
+      }
+      setEditing(null)
+      setForm({ ...EMPTY })
+      load()
+    } catch {
+      setSaveError('Errore di rete — riprova')
+    } finally {
+      setSaving(false)
     }
-    if (editing) {
-      await fetch(`/api/products/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    } else {
-      await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    }
-    setSaving(false)
-    setEditing(null)
-    setForm({ ...EMPTY })
-    load()
   }
 
   async function handleDelete(id: string) {
@@ -277,6 +289,11 @@ export default function AdminProducts() {
             </button>
           </div>
 
+          {saveError && (
+            <div style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 10, padding: '10px 14px', fontSize: '.82rem', color: 'var(--red)', marginBottom: 4 }}>
+              ⚠️ {saveError}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={handleSave}
