@@ -362,9 +362,7 @@ function NewsView() {
                     <div style={{ fontSize: '.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
                     <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>@{m.handle}</div>
                   </div>
-                  <div style={{ fontSize: '.65rem', color: 'var(--muted)', flexShrink: 0 }}>
-                    {new Date(m.joinedAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
-                  </div>
+                  <ResetBtn handle={m.handle} sessionToken={sessionToken} />
                 </div>
               ))}
             </div>
@@ -778,6 +776,54 @@ function AccountView() {
   )
 }
 
+/* ---- Admin reset password button (inside members list) ---- */
+
+function ResetBtn({ handle, sessionToken }: { handle: string; sessionToken: string }) {
+  const [open, setOpen] = React.useState(false)
+  const [pwd, setPwd] = React.useState('')
+  const [status, setStatus] = React.useState<'idle' | 'ok' | 'err'>('idle')
+  const [loading, setLoading] = React.useState(false)
+
+  async function reset() {
+    if (pwd.length < 6) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/users/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+        body: JSON.stringify({ handle, newPassword: pwd }),
+      })
+      setStatus(res.ok ? 'ok' : 'err')
+    } catch { setStatus('err') }
+    setLoading(false)
+    if (status === 'ok') { setOpen(false); setPwd('') }
+  }
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)} style={{
+      background: 'rgba(245,200,66,.08)', border: '1px solid rgba(245,200,66,.25)',
+      borderRadius: 20, padding: '4px 10px', color: '#f5c842',
+      fontFamily: 'inherit', fontSize: '.65rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+    }}>🔑 Reset</button>
+  )
+
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <input type="password" placeholder="Nuova pwd" value={pwd} onChange={e => setPwd(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && reset()}
+        style={{ width: 100, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 8px', color: 'var(--text)', fontSize: '.72rem', fontFamily: 'inherit', outline: 'none' }} />
+      <button onClick={reset} disabled={loading || pwd.length < 6} style={{
+        background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.3)',
+        borderRadius: 8, padding: '4px 8px', color: 'var(--green)',
+        fontFamily: 'inherit', fontSize: '.65rem', fontWeight: 700, cursor: 'pointer',
+      }}>{loading ? '...' : status === 'ok' ? '✓' : 'Salva'}</button>
+      <button onClick={() => { setOpen(false); setPwd(''); setStatus('idle') }} style={{
+        background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.8rem',
+      }}>✕</button>
+    </div>
+  )
+}
+
 /* ---- Auth components ---- */
 
 function AuthView() {
@@ -851,11 +897,22 @@ function AuthView() {
       <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', marginBottom: 4 }}>
         {mode === 'register' ? 'Crea Account' : 'Bentornato'}
       </div>
-      <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginBottom: 24, textAlign: 'center' }}>
+      <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginBottom: 16, textAlign: 'center' }}>
         {mode === 'register'
           ? 'Registrati per accedere al Canale, Ordini e Affiliati'
           : 'Accedi con le tue credenziali'}
       </div>
+      {mode === 'login' && (
+        <div style={{
+          background: 'rgba(61,255,110,.06)', border: '1px solid rgba(61,255,110,.15)',
+          borderRadius: 10, padding: '9px 14px', marginBottom: 16, width: '100%', maxWidth: 340, boxSizing: 'border-box',
+        }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+            💡 <strong style={{ color: 'var(--text)' }}>Suggerimento:</strong> salva le credenziali nel tuo browser/portachiavi iPhone — si compilerà automaticamente la prossima volta.<br />
+            Se hai dimenticato la password, contatta l&apos;admin su <strong style={{ color: '#3b82f6' }}>@magichous8</strong> per il reset.
+          </div>
+        </div>
+      )}
 
       <div style={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {mode === 'register' ? (
