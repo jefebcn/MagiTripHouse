@@ -89,11 +89,10 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
 // ---- Inline simple views ----
 
 function NewsView() {
-  const { sessionToken } = useUIStore()
+  const { sessionToken, channelJoined, setChannelJoined, setView } = useUIStore()
 
   const [subscribed, setSubscribed] = React.useState(false)
   const [memberCount, setMemberCount] = React.useState<number | null>(null)
-  const [inside, setInside] = React.useState(false)
   const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(null)
   const [isStandalone, setIsStandalone] = React.useState(false)
   const [pwaBannerDismissed, setPwaBannerDismissed] = React.useState(false)
@@ -103,12 +102,9 @@ function NewsView() {
     setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
     setPwaBannerDismissed(sessionStorage.getItem('pwa_banner_dismissed') === '1')
 
-    // Check existing push subscription (non-blocking)
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.ready.then(reg =>
-        reg.pushManager.getSubscription().then(sub => {
-          if (sub) { setSubscribed(true); setInside(true) }
-        })
+        reg.pushManager.getSubscription().then(sub => { if (sub) setSubscribed(true) })
       ).catch(() => {})
     }
 
@@ -117,17 +113,18 @@ function NewsView() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  // Enter channel immediately, then record membership + try push in background
+  // Enter channel: persist joined state, call API only first time
   function joinChannel() {
-    setInside(true)
-    // Record membership in DB if logged in
-    if (sessionToken) {
-      fetch('/api/channel/join', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${sessionToken}` },
-      }).catch(() => {})
+    if (!channelJoined) {
+      setChannelJoined(true)
+      if (sessionToken) {
+        fetch('/api/channel/join', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${sessionToken}` },
+        }).catch(() => {})
+      }
     }
-    // Try push async, doesn't block entry
+    // Try push async regardless (idempotent — browser returns existing sub if already subscribed)
     if ('serviceWorker' in navigator && 'PushManager' in window && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
       navigator.serviceWorker.ready.then(async reg => {
         try {
@@ -139,30 +136,13 @@ function NewsView() {
           const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr })
           await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
           setSubscribed(true)
-          setMemberCount(c => (c ?? 0) + 1)
         } catch { /* permission denied or unsupported */ }
       }).catch(() => {})
     }
   }
 
-  async function leaveChannel() {
-    if ('serviceWorker' in navigator) {
-      try {
-        const reg = await navigator.serviceWorker.ready
-        const sub = await reg.pushManager.getSubscription()
-        if (sub) {
-          await sub.unsubscribe()
-          await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
-          setMemberCount(c => Math.max(0, (c ?? 1) - 1))
-        }
-      } catch { /* noop */ }
-    }
-    setSubscribed(false)
-    setInside(false)
-  }
-
   /* ─── LANDING ─── */
-  if (!inside) return (
+  if (!channelJoined) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px 100px' }}>
       {/* Channel avatar */}
       <div style={{
@@ -227,7 +207,7 @@ function NewsView() {
         padding: '12px 16px',
         display: 'flex', alignItems: 'center', gap: 12,
       }}>
-        <button onClick={leaveChannel} style={{
+        <button onClick={() => setView('catalog')} style={{
           background: 'none', border: 'none', color: 'var(--muted)',
           fontSize: '1.3rem', cursor: 'pointer', padding: '0 4px', lineHeight: 1,
         }}>‹</button>

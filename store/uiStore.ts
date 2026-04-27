@@ -28,6 +28,9 @@ interface UIState {
   isLoggedIn: boolean
   login: (name: string, handle: string, role: string, token: string) => void
   logout: () => void
+  // Channel
+  channelJoined: boolean
+  setChannelJoined: (v: boolean) => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -59,6 +62,9 @@ export const useUIStore = create<UIState>()(
         set({ userName: name, userHandle: handle, userRole: role, sessionToken: token, isLoggedIn: true }),
       logout: () =>
         set({ userName: '', userHandle: '', userRole: '', sessionToken: '', isLoggedIn: false, view: 'catalog' }),
+      // Channel
+      channelJoined: false,
+      setChannelJoined: (channelJoined) => set({ channelJoined }),
     }),
     {
       name: 'tp_ui',
@@ -68,6 +74,7 @@ export const useUIStore = create<UIState>()(
         userRole: s.userRole,
         sessionToken: s.sessionToken,
         isLoggedIn: s.isLoggedIn,
+        channelJoined: s.channelJoined,
       }),
     }
   )
