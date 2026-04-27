@@ -80,3 +80,11 @@ model User {
   avatarUrl String?
   createdAt DateTime @default(now())
 }
+
+model UserActivity {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  lastSeen     DateTime @default(now())
+  loginCount   Int      @default(1)
+  totalMinutes Int      @default(0)
+}

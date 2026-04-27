@@ -30,7 +30,7 @@ function LedLine() {
 }
 
 export default function Home() {
-  const { view, isLoggedIn, setView } = useUIStore()
+  const { view, isLoggedIn, setView, sessionToken } = useUIStore()
   useTelegram()
 
   React.useEffect(() => {
@@ -38,6 +38,18 @@ export default function Home() {
       navigator.serviceWorker.register('/sw.js').catch(() => {})
     }
   }, [])
+
+  // Heartbeat every 60s while logged in — tracks time in app
+  React.useEffect(() => {
+    if (!sessionToken) return
+    const ping = () => fetch('/api/activity', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${sessionToken}` },
+    }).catch(() => {})
+    ping() // immediate on login
+    const id = setInterval(ping, 60_000)
+    return () => clearInterval(id)
+  }, [sessionToken])
 
   const gated = (content: React.ReactNode) =>
     isLoggedIn ? content : <AuthGate />
