@@ -257,15 +257,18 @@ function NewsView() {
 }
 
 function ChannelFeed() {
+  const { view } = useUIStore()
   const [news, setNews] = React.useState<NewsItem[]>([])
   const [loading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
+    if (view !== 'news') return
+    setLoading(true)
     fetch('/api/news')
       .then(r => r.json())
       .then(data => { setNews(data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }, [view])
 
   if (loading) return (
     <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
