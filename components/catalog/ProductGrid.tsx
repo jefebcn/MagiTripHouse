@@ -59,8 +59,24 @@ export default function ProductGrid() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '12px 16px 100px' }}>
-      {filtered.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
-    </div>
+    <>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 16px 4px',
+      }}>
+        <div style={{
+          fontFamily: "'Fredoka One', cursive", fontSize: '.82rem',
+          color: 'var(--muted)', letterSpacing: '.3px',
+        }}>
+          🌿 Catalogo
+        </div>
+        <div style={{ fontSize: '.72rem', color: 'rgba(106,138,106,.6)', fontWeight: 500 }}>
+          {filtered.length} {filtered.length === 1 ? 'prodotto' : 'prodotti'}
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '8px 16px 100px' }}>
+        {filtered.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
+      </div>
+    </>
   )
 }
