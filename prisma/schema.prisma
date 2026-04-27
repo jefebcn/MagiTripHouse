@@ -50,8 +50,17 @@ model NewsFeed {
   title       String
   content     String
   emoji       String   @default("📢")
+  imageUrl    String?
   productLink String?
   createdAt   DateTime @default(now())
+}
+
+model ChannelMember {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  handle   String
+  name     String
+  joinedAt DateTime @default(now())
 }
 
 model PushSubscription {

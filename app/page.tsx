@@ -105,9 +105,13 @@ function NewsView() {
   const [postTitle, setPostTitle] = React.useState('')
   const [postContent, setPostContent] = React.useState('')
   const [postLink, setPostLink] = React.useState('')
+  const [postImage, setPostImage] = React.useState('')
   const [postLoading, setPostLoading] = React.useState(false)
   const [postError, setPostError] = React.useState('')
   const [extraItems, setExtraItems] = React.useState<NewsItem[]>([])
+  const [showMembers, setShowMembers] = React.useState(false)
+  const [members, setMembers] = React.useState<{id:string;handle:string;name:string;joinedAt:string}[]>([])
+  const [totalUsers, setTotalUsers] = React.useState(0)
 
   React.useEffect(() => {
     fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
@@ -128,9 +132,16 @@ function NewsView() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  // Enter channel immediately, then try push subscription in background
+  // Enter channel immediately, then record membership + try push in background
   function joinChannel() {
     setInside(true)
+    // Record membership in DB if logged in
+    if (sessionToken) {
+      fetch('/api/channel/join', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${sessionToken}` },
+      }).catch(() => {})
+    }
     // Try push async, doesn't block entry
     if ('serviceWorker' in navigator && 'PushManager' in window && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
       navigator.serviceWorker.ready.then(async reg => {
@@ -172,14 +183,23 @@ function NewsView() {
       const res = await fetch('/api/news', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-        body: JSON.stringify({ emoji: postEmoji, title: postTitle.trim(), content: postContent.trim(), productLink: postLink.trim() || null }),
+        body: JSON.stringify({ emoji: postEmoji, title: postTitle.trim(), content: postContent.trim(), imageUrl: postImage.trim() || null, productLink: postLink.trim() || null }),
       })
       const item = await res.json()
       if (!res.ok) { setPostError(item.error ?? 'Errore'); setPostLoading(false); return }
       setExtraItems(prev => [item, ...prev])
-      setComposing(false); setPostTitle(''); setPostContent(''); setPostLink(''); setPostEmoji('📢')
+      setComposing(false); setPostTitle(''); setPostContent(''); setPostLink(''); setPostImage(''); setPostEmoji('📢')
     } catch { setPostError('Errore di rete') }
     setPostLoading(false)
+  }
+
+  async function fetchMembers() {
+    try {
+      const res = await fetch('/api/channel/members', { headers: { 'Authorization': `Bearer ${sessionToken}` } })
+      const data = await res.json()
+      setMembers(data.members ?? [])
+      setTotalUsers(data.total ?? 0)
+    } catch { /* noop */ }
   }
 
   /* ─── LANDING ─── */
@@ -264,12 +284,20 @@ function NewsView() {
           </div>
         </div>
         {isAdmin && (
-          <button onClick={() => setComposing(v => !v)} style={{
-            background: composing ? 'rgba(232,59,59,.1)' : 'rgba(61,255,110,.1)',
-            border: `1px solid ${composing ? 'rgba(232,59,59,.3)' : 'rgba(61,255,110,.3)'}`,
-            borderRadius: 20, padding: '5px 12px', color: composing ? 'var(--red)' : 'var(--green)',
-            fontFamily: 'inherit', fontSize: '.72rem', fontWeight: 700, cursor: 'pointer',
-          }}>{composing ? '✕ Annulla' : '✏️ Pubblica'}</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => { setComposing(v => !v); setShowMembers(false) }} style={{
+              background: composing ? 'rgba(232,59,59,.1)' : 'rgba(61,255,110,.1)',
+              border: `1px solid ${composing ? 'rgba(232,59,59,.3)' : 'rgba(61,255,110,.3)'}`,
+              borderRadius: 20, padding: '5px 10px', color: composing ? 'var(--red)' : 'var(--green)',
+              fontFamily: 'inherit', fontSize: '.7rem', fontWeight: 700, cursor: 'pointer',
+            }}>{composing ? '✕' : '✏️'}</button>
+            <button onClick={() => { setShowMembers(v => !v); setComposing(false); if (!showMembers) fetchMembers() }} style={{
+              background: showMembers ? 'rgba(59,130,246,.15)' : 'rgba(59,130,246,.08)',
+              border: '1px solid rgba(59,130,246,.3)',
+              borderRadius: 20, padding: '5px 10px', color: '#3b82f6',
+              fontFamily: 'inherit', fontSize: '.7rem', fontWeight: 700, cursor: 'pointer',
+            }}>👥</button>
+          </div>
         )}
       </div>
 
@@ -299,6 +327,51 @@ function NewsView() {
         </div>
       )}
 
+      {/* Admin members panel */}
+      {showMembers && (
+        <div style={{
+          margin: '12px 12px 0',
+          background: 'var(--bg2)', border: '1px solid rgba(59,130,246,.2)',
+          borderRadius: 14, padding: '14px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: '#3b82f6' }}>
+              👥 Membri del canale
+            </div>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>
+              {members.length} entrati · {totalUsers} registrati
+            </div>
+          </div>
+          {members.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.8rem', padding: '16px 0' }}>
+              Nessun membro ancora
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
+              {members.map(m => (
+                <div key={m.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: 'var(--bg3)', borderRadius: 10, padding: '8px 12px',
+                }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                    background: 'var(--green)', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: '1rem', fontWeight: 800, color: '#000',
+                  }}>{m.name[0].toUpperCase()}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
+                    <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>@{m.handle}</div>
+                  </div>
+                  <div style={{ fontSize: '.65rem', color: 'var(--muted)', flexShrink: 0 }}>
+                    {new Date(m.joinedAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Admin compose panel */}
       {composing && (
         <div style={{
@@ -316,7 +389,9 @@ function NewsView() {
           <textarea placeholder="Scrivi il messaggio..." value={postContent}
             onChange={e => setPostContent(e.target.value)} rows={4}
             style={{ ...inputStyle(), resize: 'vertical', fontFamily: 'inherit', fontSize: '.88rem', lineHeight: 1.55 }} />
-          <input placeholder="Link prodotto (opzionale, https://...)" value={postLink}
+          <input placeholder="URL immagine (opzionale)" value={postImage}
+            onChange={e => setPostImage(e.target.value)} style={inputStyle()} />
+          <input placeholder="Link prodotto (opzionale)" value={postLink}
             onChange={e => setPostLink(e.target.value)} style={inputStyle()} />
           {postError && <div style={{ fontSize: '.73rem', color: 'var(--red)' }}>⚠️ {postError}</div>}
           <button onClick={publishPost} disabled={postLoading} style={{
@@ -430,9 +505,16 @@ function ChannelFeed({ extraItems, sessionToken, isAdmin }: { extraItems: NewsIt
                     {item.title}
                   </div>
                 </div>
-                <div style={{ fontSize: '.85rem', color: '#cce8d0', lineHeight: 1.65, marginBottom: item.productLink ? 10 : 6 }}>
+                <div style={{ fontSize: '.85rem', color: '#cce8d0', lineHeight: 1.65, marginBottom: (item.imageUrl || item.productLink) ? 10 : 6 }}>
                   {item.content}
                 </div>
+                {item.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={item.imageUrl} alt="" style={{
+                    width: '100%', borderRadius: 10, marginBottom: 10,
+                    maxHeight: 320, objectFit: 'cover', display: 'block',
+                  }} />
+                )}
                 {item.productLink && (
                   <a href={item.productLink} target="_blank" rel="noopener" style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -457,7 +539,7 @@ function ChannelFeed({ extraItems, sessionToken, isAdmin }: { extraItems: NewsIt
 }
 
 interface NewsItem {
-  id: string; title: string; content: string; emoji: string; productLink?: string; createdAt: string
+  id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string
 }
 
 function OrdersView() {

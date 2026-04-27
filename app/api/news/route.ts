@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       title:       body.title,
       content:     body.content,
       emoji:       body.emoji ?? '📢',
+      imageUrl:    body.imageUrl ?? null,
       productLink: body.productLink ?? null,
     },
   })
