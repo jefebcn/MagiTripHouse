@@ -817,20 +817,36 @@ function AccountView() {
           </div>
           <span style={{ color: 'var(--muted)' }}>›</span>
         </a>
-        <a href="https://t.me/+x-k20v41qKk0NGJk" target="_blank" rel="noopener" style={{
-          background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)',
+        <button onClick={() => setView('news')} style={{
+          width: '100%', background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)',
           borderRadius: '0 0 16px 16px',
           padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14,
-          textDecoration: 'none', color: 'var(--text)',
+          cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit',
         }}>
           {iconCircle('rgba(61,255,110,.1)', '📢')}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, textAlign: 'left' }}>
             <div style={{ fontWeight: 700, fontSize: '.88rem' }}>Canale Ufficiale</div>
             <div style={{ fontSize: '.72rem', color: 'var(--green)', marginTop: 2 }}>Novità & Offerte esclusive</div>
           </div>
           <span style={{ color: 'var(--muted)' }}>›</span>
-        </a>
+        </button>
       </div>
+
+      {/* ── Social ── */}
+      <a href="https://www.instagram.com/magictriphouse_4.0" target="_blank" rel="noopener" style={{
+        background: 'var(--card)',
+        border: '1px solid rgba(193,53,132,.25)',
+        borderRadius: 'var(--radius)', padding: '15px 18px',
+        display: 'flex', alignItems: 'center', gap: 14,
+        textDecoration: 'none', color: 'var(--text)',
+      }}>
+        {iconCircle('rgba(193,53,132,.15)', '📸')}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: '.88rem' }}>Seguici su Instagram</div>
+          <div style={{ fontSize: '.72rem', color: '#e1306c', marginTop: 2 }}>@magictriphouse_4.0</div>
+        </div>
+        <span style={{ color: 'var(--muted)' }}>›</span>
+      </a>
 
       {/* ── Change password ── */}
       <div style={{
