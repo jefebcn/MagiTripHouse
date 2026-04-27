@@ -1,23 +1,26 @@
+import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
 import { NextResponse } from 'next/server'
-import { put } from '@vercel/blob'
 import { auth } from '@/lib/auth'
 
-export async function POST(req: Request) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export async function POST(request: Request): Promise<NextResponse> {
+  const body = (await request.json()) as HandleUploadBody
 
-  const formData = await req.formData()
-  const file = formData.get('file') as File | null
-  if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-
-  const ext = file.name.split('.').pop() ?? 'bin'
-  const filename = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-
-  const blob = await put(filename, file, {
-    access: 'public',
-    addRandomSuffix: false,
-  })
-
-  const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
-  return NextResponse.json({ url: blob.url, mediaType })
+  try {
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async () => {
+        const session = await auth()
+        if (!session) throw new Error('Unauthorized')
+        return {
+          allowedContentTypes: ['image/*', 'video/*'],
+          maximumSizeInBytes: 200 * 1024 * 1024, // 200 MB
+        }
+      },
+      onUploadCompleted: async () => {},
+    })
+    return NextResponse.json(jsonResponse)
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 400 })
+  }
 }

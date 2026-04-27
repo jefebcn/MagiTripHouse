@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { upload } from '@vercel/blob/client'
 
 interface Variant { label: string; price: number }
 interface Product {
@@ -54,13 +55,23 @@ export default function AdminProducts() {
     if (!file) return
     setUploading(true)
     setUploadProgress(0)
-    const fd = new FormData()
-    fd.append('file', file)
-    const res = await fetch('/api/upload', { method: 'POST', body: fd })
-    const data = await res.json()
-    setForm((f) => ({ ...f, imageUrl: data.url, mediaType: data.mediaType }))
+    // Simulate progress while uploading (no native progress in this SDK version)
+    const timer = setInterval(() => setUploadProgress(p => p < 90 ? p + 5 : p), 400)
+    try {
+      const ext = file.name.split('.').pop() ?? 'bin'
+      const filename = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const blob = await upload(filename, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload',
+      })
+      const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
+      setForm((f) => ({ ...f, imageUrl: blob.url, mediaType }))
+      setUploadProgress(100)
+    } catch (err) {
+      console.error('Upload failed', err)
+    }
+    clearInterval(timer)
     setUploading(false)
-    setUploadProgress(100)
   }
 
   async function handleSave() {
