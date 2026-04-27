@@ -438,16 +438,63 @@ function urlBase64ToUint8Array(base64String: string) {
   return output
 }
 
+interface MeData {
+  joinedAt: string
+  affiliate: { code: string; referredBy: string | null; referralCount: number } | null
+  channelMember: boolean
+}
+
+function PushToggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={loading}
+      style={{
+        width: 50, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer',
+        background: enabled ? 'var(--green)' : 'rgba(106,138,106,.2)',
+        position: 'relative', transition: '.25s', flexShrink: 0,
+        boxShadow: enabled ? '0 0 12px rgba(61,255,110,.35)' : 'none',
+      }}
+    >
+      <div style={{
+        width: 22, height: 22, borderRadius: '50%', background: '#fff',
+        position: 'absolute', top: 3, transition: '.25s',
+        left: enabled ? 25 : 3,
+        boxShadow: '0 1px 4px rgba(0,0,0,.4)',
+      }} />
+    </button>
+  )
+}
+
 function AccountView() {
-  const { userName, userHandle, userRole, sessionToken, login, logout } = useUIStore()
-  const [editing, setEditing] = React.useState(false)
-  const [inputVal, setInputVal] = React.useState('')
+  const { userName, userHandle, userRole, sessionToken, login, logout, setView } = useUIStore()
+
+  // Inline edit name
+  const [editingName, setEditingName] = React.useState(false)
+  const [nameVal, setNameVal] = React.useState('')
+
+  // Push
   const [pushEnabled, setPushEnabled] = React.useState(false)
   const [pushLoading, setPushLoading] = React.useState(false)
   const [hasSW, setHasSW] = React.useState(false)
 
+  // Password change
+  const [showPwd, setShowPwd] = React.useState(false)
+  const [pwdCurrent, setPwdCurrent] = React.useState('')
+  const [pwdNew, setPwdNew] = React.useState('')
+  const [pwdConfirm, setPwdConfirm] = React.useState('')
+  const [pwdLoading, setPwdLoading] = React.useState(false)
+  const [pwdMsg, setPwdMsg] = React.useState<{ ok: boolean; text: string } | null>(null)
+
+  // Server data
+  const [meData, setMeData] = React.useState<MeData | null>(null)
+  const [codeCopied, setCodeCopied] = React.useState(false)
+
+  // Orders count from localStorage
+  const [orderCount, setOrderCount] = React.useState(0)
+
   React.useEffect(() => {
-    setInputVal(userName)
+    setNameVal(userName)
     const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
     setHasSW(supported)
     if (supported) {
@@ -455,12 +502,19 @@ function AccountView() {
         reg.pushManager.getSubscription().then((sub) => setPushEnabled(!!sub))
       )
     }
-  }, [userName])
+    const saved = localStorage.getItem('tp_orders')
+    if (saved) { try { setOrderCount(JSON.parse(saved).length) } catch { /* */ } }
+
+    if (sessionToken) {
+      fetch('/api/me', { headers: { Authorization: `Bearer ${sessionToken}` } })
+        .then(r => r.json()).then(setMeData).catch(() => {})
+    }
+  }, [userName, sessionToken])
 
   function saveName() {
-    const t = inputVal.trim()
+    const t = nameVal.trim()
     if (t) login(t, userHandle, userRole, sessionToken)
-    setEditing(false)
+    setEditingName(false)
   }
 
   async function togglePush() {
@@ -484,153 +538,320 @@ function AccountView() {
     setPushLoading(false)
   }
 
+  async function changePassword() {
+    if (pwdNew !== pwdConfirm) { setPwdMsg({ ok: false, text: 'Le password non coincidono' }); return }
+    if (pwdNew.length < 6) { setPwdMsg({ ok: false, text: 'Minimo 6 caratteri' }); return }
+    setPwdLoading(true); setPwdMsg(null)
+    try {
+      const res = await fetch('/api/users/password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        body: JSON.stringify({ currentPassword: pwdCurrent, newPassword: pwdNew }),
+      })
+      const d = await res.json()
+      if (!res.ok) { setPwdMsg({ ok: false, text: d.error ?? 'Errore' }); return }
+      setPwdMsg({ ok: true, text: 'Password aggiornata!' })
+      setPwdCurrent(''); setPwdNew(''); setPwdConfirm('')
+      setTimeout(() => setShowPwd(false), 1500)
+    } catch { setPwdMsg({ ok: false, text: 'Errore di rete' }) }
+    finally { setPwdLoading(false) }
+  }
+
+  function copyCode(code: string) {
+    navigator.clipboard.writeText(code).then(() => {
+      setCodeCopied(true)
+      setTimeout(() => setCodeCopied(false), 2000)
+    }).catch(() => {})
+  }
+
   const initial = userName ? userName[0].toUpperCase() : '?'
+  const joinedDate = meData?.joinedAt ? new Date(meData.joinedAt).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : null
+
+  const rowStyle: React.CSSProperties = {
+    background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)', padding: '15px 18px',
+    display: 'flex', alignItems: 'center', gap: 14,
+  }
+  const iconCircle = (bg: string, emoji: string) => (
+    <div style={{
+      width: 44, height: 44, borderRadius: '50%', background: bg, flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem',
+    }}>{emoji}</div>
+  )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-      {/* Avatar + nome */}
+      {/* ── Hero card ── */}
       <div style={{
-        background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)',
-        borderRadius: 'var(--radius)', padding: '28px 20px 20px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+        background: 'linear-gradient(160deg,#0d1f0f 0%,var(--card) 60%)',
+        border: '1px solid rgba(61,255,110,.18)',
+        borderRadius: 'var(--radius)', padding: '28px 20px 22px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        position: 'relative', overflow: 'hidden',
       }}>
+        {/* Background glow */}
         <div style={{
-          width: 82, height: 82, borderRadius: '50%', flexShrink: 0,
-          background: 'var(--green)',
+          position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)',
+          width: 200, height: 200, borderRadius: '50%',
+          background: 'radial-gradient(circle,rgba(61,255,110,.08) 0%,transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
+        {/* Avatar */}
+        <div style={{
+          width: 88, height: 88, borderRadius: '50%',
+          background: 'linear-gradient(135deg,var(--green),var(--green2))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '2.4rem', fontWeight: 800, color: '#000',
+          fontSize: '2.6rem', fontWeight: 800, color: '#000',
           fontFamily: "'Fredoka One', cursive",
-          boxShadow: 'var(--led-green)',
+          boxShadow: '0 0 0 4px rgba(61,255,110,.15), var(--led-green)',
         }}>
           {initial}
         </div>
 
-        {editing ? (
+        {/* Name / edit */}
+        {editingName ? (
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
             <input
-              autoFocus
-              value={inputVal}
-              onChange={(e) => setInputVal(e.target.value)}
+              autoFocus value={nameVal}
+              onChange={(e) => setNameVal(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && saveName()}
-              placeholder="Il tuo nome o username..."
+              placeholder="Il tuo nome..."
               style={{
                 flex: 1, background: 'var(--bg3)', borderRadius: 10, outline: 'none',
-                border: '1px solid rgba(61,255,110,.4)', padding: '11px 14px',
-                color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit',
+                border: '1px solid rgba(61,255,110,.4)', padding: '10px 14px',
+                color: 'var(--text)', fontSize: '.92rem', fontFamily: 'inherit',
               }}
             />
             <button onClick={saveName} style={{
               background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.4)',
-              borderRadius: 10, padding: '0 18px', color: 'var(--green)',
-              fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer', fontSize: '1.1rem',
+              borderRadius: 10, padding: '0 16px', color: 'var(--green)',
+              fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer', fontSize: '1.2rem',
             }}>✓</button>
           </div>
         ) : (
           <>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', letterSpacing: '.3px' }}>
-              {userName}
-            </div>
-            {userHandle && (
-              <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: -6 }}>@{userHandle}</div>
-            )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => { setEditing(true); setInputVal(userName) }}
-                style={{
-                  background: 'var(--bg3)', border: '1px solid var(--border)',
-                  borderRadius: 20, padding: '7px 18px', color: 'var(--muted)',
-                  fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
-                }}
-              >✏️ Modifica nome</button>
-              <button
-                onClick={logout}
-                style={{
-                  background: 'rgba(232,59,59,.08)', border: '1px solid rgba(232,59,59,.25)',
-                  borderRadius: 20, padding: '7px 14px', color: 'var(--red)',
-                  fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
-                }}
-              >Esci</button>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', letterSpacing: '.3px' }}>
+                {userName}
+              </div>
+              {userHandle && (
+                <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 2 }}>@{userHandle}</div>
+              )}
+              {joinedDate && (
+                <div style={{ fontSize: '.68rem', color: 'rgba(106,138,106,.6)', marginTop: 4 }}>
+                  🗓 Membro da {joinedDate}
+                </div>
+              )}
             </div>
           </>
         )}
+
+        {/* Stats row */}
+        <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 4 }}>
+          {[
+            { label: 'Ordini', value: orderCount, icon: '📋', onClick: () => setView('orders') },
+            { label: 'Referral', value: meData?.affiliate?.referralCount ?? 0, icon: '👥', onClick: undefined },
+            { label: 'Canale', value: meData?.channelMember ? '✓' : '—', icon: '📡', onClick: () => setView('news') },
+          ].map(s => (
+            <button key={s.label} onClick={s.onClick ?? undefined}
+              style={{
+                flex: 1, background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.1)',
+                borderRadius: 12, padding: '10px 0', cursor: s.onClick ? 'pointer' : 'default',
+                textAlign: 'center', transition: '.15s',
+              }}
+            >
+              <div style={{ fontSize: '1rem', marginBottom: 2 }}>{s.icon}</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: 'var(--text)' }}>{s.value}</div>
+              <div style={{ fontSize: '.6rem', color: 'var(--muted)', marginTop: 1, letterSpacing: '.3px' }}>{s.label}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Action buttons */}
+        {!editingName && (
+          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+            <button
+              onClick={() => { setEditingName(true); setNameVal(userName) }}
+              style={{
+                flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)',
+                borderRadius: 20, padding: '8px 0', color: 'var(--muted)',
+                fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
+              }}
+            >✏️ Modifica nome</button>
+            <button
+              onClick={logout}
+              style={{
+                background: 'rgba(232,59,59,.08)', border: '1px solid rgba(232,59,59,.22)',
+                borderRadius: 20, padding: '8px 18px', color: 'var(--red)',
+                fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
+              }}
+            >Esci</button>
+          </div>
+        )}
       </div>
 
-      {/* Push notifications */}
-      {hasSW && (
+      {/* ── Referral code ── */}
+      {meData?.affiliate && (
         <div style={{
-          background: 'var(--card)', border: '1px solid var(--border)',
+          background: 'var(--card)', border: '1px solid rgba(245,200,66,.2)',
           borderRadius: 'var(--radius)', padding: '16px 18px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '.9rem' }}>🔔 Notifiche Push</div>
-            <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: 3 }}>
-              {pushEnabled ? 'Attive · ricevi news e offerte' : 'Disattive · tocca per abilitare'}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>🎫 Il tuo codice referral</div>
+            {meData.affiliate.referralCount > 0 && (
+              <div style={{ fontSize: '.7rem', color: 'var(--gold)', fontWeight: 600 }}>
+                {meData.affiliate.referralCount} {meData.affiliate.referralCount === 1 ? 'amico' : 'amici'} iscritti
+              </div>
+            )}
           </div>
           <button
-            onClick={togglePush}
-            disabled={pushLoading}
+            onClick={() => copyCode(meData.affiliate!.code)}
             style={{
-              width: 50, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer',
-              background: pushEnabled ? 'var(--green)' : 'var(--bg3)',
-              position: 'relative', transition: '.25s', flexShrink: 0,
-              boxShadow: pushEnabled ? '0 0 12px rgba(61,255,110,.4)' : 'none',
+              width: '100%', background: 'linear-gradient(135deg,rgba(245,200,66,.08),rgba(245,200,66,.04))',
+              border: '1.5px solid rgba(245,200,66,.35)', borderRadius: 12,
+              padding: '14px 18px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}
           >
-            <div style={{
-              width: 22, height: 22, borderRadius: '50%', background: '#fff',
-              position: 'absolute', top: 3, transition: '.25s',
-              left: pushEnabled ? 25 : 3,
-              boxShadow: '0 1px 4px rgba(0,0,0,.3)',
-            }} />
+            <span style={{
+              fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem',
+              letterSpacing: '8px', color: 'var(--gold)',
+              textShadow: 'var(--led-gold)',
+            }}>
+              {meData.affiliate.code}
+            </span>
+            <span style={{
+              fontSize: '.72rem', fontWeight: 700,
+              color: codeCopied ? 'var(--green)' : 'var(--muted)',
+              transition: '.2s',
+            }}>
+              {codeCopied ? '✓ Copiato!' : '📋 Copia'}
+            </span>
           </button>
+          <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.6)', marginTop: 8, lineHeight: 1.5 }}>
+            Condividi questo codice — ogni amico che si registra con il tuo codice ti viene attribuito.
+          </div>
         </div>
       )}
 
-      {/* Telegram contatto */}
-      <a href="https://t.me/magichous8" target="_blank" rel="noopener" style={{
-        background: 'var(--card)', border: '1px solid rgba(59,130,246,.25)',
-        borderRadius: 'var(--radius)', padding: '16px 18px',
-        display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'var(--text)',
-      }}>
-        <div style={{
-          width: 46, height: 46, borderRadius: '50%', background: 'rgba(59,130,246,.15)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0,
-        }}>✈️</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: '.9rem' }}>Scrivici su Telegram</div>
-          <div style={{ fontSize: '.75rem', color: '#3b82f6', marginTop: 3 }}>@magichous8</div>
+      {/* ── Push notifications ── */}
+      {hasSW && (
+        <div style={{ ...rowStyle, justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>🔔 Notifiche Push</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 3 }}>
+              {pushEnabled ? 'Attive · ricevi news e offerte' : 'Disattive · tocca per abilitare'}
+            </div>
+          </div>
+          <PushToggle enabled={pushEnabled} loading={pushLoading} onToggle={togglePush} />
         </div>
-        <span style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>›</span>
-      </a>
+      )}
 
-      {/* Canale ufficiale */}
-      <a href="https://t.me/+x-k20v41qKk0NGJk" target="_blank" rel="noopener" style={{
-        background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)',
-        borderRadius: 'var(--radius)', padding: '16px 18px',
-        display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'var(--text)',
-      }}>
-        <div style={{
-          width: 46, height: 46, borderRadius: '50%', background: 'rgba(61,255,110,.1)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0,
-        }}>📢</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: '.9rem' }}>Canale Ufficiale</div>
-          <div style={{ fontSize: '.75rem', color: 'var(--green)', marginTop: 3 }}>Novità & Offerte esclusive</div>
-        </div>
-        <span style={{ color: 'var(--muted)', fontSize: '1.2rem' }}>›</span>
-      </a>
-
-      {/* Disclaimer */}
-      <div style={{
-        background: 'rgba(232,59,59,.07)', border: '1px solid rgba(232,59,59,.2)',
-        borderRadius: 'var(--radius)', padding: '14px 16px',
-        fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6,
-      }}>
-        ⚠️ Account limitato? Salva prima il contatto <span style={{ color: 'var(--red)', fontWeight: 700 }}>@magichous8</span> prima di scrivere.
+      {/* ── Links group ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+        <a href="https://t.me/magichous8" target="_blank" rel="noopener" style={{
+          background: 'var(--card)', border: '1px solid rgba(59,130,246,.2)',
+          borderBottom: 'none', borderRadius: '16px 16px 0 0',
+          padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14,
+          textDecoration: 'none', color: 'var(--text)',
+        }}>
+          {iconCircle('rgba(59,130,246,.15)', '✈️')}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>Scrivici su Telegram</div>
+            <div style={{ fontSize: '.72rem', color: '#3b82f6', marginTop: 2 }}>@magichous8</div>
+          </div>
+          <span style={{ color: 'var(--muted)' }}>›</span>
+        </a>
+        <a href="https://t.me/+x-k20v41qKk0NGJk" target="_blank" rel="noopener" style={{
+          background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)',
+          borderRadius: '0 0 16px 16px',
+          padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14,
+          textDecoration: 'none', color: 'var(--text)',
+        }}>
+          {iconCircle('rgba(61,255,110,.1)', '📢')}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>Canale Ufficiale</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--green)', marginTop: 2 }}>Novità & Offerte esclusive</div>
+          </div>
+          <span style={{ color: 'var(--muted)' }}>›</span>
+        </a>
       </div>
+
+      {/* ── Change password ── */}
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)', overflow: 'hidden',
+      }}>
+        <button
+          onClick={() => { setShowPwd(v => !v); setPwdMsg(null) }}
+          style={{
+            width: '100%', padding: '15px 18px', background: 'none', border: 'none',
+            display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', color: 'var(--text)',
+            fontFamily: 'inherit',
+          }}
+        >
+          {iconCircle('rgba(106,138,106,.12)', '🔑')}
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>Cambia Password</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>Aggiorna le tue credenziali di accesso</div>
+          </div>
+          <span style={{ color: 'var(--muted)', transition: '.2s', transform: showPwd ? 'rotate(90deg)' : 'none' }}>›</span>
+        </button>
+
+        {showPwd && (
+          <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {(['Password attuale', 'Nuova password', 'Conferma nuova'] as const).map((label, i) => {
+              const vals = [pwdCurrent, pwdNew, pwdConfirm]
+              const setters = [setPwdCurrent, setPwdNew, setPwdConfirm]
+              return (
+                <input
+                  key={i}
+                  type="password"
+                  placeholder={label}
+                  value={vals[i]}
+                  onChange={(e) => setters[i](e.target.value)}
+                  style={{
+                    background: 'var(--bg3)', borderRadius: 10, outline: 'none',
+                    border: '1px solid rgba(61,255,110,.2)', padding: '11px 14px',
+                    color: 'var(--text)', fontSize: '.88rem', fontFamily: 'inherit', width: '100%',
+                  }}
+                />
+              )
+            })}
+            {pwdMsg && (
+              <div style={{ fontSize: '.75rem', color: pwdMsg.ok ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
+                {pwdMsg.ok ? '✓' : '⚠️'} {pwdMsg.text}
+              </div>
+            )}
+            <button
+              onClick={changePassword}
+              disabled={pwdLoading || !pwdCurrent || !pwdNew || !pwdConfirm}
+              style={{
+                background: 'linear-gradient(135deg,rgba(61,255,110,.2),rgba(61,255,110,.1))',
+                border: '1px solid rgba(61,255,110,.4)', borderRadius: 10, padding: '11px',
+                color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700,
+                fontSize: '.88rem', cursor: 'pointer',
+              }}
+            >
+              {pwdLoading ? 'Salvataggio...' : 'Aggiorna password'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Disclaimer ── */}
+      <div style={{
+        background: 'rgba(255,107,53,.05)', border: '1px solid rgba(255,107,53,.18)',
+        borderRadius: 12, padding: '12px 16px',
+        fontSize: '.72rem', color: 'rgba(106,138,106,.7)', lineHeight: 1.6,
+      }}>
+        ⚠️ Account Telegram limitato? Salva prima il contatto{' '}
+        <span style={{ color: '#ffcf99', fontWeight: 700 }}>@magichous8</span>{' '}
+        prima di scrivere.
+      </div>
+
     </div>
   )
 }
