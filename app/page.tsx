@@ -59,12 +59,20 @@ export default function Home() {
       <LedLine />
 
       <div style={{ display: view === 'catalog' ? 'block' : 'none' }}>
-        <Header />
-        <AnnouncementBanner />
-        <Marquee />
-        <CategoryFilter />
-        <SearchBar />
-        <ProductGrid />
+        {isLoggedIn ? (
+          <>
+            <Header />
+            <AnnouncementBanner />
+            <Marquee />
+            <CategoryFilter />
+            <SearchBar />
+            <ProductGrid />
+          </>
+        ) : (
+          <div style={{ padding: '16px 16px 100px' }}>
+            <AuthView />
+          </div>
+        )}
       </div>
 
       <div style={{ display: view === 'news' ? 'block' : 'none' }}>
