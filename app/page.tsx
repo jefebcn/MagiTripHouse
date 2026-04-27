@@ -154,7 +154,7 @@ function NewsView() {
       }}>📡</div>
 
       <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', textAlign: 'center', marginBottom: 6 }}>
-        MagiTripHouse
+        Magic Trip House
       </div>
       <div style={{ fontSize: '.82rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 24, lineHeight: 1.5 }}>
         Canale ufficiale<br />Novità, offerte &amp; aggiornamenti esclusivi
@@ -217,7 +217,7 @@ function NewsView() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
         }}>📡</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', lineHeight: 1.2 }}>MagiTripHouse</div>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', lineHeight: 1.2 }}>Magic Trip House</div>
           <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>
             {memberCount ?? '—'} iscritti · {subscribed ? '🔔 notifiche attive' : '🔕 solo lettura'}
           </div>
@@ -331,7 +331,7 @@ function ChannelFeed() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.85rem',
                 }}>📡</div>
                 <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--green)', flex: 1 }}>
-                  MagiTripHouse
+                  Magic Trip House
                 </span>
               </div>
 
