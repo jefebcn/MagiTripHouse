@@ -33,7 +33,12 @@ export default function Home() {
   const { view, isLoggedIn, setView } = useUIStore()
   useTelegram()
 
-  // Redirect gated views to account/login if not logged in
+  React.useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    }
+  }, [])
+
   const gated = (content: React.ReactNode) =>
     isLoggedIn ? content : <AuthGate />
 
@@ -41,7 +46,6 @@ export default function Home() {
     <main style={{ minHeight: '100dvh', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
       <LedLine />
 
-      {/* Catalog — always visible */}
       <div style={{ display: view === 'catalog' ? 'block' : 'none' }}>
         <Header />
         <AnnouncementBanner />
@@ -51,22 +55,18 @@ export default function Home() {
         <ProductGrid />
       </div>
 
-      {/* Canale */}
-      <div style={{ display: view === 'news' ? 'block' : 'none', padding: '16px 16px 100px' }}>
+      <div style={{ display: view === 'news' ? 'block' : 'none' }}>
         {gated(<NewsView />)}
       </div>
 
-      {/* Ordini */}
       <div style={{ display: view === 'orders' ? 'block' : 'none', padding: '16px 16px 100px' }}>
         {gated(<OrdersView />)}
       </div>
 
-      {/* Account */}
       <div style={{ display: view === 'account' ? 'block' : 'none', padding: '16px 16px 100px' }}>
         {isLoggedIn ? <AccountView /> : <AuthView />}
       </div>
 
-      {/* Affiliati */}
       <div style={{ display: view === 'affiliates' ? 'block' : 'none', padding: '16px 16px 100px' }}>
         {gated(<AffiliatesView />)}
       </div>
@@ -93,13 +93,11 @@ function NewsView() {
   const isAdmin = userRole === 'admin'
 
   const [subscribed, setSubscribed] = React.useState(false)
-  const [subLoading, setSubLoading] = React.useState(false)
-  const [hasPush, setHasPush] = React.useState(false)
   const [memberCount, setMemberCount] = React.useState<number | null>(null)
   const [inside, setInside] = React.useState(false)
-  const [pwaBannerDismissed, setPwaBannerDismissed] = React.useState(false)
   const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(null)
   const [isStandalone, setIsStandalone] = React.useState(false)
+  const [pwaBannerDismissed, setPwaBannerDismissed] = React.useState(false)
 
   // Admin compose
   const [composing, setComposing] = React.useState(false)
@@ -109,371 +107,351 @@ function NewsView() {
   const [postLink, setPostLink] = React.useState('')
   const [postLoading, setPostLoading] = React.useState(false)
   const [postError, setPostError] = React.useState('')
-  const [newsFeed, setNewsFeed] = React.useState<NewsItem[] | null>(null)
+  const [extraItems, setExtraItems] = React.useState<NewsItem[]>([])
 
   React.useEffect(() => {
     fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
-    const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
-    setHasPush(supported)
-    if (supported) {
-      navigator.serviceWorker.ready.then((reg) =>
-        reg.pushManager.getSubscription().then((sub) => {
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
+    setPwaBannerDismissed(sessionStorage.getItem('pwa_banner_dismissed') === '1')
+
+    // Check existing push subscription (non-blocking)
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.ready.then(reg =>
+        reg.pushManager.getSubscription().then(sub => {
           if (sub) { setSubscribed(true); setInside(true) }
         })
-      )
+      ).catch(() => {})
     }
-    // Check if already installed as PWA
-    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
-    const dismissed = sessionStorage.getItem('pwa_banner_dismissed') === '1'
-    setPwaBannerDismissed(dismissed)
-    // Capture install prompt
-    const handler = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
-    }
+
+    const handler = (e: Event) => { e.preventDefault(); setDeferredPrompt(e as BeforeInstallPromptEvent) }
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  async function joinChannel() {
-    setSubLoading(true)
-    try {
-      if (hasPush) {
-        const reg = await navigator.serviceWorker.ready
-        const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-        const padding = '='.repeat((4 - (key.length % 4)) % 4)
-        const base64 = (key + padding).replace(/-/g, '+').replace(/_/g, '/')
-        const raw = window.atob(base64)
-        const arr = new Uint8Array(raw.length)
-        for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i)
-        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr })
-        await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
-        setSubscribed(true)
-        setMemberCount(c => (c ?? 0) + 1)
-      }
-    } catch { /* permission denied — entra comunque in view-only */ }
+  // Enter channel immediately, then try push subscription in background
+  function joinChannel() {
     setInside(true)
-    setSubLoading(false)
+    // Try push async, doesn't block entry
+    if ('serviceWorker' in navigator && 'PushManager' in window && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+      navigator.serviceWorker.ready.then(async reg => {
+        try {
+          const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+          const pad = '='.repeat((4 - key.length % 4) % 4)
+          const b64 = (key + pad).replace(/-/g, '+').replace(/_/g, '/')
+          const raw = atob(b64); const arr = new Uint8Array(raw.length)
+          for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i)
+          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr })
+          await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
+          setSubscribed(true)
+          setMemberCount(c => (c ?? 0) + 1)
+        } catch { /* permission denied or unsupported */ }
+      }).catch(() => {})
+    }
   }
 
   async function leaveChannel() {
-    try {
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
-      if (sub) {
-        await sub.unsubscribe()
-        await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
-        setMemberCount(c => Math.max(0, (c ?? 1) - 1))
-      }
-    } catch { /* noop */ }
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready
+        const sub = await reg.pushManager.getSubscription()
+        if (sub) {
+          await sub.unsubscribe()
+          await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
+          setMemberCount(c => Math.max(0, (c ?? 1) - 1))
+        }
+      } catch { /* noop */ }
+    }
     setSubscribed(false)
     setInside(false)
   }
 
-  /* ---- LANDING del canale ---- */
+  async function publishPost() {
+    if (!postTitle.trim() || !postContent.trim()) { setPostError('Titolo e contenuto obbligatori'); return }
+    setPostLoading(true); setPostError('')
+    try {
+      const res = await fetch('/api/news', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+        body: JSON.stringify({ emoji: postEmoji, title: postTitle.trim(), content: postContent.trim(), productLink: postLink.trim() || null }),
+      })
+      const item = await res.json()
+      if (!res.ok) { setPostError(item.error ?? 'Errore'); setPostLoading(false); return }
+      setExtraItems(prev => [item, ...prev])
+      setComposing(false); setPostTitle(''); setPostContent(''); setPostLink(''); setPostEmoji('📢')
+    } catch { setPostError('Errore di rete') }
+    setPostLoading(false)
+  }
+
+  /* ─── LANDING ─── */
   if (!inside) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 32, gap: 0 }}>
-      {/* Avatar canale */}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px 100px' }}>
+      {/* Channel avatar */}
       <div style={{
-        width: 88, height: 88, borderRadius: '50%',
-        background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.35), rgba(61,255,110,.08))',
-        border: '2px solid rgba(61,255,110,.4)',
+        width: 96, height: 96, borderRadius: '50%', marginBottom: 20,
+        background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.4), rgba(61,255,110,.1))',
+        border: '2.5px solid rgba(61,255,110,.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '2.6rem', boxShadow: '0 0 32px rgba(61,255,110,.2)',
-        marginBottom: 18,
+        fontSize: '2.8rem', boxShadow: '0 0 40px rgba(61,255,110,.25)',
       }}>📡</div>
 
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', letterSpacing: '.4px', textAlign: 'center' }}>
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', textAlign: 'center', marginBottom: 6 }}>
         MagiTripHouse
       </div>
-      <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 6, textAlign: 'center' }}>
-        Canale ufficiale · Novità, offerte & aggiornamenti esclusivi
+      <div style={{ fontSize: '.82rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 24, lineHeight: 1.5 }}>
+        Canale ufficiale<br />Novità, offerte &amp; aggiornamenti esclusivi
       </div>
 
-      {/* Contatore iscritti */}
       <div style={{
-        marginTop: 18, display: 'flex', alignItems: 'center', gap: 8,
-        background: 'var(--bg3)', border: '1px solid var(--border)',
-        borderRadius: 20, padding: '8px 18px',
+        display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32,
+        background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '10px 24px',
       }}>
-        <span style={{ fontSize: '1rem' }}>👥</span>
-        <span style={{ fontWeight: 700, fontSize: '.9rem', color: 'var(--green)' }}>
-          {memberCount ?? '—'}
-        </span>
-        <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>iscritti</span>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--green)' }}>{memberCount ?? '—'}</div>
+          <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>iscritti</div>
+        </div>
+        <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text)' }}>📡</div>
+          <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>canale</div>
+        </div>
       </div>
 
       <button
         onClick={joinChannel}
-        disabled={subLoading}
         style={{
-          marginTop: 28, padding: '14px 40px',
+          width: '100%', maxWidth: 300, padding: '15px',
           borderRadius: 14, fontFamily: 'inherit', fontWeight: 700,
-          fontSize: '1rem', cursor: 'pointer', transition: '.2s',
-          background: 'rgba(61,255,110,.18)', border: '1.5px solid rgba(61,255,110,.5)',
-          color: 'var(--green)', boxShadow: '0 0 20px rgba(61,255,110,.15)',
+          fontSize: '1.05rem', cursor: 'pointer',
+          background: 'linear-gradient(135deg, rgba(61,255,110,.25), rgba(61,255,110,.12))',
+          border: '1.5px solid rgba(61,255,110,.6)',
+          color: 'var(--green)', boxShadow: '0 0 24px rgba(61,255,110,.2)',
+          marginBottom: 10,
         }}
-      >
-        {subLoading ? '...' : '📡 Entra nel Canale'}
-      </button>
-
-      <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 12, textAlign: 'center', opacity: .7 }}>
+      >📡 Entra nel Canale</button>
+      <div style={{ fontSize: '.7rem', color: 'var(--muted)', opacity: .7 }}>
         Attiva le notifiche per non perderti nulla
       </div>
     </div>
   )
 
-  async function installPwa() {
-    if (deferredPrompt) {
-      deferredPrompt.prompt()
-      const { outcome } = await deferredPrompt.userChoice
-      if (outcome === 'accepted') setDeferredPrompt(null)
-    }
-  }
-
-  function dismissPwaBanner() {
-    sessionStorage.setItem('pwa_banner_dismissed', '1')
-    setPwaBannerDismissed(true)
-  }
-
-  /* ---- INTERNO del canale ---- */
   const showPwaBanner = !isStandalone && !pwaBannerDismissed
 
+  /* ─── INTERNO canale (stile Telegram) ─── */
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* Header interno */}
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', paddingBottom: 80 }}>
+
+      {/* Sticky header */}
       <div style={{
-        background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.15)',
-        borderRadius: 'var(--radius)', padding: '16px 18px',
-        display: 'flex', alignItems: 'center', gap: 14, marginBottom: showPwaBanner ? 14 : 20,
+        position: 'sticky', top: 0, zIndex: 10,
+        background: 'rgba(8,12,8,.95)', backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid rgba(61,255,110,.12)',
+        padding: '12px 16px',
+        display: 'flex', alignItems: 'center', gap: 12,
       }}>
+        <button onClick={leaveChannel} style={{
+          background: 'none', border: 'none', color: 'var(--muted)',
+          fontSize: '1.3rem', cursor: 'pointer', padding: '0 4px', lineHeight: 1,
+        }}>‹</button>
         <div style={{
-          width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-          background: 'rgba(61,255,110,.12)', border: '1.5px solid rgba(61,255,110,.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem',
+          width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+          background: 'rgba(61,255,110,.15)', border: '1.5px solid rgba(61,255,110,.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
         }}>📡</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem' }}>MagiTripHouse</div>
-          <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
-            👥 {memberCount ?? '—'} iscritti · {subscribed ? '🔔 Notifiche attive' : '🔕 Solo lettura'}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', lineHeight: 1.2 }}>MagiTripHouse</div>
+          <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>
+            {memberCount ?? '—'} iscritti · {subscribed ? '🔔 notifiche attive' : '🔕 solo lettura'}
           </div>
         </div>
-        <button
-          onClick={leaveChannel}
-          style={{
-            background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.25)',
-            borderRadius: 20, padding: '6px 14px', color: 'var(--red)',
+        {isAdmin && (
+          <button onClick={() => setComposing(v => !v)} style={{
+            background: composing ? 'rgba(232,59,59,.1)' : 'rgba(61,255,110,.1)',
+            border: `1px solid ${composing ? 'rgba(232,59,59,.3)' : 'rgba(61,255,110,.3)'}`,
+            borderRadius: 20, padding: '5px 12px', color: composing ? 'var(--red)' : 'var(--green)',
             fontFamily: 'inherit', fontSize: '.72rem', fontWeight: 700, cursor: 'pointer',
-          }}
-        >Esci</button>
+          }}>{composing ? '✕ Annulla' : '✏️ Pubblica'}</button>
+        )}
       </div>
 
-      {/* PWA install banner */}
+      {/* PWA banner */}
       {showPwaBanner && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(61,255,110,.1), rgba(245,200,66,.07))',
-          border: '1px solid rgba(61,255,110,.3)',
-          borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 18,
-          position: 'relative',
+          margin: '10px 12px 0',
+          background: 'linear-gradient(135deg,rgba(61,255,110,.1),rgba(245,200,66,.06))',
+          border: '1px solid rgba(61,255,110,.25)', borderRadius: 12, padding: '12px 14px',
+          display: 'flex', gap: 10, alignItems: 'flex-start', position: 'relative',
         }}>
-          <button
-            onClick={dismissPwaBanner}
-            style={{
-              position: 'absolute', top: 10, right: 12, background: 'none', border: 'none',
-              color: 'var(--muted)', fontSize: '1rem', cursor: 'pointer', lineHeight: 1,
-            }}
-          >✕</button>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', paddingRight: 20 }}>
-            <span style={{ fontSize: '1.8rem', lineHeight: 1, flexShrink: 0 }}>📲</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: 4, color: 'var(--green)' }}>
-                Installa l&apos;app sul telefono!
-              </div>
-              <div style={{ fontSize: '.78rem', color: '#c8e6cb', lineHeight: 1.55 }}>
-                Aggiungi MagiTripHouse alla schermata Home per accedere subito al canale e non perderti nessuna novità.
-                Poi attiva le notifiche push per ricevere aggiornamenti in tempo reale.
-              </div>
-              {deferredPrompt ? (
-                <button
-                  onClick={installPwa}
-                  style={{
-                    marginTop: 10, padding: '8px 18px', borderRadius: 10,
-                    background: 'rgba(61,255,110,.2)', border: '1px solid rgba(61,255,110,.45)',
-                    color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700,
-                    fontSize: '.8rem', cursor: 'pointer',
-                  }}
-                >📲 Installa ora</button>
-              ) : (
-                <div style={{ marginTop: 8, fontSize: '.73rem', color: 'var(--muted)', opacity: .85 }}>
-                  iOS: tocca <strong style={{ color: 'var(--text)' }}>Condividi</strong> → <strong style={{ color: 'var(--text)' }}>Aggiungi a Home</strong>
-                  <br />Android: menu browser → <strong style={{ color: 'var(--text)' }}>Aggiungi a schermata Home</strong>
-                </div>
-              )}
+          <button onClick={() => { sessionStorage.setItem('pwa_banner_dismissed','1'); setPwaBannerDismissed(true) }}
+            style={{ position:'absolute', top:8, right:10, background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'.9rem' }}>✕</button>
+          <span style={{ fontSize:'1.5rem', flexShrink:0 }}>📲</span>
+          <div style={{ paddingRight: 20 }}>
+            <div style={{ fontWeight:700, fontSize:'.82rem', color:'var(--green)', marginBottom:3 }}>Installa l&apos;app!</div>
+            <div style={{ fontSize:'.73rem', color:'var(--muted)', lineHeight:1.5 }}>
+              {deferredPrompt
+                ? <button onClick={async () => { deferredPrompt.prompt(); await deferredPrompt.userChoice; setDeferredPrompt(null) }}
+                    style={{ background:'rgba(61,255,110,.15)', border:'1px solid rgba(61,255,110,.4)', borderRadius:8, padding:'5px 14px', color:'var(--green)', fontFamily:'inherit', fontWeight:700, fontSize:'.78rem', cursor:'pointer' }}>
+                    📲 Installa ora
+                  </button>
+                : <>iOS: Condividi → Aggiungi a Home · Android: menu → Aggiungi a schermata Home</>
+              }
             </div>
           </div>
         </div>
       )}
 
       {/* Admin compose panel */}
-      {isAdmin && (
-        <div style={{ marginBottom: 16 }}>
-          {!composing ? (
-            <button
-              onClick={() => setComposing(true)}
-              style={{
-                width: '100%', padding: '12px', borderRadius: 12,
-                background: 'rgba(61,255,110,.1)', border: '1.5px dashed rgba(61,255,110,.4)',
-                color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700,
-                fontSize: '.9rem', cursor: 'pointer',
-              }}
-            >✏️ Pubblica nel canale</button>
-          ) : (
-            <div style={{
-              background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.25)',
-              borderRadius: 'var(--radius)', padding: '16px',
-              display: 'flex', flexDirection: 'column', gap: 10,
-            }}>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: 'var(--green)', marginBottom: 2 }}>
-                📝 Nuovo messaggio
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input placeholder="Emoji" value={postEmoji}
-                  onChange={e => setPostEmoji(e.target.value)}
-                  style={{ ...inputStyle(), width: 60, flexShrink: 0, textAlign: 'center', fontSize: '1.2rem' }} />
-                <input placeholder="Titolo" value={postTitle}
-                  onChange={e => setPostTitle(e.target.value)}
-                  style={{ ...inputStyle(), flex: 1 }} />
-              </div>
-              <textarea placeholder="Contenuto del messaggio..." value={postContent}
-                onChange={e => setPostContent(e.target.value)}
-                rows={4}
-                style={{
-                  ...inputStyle(), resize: 'vertical', lineHeight: 1.55,
-                  fontFamily: 'inherit', fontSize: '.88rem',
-                }} />
-              <input placeholder="Link prodotto (opzionale)" value={postLink}
-                onChange={e => setPostLink(e.target.value)}
-                style={inputStyle()} />
-              {postError && <div style={{ fontSize: '.75rem', color: 'var(--red)' }}>⚠️ {postError}</div>}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={async () => {
-                    if (!postTitle.trim() || !postContent.trim()) { setPostError('Titolo e contenuto obbligatori'); return }
-                    setPostLoading(true); setPostError('')
-                    try {
-                      const res = await fetch('/api/news', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
-                        body: JSON.stringify({ emoji: postEmoji, title: postTitle.trim(), content: postContent.trim(), productLink: postLink.trim() || null }),
-                      })
-                      const item = await res.json()
-                      if (!res.ok) { setPostError(item.error ?? 'Errore'); setPostLoading(false); return }
-                      setNewsFeed(prev => [item, ...(prev ?? [])])
-                      setComposing(false); setPostTitle(''); setPostContent(''); setPostLink(''); setPostEmoji('📢')
-                    } catch { setPostError('Errore di rete') }
-                    setPostLoading(false)
-                  }}
-                  disabled={postLoading}
-                  style={{
-                    flex: 1, padding: '12px', borderRadius: 10, fontFamily: 'inherit', fontWeight: 700,
-                    fontSize: '.9rem', cursor: postLoading ? 'default' : 'pointer',
-                    background: 'rgba(61,255,110,.18)', border: '1px solid rgba(61,255,110,.45)', color: 'var(--green)',
-                  }}
-                >{postLoading ? '...' : '🚀 Pubblica'}</button>
-                <button
-                  onClick={() => { setComposing(false); setPostError('') }}
-                  style={{
-                    padding: '12px 16px', borderRadius: 10, fontFamily: 'inherit',
-                    background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer',
-                  }}
-                >Annulla</button>
-              </div>
-            </div>
-          )}
+      {composing && (
+        <div style={{
+          margin: '12px 12px 0',
+          background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.2)',
+          borderRadius: 14, padding: '14px',
+          display: 'flex', flexDirection: 'column', gap: 9,
+        }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input placeholder="📢" value={postEmoji} onChange={e => setPostEmoji(e.target.value)}
+              style={{ ...inputStyle(), width: 52, textAlign: 'center', fontSize: '1.2rem', padding: '10px 6px' }} />
+            <input placeholder="Titolo del messaggio" value={postTitle} onChange={e => setPostTitle(e.target.value)}
+              style={{ ...inputStyle(), flex: 1 }} />
+          </div>
+          <textarea placeholder="Scrivi il messaggio..." value={postContent}
+            onChange={e => setPostContent(e.target.value)} rows={4}
+            style={{ ...inputStyle(), resize: 'vertical', fontFamily: 'inherit', fontSize: '.88rem', lineHeight: 1.55 }} />
+          <input placeholder="Link prodotto (opzionale, https://...)" value={postLink}
+            onChange={e => setPostLink(e.target.value)} style={inputStyle()} />
+          {postError && <div style={{ fontSize: '.73rem', color: 'var(--red)' }}>⚠️ {postError}</div>}
+          <button onClick={publishPost} disabled={postLoading} style={{
+            padding: '12px', borderRadius: 10, fontFamily: 'inherit', fontWeight: 700,
+            fontSize: '.9rem', cursor: postLoading ? 'default' : 'pointer',
+            background: 'rgba(61,255,110,.18)', border: '1px solid rgba(61,255,110,.45)', color: 'var(--green)',
+          }}>{postLoading ? '...' : '🚀 Pubblica nel canale'}</button>
         </div>
       )}
 
-      <NewsFeed externalItems={newsFeed} />
+      {/* Feed messaggi */}
+      <ChannelFeed extraItems={extraItems} sessionToken={sessionToken} isAdmin={isAdmin} />
     </div>
   )
 }
 
-function NewsFeed({ externalItems }: { externalItems?: NewsItem[] | null }) {
+function ChannelFeed({ extraItems, sessionToken, isAdmin }: { extraItems: NewsItem[]; sessionToken: string; isAdmin: boolean }) {
   const [news, setNews] = React.useState<NewsItem[]>([])
   const [loading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
     fetch('/api/news')
-      .then((r) => r.json())
-      .then((data) => { setNews(data); setLoading(false) })
+      .then(r => r.json())
+      .then(data => { setNews(data); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
-  const displayNews = externalItems ?? news
+  async function deletePost(id: string) {
+    await fetch('/api/news', { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` }, body: JSON.stringify({ id }) })
+    setNews(prev => prev.filter(n => n.id !== id))
+  }
+
+  const allItems = [...extraItems, ...news.filter(n => !extraItems.find(e => e.id === n.id))]
 
   if (loading) return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {[1, 2, 3].map((i) => (
-        <div key={i} style={{ background: 'var(--card)', borderRadius: 'var(--radius)', height: 90, opacity: .5, animation: 'skeleton-shine 1.4s infinite' }} />
+    <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {[1, 2, 3].map(i => (
+        <div key={i} style={{ background: 'var(--card)', borderRadius: 16, height: 110, opacity: .4, animation: 'skeleton-shine 1.4s infinite' }} />
       ))}
     </div>
   )
 
-  if (!loading && !displayNews.length) return (
-    <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px 0' }}>
-      <div style={{ fontSize: '3rem', marginBottom: 10 }}>📭</div>
-      <div style={{ fontSize: '.88rem' }}>Nessun messaggio ancora</div>
-      <div style={{ fontSize: '.75rem', marginTop: 6, opacity: .6 }}>Iscriviti per ricevere le prime novità</div>
+  if (!allItems.length) return (
+    <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '60px 24px' }}>
+      <div style={{ fontSize: '3rem', marginBottom: 12 }}>📭</div>
+      <div style={{ fontSize: '.9rem', fontWeight: 600 }}>Nessun messaggio ancora</div>
+      <div style={{ fontSize: '.75rem', marginTop: 6, opacity: .6 }}>I messaggi del canale appariranno qui</div>
     </div>
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {displayNews.map((item, i) => (
-        <div
-          key={item.id}
-          style={{
-            background: 'var(--card)', border: '1px solid rgba(61,255,110,.1)',
-            borderRadius: 'var(--radius)', padding: '16px 16px 14px',
-            animation: 'fadeInUp .3s ease both', animationDelay: `${i * 0.05}s`,
-            position: 'relative', overflow: 'hidden',
-          }}
-        >
-          {/* left accent bar */}
-          <div style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
-            background: 'linear-gradient(180deg, var(--green), rgba(61,255,110,.2))',
-          }} />
-          <div style={{ paddingLeft: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-              <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>{item.emoji}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', letterSpacing: '.2px' }}>
-                  {item.title}
+    <div style={{ padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {allItems.map((item, i) => {
+        const dt = new Date(item.createdAt)
+        const today = new Date(); const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+        const isToday = dt.toDateString() === today.toDateString()
+        const isYest = dt.toDateString() === yesterday.toDateString()
+        const dateLabel = isToday ? 'Oggi' : isYest ? 'Ieri' : dt.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })
+        const prevItem = allItems[i - 1]
+        const prevDt = prevItem ? new Date(prevItem.createdAt) : null
+        const showDate = !prevDt || prevDt.toDateString() !== dt.toDateString()
+
+        return (
+          <React.Fragment key={item.id}>
+            {showDate && (
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 6px' }}>
+                <span style={{
+                  background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.15)',
+                  borderRadius: 20, padding: '3px 14px', fontSize: '.68rem', color: 'var(--muted)',
+                }}>{dateLabel}</span>
+              </div>
+            )}
+            {/* Channel post bubble */}
+            <div style={{
+              background: 'var(--bg2)',
+              border: '1px solid rgba(61,255,110,.1)',
+              borderRadius: '4px 16px 16px 16px',
+              padding: '0',
+              animation: 'fadeInUp .25s ease both',
+              animationDelay: `${Math.min(i, 6) * 0.04}s`,
+              overflow: 'hidden',
+              position: 'relative',
+            }}>
+              {/* Channel name bar */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 14px 6px',
+                borderBottom: '1px solid rgba(61,255,110,.07)',
+              }}>
+                <div style={{
+                  width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                  background: 'rgba(61,255,110,.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.85rem',
+                }}>📡</div>
+                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--green)', flex: 1 }}>
+                  MagiTripHouse
+                </span>
+                {isAdmin && (
+                  <button onClick={() => deletePost(item.id)} style={{
+                    background: 'none', border: 'none', color: 'rgba(232,59,59,.5)',
+                    cursor: 'pointer', fontSize: '.75rem', padding: '0 2px',
+                  }}>🗑</button>
+                )}
+              </div>
+
+              {/* Post content */}
+              <div style={{ padding: '10px 14px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                  <span style={{ fontSize: '1.5rem', lineHeight: 1, flexShrink: 0 }}>{item.emoji}</span>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', letterSpacing: '.2px', flex: 1, paddingTop: 2 }}>
+                    {item.title}
+                  </div>
                 </div>
-                <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 1 }}>
-                  {new Date(item.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                <div style={{ fontSize: '.85rem', color: '#cce8d0', lineHeight: 1.65, marginBottom: item.productLink ? 10 : 6 }}>
+                  {item.content}
+                </div>
+                {item.productLink && (
+                  <a href={item.productLink} target="_blank" rel="noopener" style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    background: 'rgba(61,255,110,.1)', border: '1px solid rgba(61,255,110,.3)',
+                    borderRadius: 20, padding: '6px 14px',
+                    color: 'var(--green)', fontSize: '.78rem', fontWeight: 700, textDecoration: 'none',
+                  }}>🛒 Scopri il prodotto →</a>
+                )}
+                {/* Timestamp */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <span style={{ fontSize: '.65rem', color: 'var(--muted)', opacity: .7 }}>
+                    {dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} ✓
+                  </span>
                 </div>
               </div>
             </div>
-            <div style={{ color: '#c8e6cb', fontSize: '.82rem', lineHeight: 1.65 }}>{item.content}</div>
-            {item.productLink && (
-              <a
-                href={item.productLink}
-                target="_blank"
-                rel="noopener"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  marginTop: 10, color: 'var(--green)', fontSize: '.78rem',
-                  fontWeight: 700, textDecoration: 'none',
-                }}
-              >
-                🛒 Scopri il prodotto →
-              </a>
-            )}
-          </div>
-        </div>
-      ))}
+          </React.Fragment>
+        )
+      })}
     </div>
   )
 }
