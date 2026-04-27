@@ -98,7 +98,6 @@ function NewsView() {
   const [pwaBannerDismissed, setPwaBannerDismissed] = React.useState(false)
 
   React.useEffect(() => {
-    fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
     setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
     setPwaBannerDismissed(sessionStorage.getItem('pwa_banner_dismissed') === '1')
 
@@ -113,6 +112,23 @@ function NewsView() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
+  // On mount (or token change): sync membership status from server so cross-device login works
+  React.useEffect(() => {
+    if (!sessionToken) {
+      // Not logged in — just fetch the public count
+      fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
+      return
+    }
+    fetch('/api/channel/join', { headers: { 'Authorization': `Bearer ${sessionToken}` } })
+      .then(r => r.json())
+      .then(d => {
+        if (d.joined && !channelJoined) setChannelJoined(true)
+        if (typeof d.count === 'number') setMemberCount(d.count)
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionToken])
+
   // Enter channel: persist joined state, call API only first time
   function joinChannel() {
     if (!channelJoined) {
@@ -121,7 +137,10 @@ function NewsView() {
         fetch('/api/channel/join', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${sessionToken}` },
-        }).catch(() => {})
+        })
+          .then(r => r.json())
+          .then(d => { if (typeof d.count === 'number') setMemberCount(d.count) })
+          .catch(() => {})
       }
     }
     // Try push async regardless (idempotent — browser returns existing sub if already subscribed)

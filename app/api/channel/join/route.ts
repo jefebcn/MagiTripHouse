@@ -4,6 +4,21 @@ import { verifyToken } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
 
+// Check if the authenticated user is already a channel member
+export async function GET(req: Request) {
+  const bearer = req.headers.get('authorization')?.replace('Bearer ', '')
+  if (!bearer) return NextResponse.json({ joined: false, count: 0 })
+  const payload = await verifyToken(bearer)
+  if (!payload) return NextResponse.json({ joined: false, count: 0 })
+
+  const [member, count] = await Promise.all([
+    prisma.channelMember.findUnique({ where: { userId: payload.id } }),
+    prisma.channelMember.count(),
+  ])
+
+  return NextResponse.json({ joined: !!member, count })
+}
+
 export async function POST(req: Request) {
   const bearer = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!bearer) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
@@ -19,5 +34,6 @@ export async function POST(req: Request) {
     update: {},
   })
 
-  return NextResponse.json({ ok: true })
+  const count = await prisma.channelMember.count()
+  return NextResponse.json({ ok: true, count })
 }

@@ -4,6 +4,6 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const count = await prisma.pushSubscription.count()
+  const count = await prisma.channelMember.count()
   return NextResponse.json({ count })
 }
