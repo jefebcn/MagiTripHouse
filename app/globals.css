@@ -168,6 +168,24 @@ body > * { position: relative; z-index: 1; }
 }
 .cart-badge-pop { animation: cartBadgePop .4s ease; }
 
+/* Logo float + glow pulse */
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-9px); }
+}
+@keyframes logoGlow {
+  0%, 100% { filter: drop-shadow(0 0 18px rgba(61,255,110,.38)) drop-shadow(0 0 6px rgba(61,255,110,.2)); }
+  50%       { filter: drop-shadow(0 0 32px rgba(61,255,110,.7)) drop-shadow(0 0 12px rgba(61,255,110,.4)); }
+}
+
+/* Particle burst on logo tap */
+@keyframes particleBurst {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  55%  { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--tx,0px)), calc(-50% + var(--ty,0px))) scale(1.4); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton-shine, [class*='animate-'] { animation: none !important; }
+  .logo-float { animation: none !important; }
 }
