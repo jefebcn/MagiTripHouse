@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { notifyAdminOrder } from '@/lib/telegram'
 
 export async function GET() {
   const session = await auth()
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
       referredBy: body.referredBy ?? null,
     },
   })
+  notifyAdminOrder(order).catch(() => {})
   return NextResponse.json(order, { status: 201 })
 }
 
