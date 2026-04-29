@@ -11,9 +11,9 @@ function haptic(pattern: number | number[] = 50) {
 }
 
 export default function CartDrawer() {
-  const { cartOpen, setCartOpen } = useUIStore()
+  const { cartOpen, setCartOpen, userHandle, userName } = useUIStore()
   const { items, changeQty, clear, total } = useCartStore()
-  const { user } = useTelegram()
+  const { user: tgUser } = useTelegram()
   const panelRef = useRef<HTMLDivElement>(null)
   const [note, setNote] = useState('')
 
@@ -22,12 +22,17 @@ export default function CartDrawer() {
 
   function placeOrder() {
     if (!items.length) return
+
+    // Use registered handle if logged in, fall back to Telegram username
+    const displayName = userName || tgUser || 'Anonimo'
+    const userId = userHandle || tgUser || 'anonymous'
+
     const orderId = `MTH-${Date.now()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`
     const date = new Date().toLocaleDateString('it-IT')
     const lines = [
       `🛒 *NUOVO ORDINE — Magic Trip House*`,
       `🆔 Ordine: ${orderId}`,
-      `👤 Cliente: ${user || 'Anonimo'}`,
+      `👤 Cliente: ${displayName}`,
       `📅 Data: ${date}`,
       ``,
       `📦 *Prodotti:*`,
@@ -39,13 +44,13 @@ export default function CartDrawer() {
     const msg = lines.join('\n')
     const tgUrl = `https://t.me/magichous8?text=${encodeURIComponent(msg)}`
 
-    // Save order to DB
+    // Save order to DB — server-side notifyAdminOrder fires here
     fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: orderId,
-        userId: user || 'anonymous',
+        userId,
         total: total(),
         items: items.map((x) => ({ id: x.id, label: x.variantLabel, price: x.variantPrice, qty: x.qty })),
         note: note.trim() || null,
@@ -56,7 +61,14 @@ export default function CartDrawer() {
     haptic([80, 40, 80])
     clear()
     close()
-    window.location.href = tgUrl
+
+    // Inside Telegram WebApp use openTelegramLink, otherwise fall back to href
+    const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(tgUrl)
+    } else {
+      window.open(tgUrl, '_blank')
+    }
   }
 
   if (!cartOpen) return null
