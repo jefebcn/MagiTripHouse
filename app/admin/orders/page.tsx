@@ -135,7 +135,7 @@ export default function AdminOrders() {
                 <div>
                   <div style={{ fontFamily: 'monospace', fontSize: '.78rem', color: 'var(--green)', fontWeight: 700 }}>{o.id}</div>
                   <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
-                    👤 {o.userId} · {new Date(o.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    👤 {o.userId && o.userId !== 'anonymous' ? `@${o.userId}` : 'Anonimo'} · {new Date(o.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
                 <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', color: 'var(--gold)' }}>

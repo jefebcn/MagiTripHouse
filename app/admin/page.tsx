@@ -127,7 +127,7 @@ export default function AdminDashboard() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--green)', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.id}</div>
                     <div style={{ fontSize: '.62rem', color: 'var(--muted)', marginTop: 1 }}>
-                      @{o.userId} · {new Date(o.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+                      {o.userId && o.userId !== 'anonymous' ? `@${o.userId}` : 'Anonimo'} · {new Date(o.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
                     </div>
                   </div>
                   <div style={{ fontSize: '.9rem', fontWeight: 800, color: 'var(--gold)', fontFamily: "'Fredoka One', cursive", whiteSpace: 'nowrap' }}>€{o.total.toFixed(2)}</div>
