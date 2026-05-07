@@ -502,6 +502,7 @@ function AccountView() {
   const [pushEnabled, setPushEnabled] = React.useState(false)
   const [pushLoading, setPushLoading] = React.useState(false)
   const [hasSW, setHasSW] = React.useState(false)
+  const [pushMsg, setPushMsg] = React.useState<{ ok: boolean; text: string } | null>(null)
 
   // Password change
   const [showPwd, setShowPwd] = React.useState(false)
@@ -567,7 +568,12 @@ function AccountView() {
   }
 
   async function togglePush() {
+    if (!hasSW) {
+      setPushMsg({ ok: false, text: 'Notifiche non supportate su questo browser' })
+      return
+    }
     setPushLoading(true)
+    setPushMsg(null)
     try {
       const reg = await navigator.serviceWorker.ready
       if (pushEnabled) {
@@ -577,13 +583,36 @@ function AccountView() {
           await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
         }
         setPushEnabled(false)
+        setPushMsg({ ok: true, text: 'Notifiche disattivate' })
       } else {
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+        // Richiedi permesso esplicitamente
+        const permission = await Notification.requestPermission()
+        if (permission === 'denied') {
+          setPushMsg({ ok: false, text: 'Permesso bloccato — abilitalo nelle impostazioni del browser' })
+          setPushLoading(false)
+          return
+        }
+        if (permission !== 'granted') {
+          setPushMsg({ ok: false, text: 'Permesso non concesso' })
+          setPushLoading(false)
+          return
+        }
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        if (!vapidKey) {
+          setPushMsg({ ok: false, text: 'Chiavi VAPID non configurate — imposta NEXT_PUBLIC_VAPID_PUBLIC_KEY su Vercel' })
+          setPushLoading(false)
+          return
+        }
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) })
         await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
         setPushEnabled(true)
+        setPushMsg({ ok: true, text: '🔔 Notifiche attivate!' })
+        setTimeout(() => setPushMsg(null), 3000)
       }
-    } catch { /* permission denied or not supported */ }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Errore'
+      setPushMsg({ ok: false, text: msg })
+    }
     setPushLoading(false)
   }
 
@@ -810,17 +839,32 @@ function AccountView() {
       )}
 
       {/* ── Push notifications ── */}
-      {hasSW && (
-        <div style={{ ...rowStyle, justifyContent: 'space-between' }}>
+      <div style={{ ...rowStyle, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: '.88rem' }}>🔔 Notifiche Push</div>
             <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 3 }}>
-              {pushEnabled ? 'Attive · ricevi news e offerte' : 'Disattive · tocca per abilitare'}
+              {!hasSW
+                ? 'Non supportate su questo browser'
+                : pushEnabled
+                  ? 'Attive · ricevi news e offerte'
+                  : 'Disattive · tocca per abilitare'}
             </div>
           </div>
           <PushToggle enabled={pushEnabled} loading={pushLoading} onToggle={togglePush} />
         </div>
-      )}
+        {pushMsg && (
+          <div style={{
+            fontSize: '.72rem', fontWeight: 600,
+            color: pushMsg.ok ? 'var(--green)' : '#e83b3b',
+            background: pushMsg.ok ? 'rgba(61,255,110,.08)' : 'rgba(232,59,59,.08)',
+            border: `1px solid ${pushMsg.ok ? 'rgba(61,255,110,.2)' : 'rgba(232,59,59,.2)'}`,
+            borderRadius: 8, padding: '6px 10px',
+          }}>
+            {pushMsg.text}
+          </div>
+        )}
+      </div>
 
       {/* ── Links group ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 'var(--radius)', overflow: 'hidden' }}>
