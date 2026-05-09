@@ -527,6 +527,8 @@ function AccountView() {
   const [pushLoading, setPushLoading] = React.useState(false)
   const [hasSW, setHasSW] = React.useState(false)
   const [pushMsg, setPushMsg] = React.useState<{ ok: boolean; text: string } | null>(null)
+  const [permissionDenied, setPermissionDenied] = React.useState(false)
+  const [isIos, setIsIos] = React.useState(false)
 
   // Password change
   const [showPwd, setShowPwd] = React.useState(false)
@@ -545,12 +547,16 @@ function AccountView() {
 
   React.useEffect(() => {
     setNameVal(userName)
+    setIsIos(/iphone|ipad|ipod/i.test(navigator.userAgent))
     const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
     setHasSW(supported)
     if (supported) {
       navigator.serviceWorker.ready.then((reg) =>
         reg.pushManager.getSubscription().then((sub) => setPushEnabled(!!sub))
       )
+    }
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+      setPermissionDenied(true)
     }
     const saved = localStorage.getItem('tp_orders')
     if (saved) { try { setOrderCount(JSON.parse(saved).length) } catch { /* */ } }
@@ -599,8 +605,9 @@ function AccountView() {
     setPushLoading(true)
     setPushMsg(null)
     try {
-      const reg = await navigator.serviceWorker.ready
       if (pushEnabled) {
+        // Unsubscribe — no permission needed, serviceWorker.ready first is fine
+        const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.getSubscription()
         if (sub) {
           await sub.unsubscribe()
@@ -609,15 +616,10 @@ function AccountView() {
         setPushEnabled(false)
         setPushMsg({ ok: true, text: 'Notifiche disattivate' })
       } else {
-        // Richiedi permesso esplicitamente
-        const permission = await Notification.requestPermission()
-        if (permission === 'denied') {
-          setPushMsg({ ok: false, text: 'Permesso bloccato — abilitalo nelle impostazioni del browser' })
-          setPushLoading(false)
-          return
-        }
-        if (permission !== 'granted') {
-          setPushMsg({ ok: false, text: 'Permesso non concesso' })
+        // Subscribe — requestPermission MUST come before any await on iOS PWA
+        // to keep the user-gesture context intact
+        if (Notification.permission === 'denied') {
+          setPermissionDenied(true)
           setPushLoading(false)
           return
         }
@@ -627,6 +629,21 @@ function AccountView() {
           setPushLoading(false)
           return
         }
+        // Request permission immediately (user gesture still active)
+        const permission = await Notification.requestPermission()
+        if (permission === 'denied') {
+          setPermissionDenied(true)
+          setPushLoading(false)
+          return
+        }
+        if (permission !== 'granted') {
+          setPushMsg({ ok: false, text: 'Permesso non concesso' })
+          setPushLoading(false)
+          return
+        }
+        // Permission granted — now we can safely await serviceWorker
+        setPermissionDenied(false)
+        const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) })
         await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
         setPushEnabled(true)
@@ -872,12 +889,58 @@ function AccountView() {
                 ? 'Non supportate su questo browser'
                 : pushEnabled
                   ? 'Attive · ricevi news e offerte'
-                  : 'Disattive · tocca per abilitare'}
+                  : permissionDenied
+                    ? '🔕 Permesso bloccato'
+                    : 'Disattive · tocca per abilitare'}
             </div>
           </div>
           <PushToggle enabled={pushEnabled} loading={pushLoading} onToggle={togglePush} />
         </div>
-        {pushMsg && (
+
+        {/* Permission denied — instruction panel */}
+        {permissionDenied && (
+          <div style={{
+            background: 'rgba(232,59,59,.06)', border: '1px solid rgba(232,59,59,.2)',
+            borderRadius: 10, padding: '12px 14px',
+          }}>
+            <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#e83b3b', marginBottom: 8 }}>
+              🔕 Il browser ha bloccato le notifiche
+            </div>
+            <div style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.7, marginBottom: 10 }}>
+              {isIos ? (
+                <>
+                  <strong style={{ color: 'var(--text)' }}>Come sbloccare su iPhone/iPad:</strong><br />
+                  1. Apri <strong style={{ color: 'var(--text)' }}>Impostazioni</strong><br />
+                  2. Scorri fino a <strong style={{ color: 'var(--text)' }}>Safari</strong> (o cerca il nome dell&apos;app se installata)<br />
+                  3. Tocca <strong style={{ color: 'var(--text)' }}>Notifiche</strong><br />
+                  4. Imposta su <strong style={{ color: 'var(--text)' }}>Consenti</strong><br />
+                  5. Torna qui e tocca il pulsante qui sotto
+                </>
+              ) : (
+                <>
+                  <strong style={{ color: 'var(--text)' }}>Come sbloccare:</strong><br />
+                  1. Tocca l&apos;icona 🔒 nella barra del browser<br />
+                  2. Tocca <strong style={{ color: 'var(--text)' }}>Notifiche → Consenti</strong><br />
+                  3. Ricarica la pagina e tocca il pulsante qui sotto
+                </>
+              )}
+            </div>
+            <button
+              onClick={togglePush}
+              disabled={pushLoading}
+              style={{
+                width: '100%', background: 'rgba(61,255,110,.12)',
+                border: '1px solid rgba(61,255,110,.4)', borderRadius: 8,
+                padding: '9px', color: 'var(--green)', fontFamily: 'inherit',
+                fontWeight: 700, fontSize: '.8rem', cursor: 'pointer',
+              }}
+            >
+              {pushLoading ? '...' : '✓ Ho abilitato — Attiva notifiche'}
+            </button>
+          </div>
+        )}
+
+        {pushMsg && !permissionDenied && (
           <div style={{
             fontSize: '.72rem', fontWeight: 600,
             color: pushMsg.ok ? 'var(--green)' : '#e83b3b',
@@ -1209,4 +1272,3 @@ function AffiliatesView() {
     </div>
   )
 }
-
