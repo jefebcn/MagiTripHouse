@@ -21,9 +21,11 @@ export async function PUT(req: Request, { params }: Ctx) {
       imageUrl:    body.imageUrl ?? null,
       mediaType:   body.mediaType ?? null,
       emoji:       body.emoji ?? '🌿',
-      badge:       body.badge ?? null,
-      origin:      body.origin ?? null,
-      sortOrder:   body.sortOrder ?? 99,
+      badge:        body.badge ?? null,
+      origin:       body.origin ?? null,
+      sortOrder:    body.sortOrder ?? 99,
+      isOnSale:     body.isOnSale ?? false,
+      isComingSoon: body.isComingSoon ?? false,
     },
   })
   return NextResponse.json(product)

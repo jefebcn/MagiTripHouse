@@ -17,6 +17,8 @@ export interface Product {
   badge?: string | null
   origin?: string | null
   sortOrder: number
+  isOnSale: boolean
+  isComingSoon: boolean
   createdAt: string
 }
 

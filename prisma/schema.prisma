@@ -8,21 +8,23 @@ datasource db {
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  category    String   @default("premium")
-  tags        String[]
-  variants    Json
-  stock       Int?
-  imageUrl    String?
-  mediaType   String?
-  emoji       String   @default("🌿")
-  badge       String?
-  origin      String?
-  sortOrder   Int      @default(99)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  category     String   @default("premium")
+  tags         String[]
+  variants     Json
+  stock        Int?
+  imageUrl     String?
+  mediaType    String?
+  emoji        String   @default("🌿")
+  badge        String?
+  origin       String?
+  sortOrder    Int      @default(99)
+  isOnSale     Boolean  @default(false)
+  isComingSoon Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Order {

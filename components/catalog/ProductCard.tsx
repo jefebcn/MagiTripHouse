@@ -31,13 +31,16 @@ export default function ProductCard({ product: p, index }: Props) {
   const { setDetailProduct } = useUIStore()
   const [pressed, setPressed] = React.useState(false)
   const minPrice = getMinPrice(p)
-  const isExhausted = p.stock === 0
-  const badgeStyle = p.badge ? (BADGE_COLORS[p.badge] ?? { bg: 'rgba(0,0,0,.7)', color: '#fff', border: 'rgba(255,255,255,.2)' }) : null
+  const isExhausted  = p.stock === 0
+  const isComingSoon = p.isComingSoon
+  const isOnSale     = p.isOnSale && !isExhausted && !isComingSoon
+  const badgeStyle   = p.badge ? (BADGE_COLORS[p.badge] ?? { bg: 'rgba(0,0,0,.7)', color: '#fff', border: 'rgba(255,255,255,.2)' }) : null
+  const unavailable  = isExhausted || isComingSoon
 
   return (
     <div
-      onClick={() => setDetailProduct(p)}
-      onPointerDown={() => setPressed(true)}
+      onClick={() => !unavailable && setDetailProduct(p)}
+      onPointerDown={() => !unavailable && setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       style={{
@@ -45,12 +48,11 @@ export default function ProductCard({ product: p, index }: Props) {
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
         overflow: 'hidden',
-        cursor: 'pointer',
+        cursor: unavailable ? 'default' : 'pointer',
         transition: 'transform .15s, box-shadow .15s',
         willChange: 'transform',
         animation: `fadeInUp .35s ease both`,
         animationDelay: `${index * 0.05}s`,
-        opacity: isExhausted ? .6 : 1,
         transform: pressed ? 'scale(.97)' : 'scale(1)',
         boxShadow: pressed ? '0 1px 6px rgba(0,0,0,.3)' : '0 2px 12px rgba(0,0,0,.35)',
       }}
@@ -62,14 +64,16 @@ export default function ProductCard({ product: p, index }: Props) {
             <video
               src={p.imageUrl}
               autoPlay muted loop playsInline
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
+                filter: isExhausted ? 'grayscale(0.9) brightness(0.45)' : isComingSoon ? 'brightness(0.55)' : 'none' }}
             />
           ) : (
             <Image
               src={p.imageUrl}
               alt={p.name}
               fill
-              style={{ objectFit: 'cover' }}
+              style={{ objectFit: 'cover',
+                filter: isExhausted ? 'grayscale(0.9) brightness(0.45)' : isComingSoon ? 'brightness(0.55)' : 'none' }}
               sizes="(max-width: 480px) 50vw, 240px"
             />
           )
@@ -78,6 +82,7 @@ export default function ProductCard({ product: p, index }: Props) {
             position: 'absolute', inset: 0, display: 'flex',
             alignItems: 'center', justifyContent: 'center', fontSize: '2.8rem',
             background: 'radial-gradient(ellipse at center, rgba(61,255,110,.04) 0%, transparent 70%)',
+            opacity: unavailable ? 0.4 : 1,
           }}>
             {p.emoji}
           </div>
@@ -90,24 +95,58 @@ export default function ProductCard({ product: p, index }: Props) {
           pointerEvents: 'none',
         }} />
 
-        {/* Badge */}
-        {p.badge && !isExhausted && badgeStyle && (
+        {/* Category badge — top left */}
+        {p.badge && !unavailable && badgeStyle && (
           <div style={{
             position: 'absolute', top: 8, left: 8,
-            background: badgeStyle.bg,
-            backdropFilter: 'blur(8px)',
+            background: badgeStyle.bg, backdropFilter: 'blur(8px)',
             border: `1px solid ${badgeStyle.border}`,
-            borderRadius: 20,
-            padding: '3px 9px', fontSize: '.6rem', fontWeight: 700,
-            color: badgeStyle.color,
-            letterSpacing: '.3px',
+            borderRadius: 20, padding: '3px 9px',
+            fontSize: '.6rem', fontWeight: 700, color: badgeStyle.color, letterSpacing: '.3px',
           }}>
             {BADGE_LABELS[p.badge] ?? p.badge}
           </div>
         )}
 
-        {/* ESAURITO */}
-        {isExhausted && <div className="badge-esaurito">ESAURITO</div>}
+        {/* SCONTO badge — top right */}
+        {isOnSale && (
+          <div style={{
+            position: 'absolute', top: 8, right: 8,
+            background: 'rgba(232,59,59,.88)', backdropFilter: 'blur(6px)',
+            border: '1px solid rgba(232,59,59,.5)',
+            borderRadius: 20, padding: '3px 9px',
+            fontSize: '.6rem', fontWeight: 800, color: '#fff', letterSpacing: '1px',
+          }}>SCONTO</div>
+        )}
+
+        {/* ESAURITO overlay */}
+        {isExhausted && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              background: 'rgba(30,30,30,.75)', backdropFilter: 'blur(2px)',
+              borderRadius: 8, padding: '5px 14px',
+              fontSize: '.7rem', fontWeight: 800, color: 'rgba(255,255,255,.7)',
+              letterSpacing: '1.5px',
+            }}>ESAURITO</div>
+          </div>
+        )}
+
+        {/* IN ARRIVO overlay */}
+        {isComingSoon && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              background: 'rgba(59,130,246,.85)', backdropFilter: 'blur(2px)',
+              borderRadius: 8, padding: '5px 14px',
+              fontSize: '.7rem', fontWeight: 800, color: '#fff', letterSpacing: '1.5px',
+            }}>IN ARRIVO</div>
+          </div>
+        )}
 
         {/* Video play indicator */}
         {p.mediaType === 'video' && (
@@ -115,23 +154,18 @@ export default function ProductCard({ product: p, index }: Props) {
             position: 'absolute', bottom: 8, right: 8,
             background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)',
             borderRadius: 6, padding: '2px 7px',
-            fontSize: '.6rem', color: 'rgba(255,255,255,.9)', fontWeight: 600,
-            letterSpacing: '.5px',
+            fontSize: '.6rem', color: 'rgba(255,255,255,.9)', fontWeight: 600, letterSpacing: '.5px',
           }}>▶ VIDEO</div>
         )}
       </div>
 
       {/* Info */}
-      <div style={{
-        padding: '12px 13px 14px',
-        borderTop: '1px solid rgba(61,255,110,.07)',
-      }}>
+      <div style={{ padding: '12px 13px 14px', borderTop: '1px solid rgba(61,255,110,.07)' }}>
         <div style={{
           fontFamily: "'Fredoka One', cursive", fontSize: '1rem',
           fontWeight: 400, letterSpacing: '.2px', marginBottom: 4,
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-          color: 'var(--text)', lineHeight: 1.25,
+          overflow: 'hidden', color: unavailable ? 'var(--muted)' : 'var(--text)', lineHeight: 1.25,
         }}>
           {p.name}
         </div>
@@ -141,34 +175,33 @@ export default function ProductCard({ product: p, index }: Props) {
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-          {minPrice > 0 ? (
+          {isComingSoon ? (
+            <div style={{ fontSize: '.75rem', color: '#7ec8f8', fontWeight: 700 }}>Prossimamente</div>
+          ) : isExhausted ? (
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>Non disponibile</div>
+          ) : minPrice > 0 ? (
             <div style={{
               fontFamily: "'Fredoka One', cursive", fontSize: '1.18rem',
-              color: 'var(--green)', textShadow: 'var(--led-green)',
-              letterSpacing: '.2px',
+              color: 'var(--green)', textShadow: 'var(--led-green)', letterSpacing: '.2px',
             }}>
               da €{minPrice}
             </div>
           ) : (
             <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>Vedi tagli</div>
           )}
-          <button
-            onClick={(e) => { e.stopPropagation(); setDetailProduct(p) }}
-            style={{
-              background: 'linear-gradient(135deg,var(--green),var(--green2))',
-              border: 'none',
-              borderRadius: 8, padding: '6px 14px',
-              fontSize: '.78rem', fontWeight: 700,
-              cursor: 'pointer', color: '#000',
-              fontFamily: "'Fredoka One', cursive",
-              transition: '.15s',
-              letterSpacing: '.3px',
-              boxShadow: '0 2px 8px rgba(61,255,110,.25)',
-              flexShrink: 0,
-            }}
-          >
-            Scegli
-          </button>
+
+          {!unavailable && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setDetailProduct(p) }}
+              style={{
+                background: 'linear-gradient(135deg,var(--green),var(--green2))',
+                border: 'none', borderRadius: 8, padding: '6px 14px',
+                fontSize: '.78rem', fontWeight: 700, cursor: 'pointer', color: '#000',
+                fontFamily: "'Fredoka One', cursive", transition: '.15s',
+                letterSpacing: '.3px', boxShadow: '0 2px 8px rgba(61,255,110,.25)', flexShrink: 0,
+              }}
+            >Scegli</button>
+          )}
         </div>
       </div>
     </div>
