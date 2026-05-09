@@ -325,18 +325,19 @@ function ChannelFeed() {
 interface NewsItem { id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string }
 interface GameItemDef {
   emoji: string; label: string; pts: number; speed: number; weight: number; glow: string
+  physics: 'straight' | 'drift' | 'bounce' | 'zigzag' | 'chase'
   isSlow?: boolean; isLife?: boolean; isDanger?: boolean; isSuperDanger?: boolean; isRare?: boolean
 }
 const GAME_ITEMS: GameItemDef[] = [
-  { emoji: '🌿', label: 'Erba',       pts: 2,   speed: 2.5, weight: 38, glow: 'rgba(61,255,110,.7)'   },
-  { emoji: '🍃', label: 'Foglia',     pts: 3,   speed: 2.1, weight: 20, glow: 'rgba(80,220,100,.8)'   },
-  { emoji: '🍯', label: 'Hash',       pts: 5,   speed: 1.8, weight: 12, glow: 'rgba(245,200,66,.7)'   },
-  { emoji: '💎', label: 'Crystal',    pts: 8,   speed: 1.4, weight: 6,  glow: 'rgba(100,180,255,.9)',  isRare: true },
-  { emoji: '⭐', label: 'Stella Oro', pts: 15,  speed: 0.9, weight: 3,  glow: 'rgba(255,215,0,.95)',   isRare: true },
-  { emoji: '💨', label: 'Fumata',     pts: 0,   speed: 2.0, weight: 8,  glow: 'rgba(180,150,255,.7)',  isSlow: true },
-  { emoji: '❤️', label: 'Vita',       pts: 0,   speed: 1.7, weight: 4,  glow: 'rgba(255,80,80,.8)',    isLife: true },
-  { emoji: '💣', label: 'Bomba',      pts: -5,  speed: 3.0, weight: 6,  glow: 'rgba(232,59,59,.9)',    isDanger: true },
-  { emoji: '🚔', label: 'Polizia',    pts: -10, speed: 2.3, weight: 3,  glow: 'rgba(255,100,0,.9)',    isSuperDanger: true },
+  { emoji: '🌿', label: 'Erba',       pts: 2,   speed: 2.6, weight: 38, physics: 'straight', glow: 'rgba(61,255,110,.7)'   },
+  { emoji: '🍃', label: 'Foglia',     pts: 3,   speed: 2.1, weight: 20, physics: 'drift',    glow: 'rgba(80,220,100,.8)'   },
+  { emoji: '🍯', label: 'Hash',       pts: 5,   speed: 3.1, weight: 12, physics: 'straight', glow: 'rgba(245,200,66,.7)'   },
+  { emoji: '💎', label: 'Crystal',    pts: 8,   speed: 1.9, weight: 6,  physics: 'bounce',   glow: 'rgba(100,180,255,.9)',  isRare: true },
+  { emoji: '⭐', label: 'Stella Oro', pts: 15,  speed: 1.5, weight: 3,  physics: 'zigzag',   glow: 'rgba(255,215,0,.95)',   isRare: true },
+  { emoji: '💨', label: 'Fumata',     pts: 0,   speed: 1.6, weight: 8,  physics: 'drift',    glow: 'rgba(180,150,255,.7)',  isSlow: true },
+  { emoji: '❤️', label: 'Vita',       pts: 0,   speed: 1.2, weight: 4,  physics: 'drift',    glow: 'rgba(255,80,80,.8)',    isLife: true },
+  { emoji: '💣', label: 'Bomba',      pts: -5,  speed: 3.6, weight: 6,  physics: 'straight', glow: 'rgba(232,59,59,.9)',    isDanger: true },
+  { emoji: '🚔', label: 'Polizia',    pts: -10, speed: 2.1, weight: 3,  physics: 'chase',    glow: 'rgba(255,100,0,.9)',    isSuperDanger: true },
 ]
 function pickItemDef(): GameItemDef {
   let r = Math.random() * 100
@@ -353,7 +354,7 @@ const BG_STARS = Array.from({ length: 18 }, (_, i) => ({
   id: i, left: (i * 37 + 11) % 100, top: (i * 53 + 7) % 100,
   size: 1.5 + (i % 3) * 0.8, dur: 2.5 + (i % 4) * 0.7, delay: (i * 0.3) % 3,
 }))
-interface FItem { id: number; def: GameItemDef; x: number; y: number; wobble: number }
+interface FItem { id: number; def: GameItemDef; x: number; y: number; vx: number; phase: number }
 interface FbItem { id: number; x: number; y: number; text: string; color: string }
 interface LeaderEntry { id: string; handle: string; name: string; score: number; month: string }
 interface OrderItem { id: string; total: number; date: string }
@@ -795,18 +796,23 @@ function GameView() {
   const [displayTime, setDisplayTime] = React.useState(60)
   const [displayLives, setDisplayLives] = React.useState(3)
   const [displayCombo, setDisplayCombo] = React.useState(0)
+  const [displayCatcherX, setDisplayCatcherX] = React.useState(160)
   const [displayItems, setDisplayItems] = React.useState<FItem[]>([])
   const [displayFb, setDisplayFb] = React.useState<FbItem[]>([])
   const [displaySlowed, setDisplaySlowed] = React.useState(false)
+  const [catchPulse, setCatchPulse] = React.useState(0)
   const [shakeKey, setShakeKey] = React.useState(0)
   const [result, setResult] = React.useState<{ score: number; rank: number | null; bestScore: number } | null>(null)
   const [leaderboard, setLeaderboard] = React.useState<LeaderEntry[]>([])
   const [playsToday, setPlaysToday] = React.useState(0)
   const MAX_PLAYS = 3
+  const CATCHER_HALF = 48
 
   const scoreRef = React.useRef(0)
   const livesRef = React.useRef(3)
   const comboRef = React.useRef(0)
+  const catcherXRef = React.useRef(160)
+  const touchXRef = React.useRef(160)
   const itemsRef = React.useRef<FItem[]>([])
   const fbRef = React.useRef<FbItem[]>([])
   const lastSpawnRef = React.useRef(0)
@@ -831,10 +837,10 @@ function GameView() {
   }
 
   function spawnMs(elapsed: number) {
-    if (elapsed < 15) return 1200
-    if (elapsed < 30) return 950
-    if (elapsed < 45) return 740
-    return 570
+    if (elapsed < 15) return 1300
+    if (elapsed < 30) return 1050
+    if (elapsed < 45) return 820
+    return 640
   }
 
   function startCountdown() {
@@ -844,9 +850,13 @@ function GameView() {
   }
 
   function startGame() {
+    const gW = gameAreaRef.current?.clientWidth ?? 360
+    const startX = gW / 2
     scoreRef.current = 0; livesRef.current = 3; comboRef.current = 0
+    catcherXRef.current = startX; touchXRef.current = startX
     itemsRef.current = []; fbRef.current = []; slowEndRef.current = 0
     setDisplayScore(0); setDisplayTime(60); setDisplayLives(3); setDisplayCombo(0)
+    setDisplayCatcherX(startX); setCatchPulse(0)
     setDisplayItems([]); setDisplayFb([]); setDisplaySlowed(false); setResult(null)
     startTimeRef.current = performance.now(); lastSpawnRef.current = 0
     setPhase('playing'); phaseRef.current = 'playing'
@@ -864,63 +874,89 @@ function GameView() {
     if (!ga) { rafRef.current = requestAnimationFrame(loop); return }
     const gH = ga.clientHeight, gW = ga.clientWidth
     const slowed = now < slowEndRef.current
+    const sf = slowed ? 0.35 : 1
+
+    // Smooth catcher movement toward touch position
+    const clampedTarget = Math.max(CATCHER_HALF, Math.min(gW - CATCHER_HALF, touchXRef.current))
+    catcherXRef.current += (clampedTarget - catcherXRef.current) * 0.2
+    const cX = catcherXRef.current
+    const catcherTop = gH - 60
+    const catcherBot = gH - 20
+
+    // Spawn
     if (now - lastSpawnRef.current > spawnMs(elapsed)) {
       const def = pickItemDef()
-      itemsRef.current.push({ id: nextIdRef.current++, def, x: 8 + Math.random() * Math.max(0, gW - 72), y: -70, wobble: Math.random() * Math.PI * 2 })
+      const vx = def.physics === 'bounce' ? (Math.random() > 0.5 ? 2.2 : -2.2) : 0
+      itemsRef.current.push({ id: nextIdRef.current++, def, x: 8 + Math.random() * Math.max(0, gW - 72), y: -70, vx, phase: Math.random() * Math.PI * 2 })
       lastSpawnRef.current = now
     }
-    const sf = slowed ? 0.35 : 1
-    itemsRef.current = itemsRef.current
-      .map(i => ({ ...i, y: i.y + i.def.speed * sf, x: i.x + Math.sin(elapsed * 1.8 + i.wobble) * 0.5 }))
-      .filter(i => i.y < gH + 70)
+
+    // Move items + collision detect via catcher
+    const nextItems: FItem[] = []
+    for (const item of itemsRef.current) {
+      let { x, y, vx, phase } = item
+      y += item.def.speed * sf
+      switch (item.def.physics) {
+        case 'drift': x += Math.sin(elapsed * 2.5 + phase) * 1.5 * sf; break
+        case 'bounce':
+          x += vx * sf
+          if (x < 8) { vx = Math.abs(vx); x = 8 }
+          if (x > gW - 72) { vx = -Math.abs(vx); x = gW - 72 }
+          break
+        case 'zigzag': x += Math.sin(elapsed * 5 + phase) * 3 * sf; break
+        case 'chase': x += ((cX - 28) - x) * 0.018 * sf; break
+      }
+      const iCX = x + 28, iCY = y + 28
+      if (iCX > cX - CATCHER_HALF - 6 && iCX < cX + CATCHER_HALF + 6 && iCY > catcherTop && iCY < catcherBot + 24) {
+        onCatch(item, now)
+      } else if (y < gH + 70) {
+        nextItems.push({ ...item, x, y, vx, phase })
+      }
+    }
+    itemsRef.current = nextItems
+
     setDisplayScore(scoreRef.current); setDisplayTime(Math.ceil(remaining))
     setDisplayLives(livesRef.current); setDisplayCombo(comboRef.current)
+    setDisplayCatcherX(cX)
     setDisplayItems([...itemsRef.current]); setDisplayFb([...fbRef.current])
     setDisplaySlowed(slowed)
     rafRef.current = requestAnimationFrame(loop)
   }
 
-  function handleTap(e: React.TouchEvent | React.MouseEvent) {
-    if (phaseRef.current !== 'playing') return
-    const rect = gameAreaRef.current!.getBoundingClientRect()
-    const cx = 'changedTouches' in e ? (e as React.TouchEvent).changedTouches[0].clientX : (e as React.MouseEvent).clientX
-    const cy = 'changedTouches' in e ? (e as React.TouchEvent).changedTouches[0].clientY : (e as React.MouseEvent).clientY
-    const tx = cx - rect.left, ty = cy - rect.top
-    for (let i = itemsRef.current.length - 1; i >= 0; i--) {
-      const item = itemsRef.current[i]
-      const dx = tx - item.x - 28, dy = ty - item.y - 28
-      if (dx * dx + dy * dy < 40 * 40) {
-        const def = item.def
-        itemsRef.current.splice(i, 1)
-        const fbId = nextFbIdRef.current++
-        if (def.isSlow) {
-          slowEndRef.current = performance.now() + 3000
-          comboRef.current++
-          fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: '⏱ SLOW!', color: 'rgba(200,160,255,1)' }]
-        } else if (def.isLife) {
-          livesRef.current = Math.min(5, livesRef.current + 1)
-          comboRef.current++
-          fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: '+1 ❤️', color: 'rgba(255,100,100,1)' }]
-        } else if (def.isDanger || def.isSuperDanger) {
-          const lost = def.isSuperDanger ? 2 : 1
-          livesRef.current = Math.max(0, livesRef.current - lost)
-          comboRef.current = 0
-          setShakeKey(k => k + 1)
-          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([60, 20, 60])
-          fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: def.isSuperDanger ? '🚔 -2❤️' : '💥 -1❤️', color: 'rgba(232,59,59,1)' }]
-        } else {
-          const newCombo = comboRef.current + 1
-          const multi = comboMultiplier(newCombo)
-          const earned = Math.round(def.pts * multi)
-          scoreRef.current += earned
-          comboRef.current = newCombo
-          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
-          const label = multi > 1 ? `+${earned} ×${multi}` : `+${earned}`
-          fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: label, color: def.isRare ? 'rgba(255,215,0,1)' : 'rgba(61,255,110,1)' }]
-        }
-        setTimeout(() => { fbRef.current = fbRef.current.filter(f => f.id !== fbId) }, 900)
-        break
-      }
+  function onCatch(item: FItem, now: number) {
+    const def = item.def
+    const fbId = nextFbIdRef.current++
+    if (def.isSlow) {
+      slowEndRef.current = now + 3000; comboRef.current++
+      fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: '⏱ SLOW!', color: 'rgba(200,160,255,1)' }]
+    } else if (def.isLife) {
+      livesRef.current = Math.min(5, livesRef.current + 1); comboRef.current++
+      fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: '+1 ❤️', color: 'rgba(255,100,100,1)' }]
+    } else if (def.isDanger || def.isSuperDanger) {
+      const lost = def.isSuperDanger ? 2 : 1
+      livesRef.current = Math.max(0, livesRef.current - lost); comboRef.current = 0
+      setShakeKey(k => k + 1)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([70, 25, 70])
+      fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: def.isSuperDanger ? '🚔 -2❤️' : '💥 -1❤️', color: 'rgba(232,59,59,1)' }]
+    } else {
+      const newCombo = comboRef.current + 1
+      const multi = comboMultiplier(newCombo)
+      const earned = Math.round(def.pts * multi)
+      scoreRef.current += earned; comboRef.current = newCombo
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
+      fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: multi > 1 ? `+${earned} ×${multi}` : `+${earned}`, color: def.isRare ? 'rgba(255,215,0,1)' : 'rgba(61,255,110,1)' }]
+    }
+    setCatchPulse(p => p + 1)
+    setTimeout(() => { fbRef.current = fbRef.current.filter(f => f.id !== fbId) }, 900)
+  }
+
+  function handlePointerMove(e: React.TouchEvent | React.MouseEvent) {
+    const rect = gameAreaRef.current?.getBoundingClientRect()
+    if (!rect) return
+    if ('touches' in e) {
+      touchXRef.current = (e as React.TouchEvent).touches[0].clientX - rect.left
+    } else {
+      touchXRef.current = (e as React.MouseEvent).clientX - rect.left
     }
   }
 
@@ -938,51 +974,76 @@ function GameView() {
 
   const canPlay = playsToday < MAX_PLAYS
   const multi = comboMultiplier(displayCombo)
+  const catcherColor = displayCombo >= 8 ? '#ff6b35' : displayCombo >= 5 ? '#f5c842' : '#3dff6e'
+  const catchAnim = catchPulse > 0 ? (catchPulse % 2 === 0 ? 'bud-catcha .18s ease' : 'bud-catchb .18s ease') : 'none'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 62px)', paddingBottom: 80 }}>
       <style>{`
-        @keyframes bud-fb{from{opacity:1;transform:translateY(0) scale(1.3)}to{opacity:0;transform:translateY(-70px) scale(.8)}}
-        @keyframes bud-shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-5px,3px)}40%{transform:translate(5px,-3px)}60%{transform:translate(-3px,2px)}80%{transform:translate(3px,-1px)}}
-        @keyframes bud-star{0%,100%{opacity:.22;transform:scale(1)}50%{opacity:.7;transform:scale(1.4)}}
-        @keyframes bud-slow{0%,100%{opacity:.6}50%{opacity:1}}
+        @keyframes bud-fb{from{opacity:1;transform:translateY(0) scale(1.3)}to{opacity:0;transform:translateY(-72px) scale(.8)}}
+        @keyframes bud-shake{0%,100%{transform:translate(0,0)}15%{transform:translate(-6px,3px)}30%{transform:translate(6px,-3px)}50%{transform:translate(-4px,2px)}70%{transform:translate(4px,-2px)}85%{transform:translate(-2px,1px)}}
+        @keyframes bud-star{0%,100%{opacity:.2;transform:scale(1)}50%{opacity:.65;transform:scale(1.4)}}
+        @keyframes bud-slow{0%,100%{opacity:.55}50%{opacity:1}}
         @keyframes bud-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
         @keyframes bud-count{0%{transform:scale(1.6);opacity:0}35%{transform:scale(1);opacity:1}80%{transform:scale(.97);opacity:1}100%{transform:scale(.8);opacity:0}}
+        @keyframes bud-catcha{0%{transform:scaleX(1.35) scaleY(.55)}100%{transform:scaleX(1) scaleY(1)}}
+        @keyframes bud-catchb{0%{transform:scaleX(1.35) scaleY(.55)}100%{transform:scaleX(1) scaleY(1)}}
       `}</style>
 
       {/* ── Header ── */}
       <div style={{ padding: '12px 16px 8px', background: 'var(--bg2)', borderBottom: '1px solid rgba(61,255,110,.15)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>🎮 Bud Rush</div>
-          <div style={{ fontSize: '.6rem', color: 'rgba(61,255,110,.7)', background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 20, padding: '2px 8px', letterSpacing: 1 }}>BETA</div>
+          <div style={{ fontSize: '.6rem', color: 'rgba(61,255,110,.7)', background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 20, padding: '2px 8px', letterSpacing: 1 }}>v2</div>
         </div>
-        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>Cattura i buds · costruisci combo · il top scorer mensile vince 🏆</div>
+        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>Muovi il cestino · cattura i buds · top scorer mensile vince 🏆</div>
       </div>
 
       {/* ── IDLE ── */}
       {phase === 'idle' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Rules */}
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', marginBottom: 6, color: 'var(--green)' }}>📖 Come si gioca</div>
-            <div style={{ fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.65, marginBottom: 16 }}>
-              Gli oggetti cadono dall&apos;alto: <strong style={{ color: 'var(--text)' }}>tocca</strong> per raccoglierli!
-              Prese consecutive costruiscono la tua <strong style={{ color: 'var(--gold)' }}>combo</strong> — più alta è, più punti guadagni.
-              Hai <strong style={{ color: 'var(--text)' }}>3 ❤️ vite</strong> e <strong style={{ color: 'var(--text)' }}>60 secondi</strong>: finisci le vite e la partita termina subito!
+          {/* Controls */}
+          <div style={{ background: 'var(--card)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 'var(--radius)', padding: '16px' }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', marginBottom: 12, color: 'var(--green)' }}>🕹️ Come si controlla</div>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+              <div style={{ flex: 1, padding: '11px 8px', background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.12)', borderRadius: 12, textAlign: 'center' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: 5 }}>👆</div>
+                <div style={{ fontSize: '.72rem', color: 'var(--text)', fontWeight: 600 }}>Trascina il dito</div>
+                <div style={{ fontSize: '.63rem', color: 'var(--muted)', marginTop: 2 }}>sinistra / destra</div>
+              </div>
+              <div style={{ flex: 1, padding: '11px 8px', background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.12)', borderRadius: 12, textAlign: 'center' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: 5 }}>🧺</div>
+                <div style={{ fontSize: '.72rem', color: 'var(--text)', fontWeight: 600 }}>Cestino insegue</div>
+                <div style={{ fontSize: '.63rem', color: 'var(--muted)', marginTop: 2 }}>il tuo tocco</div>
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+              Hai <strong style={{ color: 'var(--text)' }}>3 ❤️ vite</strong> e <strong style={{ color: 'var(--text)' }}>60 secondi</strong>.
+              Ogni cattura consecutiva aumenta la <strong style={{ color: 'var(--gold)' }}>combo</strong>!
+            </div>
+          </div>
+
+          {/* Items with physics descriptions */}
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px' }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', marginBottom: 10, color: 'var(--text)' }}>📦 Oggetti</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {GAME_ITEMS.map(def => {
                 const isDmg = def.isDanger || def.isSuperDanger
                 const isPow = def.isSlow || def.isLife
+                const physicsNote: Record<string, string> = {
+                  straight: 'cade dritto', drift: 'dondola nel vento',
+                  bounce: 'rimbalza sui muri', zigzag: 'zigzag imprevedibile', chase: '🚨 segue il cestino',
+                }
                 return (
                   <div key={def.emoji} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: isDmg ? 'rgba(232,59,59,.05)' : isPow ? 'rgba(180,150,255,.05)' : 'rgba(61,255,110,.04)', border: `1px solid ${isDmg ? 'rgba(232,59,59,.14)' : isPow ? 'rgba(180,150,255,.14)' : 'rgba(61,255,110,.1)'}` }}>
-                    <span style={{ fontSize: '1.5rem', lineHeight: 1, filter: `drop-shadow(0 0 5px ${def.glow})` }}>{def.emoji}</span>
+                    <span style={{ fontSize: '1.45rem', lineHeight: 1, filter: `drop-shadow(0 0 5px ${def.glow})` }}>{def.emoji}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '.73rem', color: 'var(--text)', fontWeight: 600 }}>{def.label}</div>
-                      <div style={{ fontSize: '.63rem', color: isDmg ? '#e83b3b' : isPow ? 'rgba(200,160,255,1)' : 'var(--green)' }}>
-                        {def.isSlow ? '⏱ Rallenta 3s' : def.isLife ? '+1 ❤️ vita' : def.pts > 0 ? `+${def.pts} pt base` : `${def.pts} pt · -${def.isSuperDanger ? 2 : 1}❤️`}
+                      <div style={{ fontSize: '.72rem', color: 'var(--text)', fontWeight: 600 }}>{def.label}</div>
+                      <div style={{ fontSize: '.6rem', color: isDmg ? '#e83b3b' : isPow ? 'rgba(200,160,255,1)' : 'var(--green)', marginBottom: 1 }}>
+                        {def.isSlow ? '⏱ Rallenta tutto 3s' : def.isLife ? '+1 ❤️ vita' : def.pts > 0 ? `+${def.pts} pt base` : `${def.pts} pt · -${def.isSuperDanger ? 2 : 1}❤️`}
                       </div>
+                      <div style={{ fontSize: '.57rem', color: 'rgba(106,138,106,.55)' }}>{physicsNote[def.physics]}</div>
                     </div>
                   </div>
                 )
@@ -990,30 +1051,30 @@ function GameView() {
             </div>
           </div>
 
-          {/* Combo system */}
+          {/* Combo */}
           <div style={{ background: 'rgba(245,200,66,.04)', border: '1px solid rgba(245,200,66,.14)', borderRadius: 'var(--radius)', padding: '14px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', color: 'var(--gold)', marginBottom: 10 }}>⚡ Sistema Combo</div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', color: 'var(--gold)', marginBottom: 10 }}>⚡ Combo Multiplier</div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               {([['3+', '×1.5', '#3dff6e'], ['5+', '×2', '#f5c842'], ['8+', '×3 🔥', '#ff6b35']] as const).map(([hits, m, color]) => (
                 <div key={hits} style={{ flex: 1, textAlign: 'center', padding: '9px 4px', background: 'rgba(0,0,0,.2)', border: `1px solid ${color}22`, borderRadius: 10 }}>
                   <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color, lineHeight: 1 }}>{m}</div>
-                  <div style={{ fontSize: '.62rem', color: 'var(--muted)', marginTop: 3 }}>{hits} di fila</div>
+                  <div style={{ fontSize: '.62rem', color: 'var(--muted)', marginTop: 3 }}>{hits} fila</div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.6)', marginTop: 10, textAlign: 'center' }}>Il moltiplicatore si azzera colpendo una trappola 💣🚔</div>
+            <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.6)', textAlign: 'center' }}>Il cestino cambia colore con la combo · si azzera su trappola</div>
           </div>
 
           {/* Tips */}
           <div style={{ background: 'rgba(61,255,110,.03)', border: '1px solid rgba(61,255,110,.08)', borderRadius: 'var(--radius)', padding: '12px 14px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem', color: 'var(--text)', marginBottom: 8 }}>💡 Consigli</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem', color: 'var(--text)', marginBottom: 8 }}>💡 Strategia</div>
             {[
-              '🍯 Hash e 💎 Crystal valgono di più — prioritizza quelli ad alta quota',
-              '💨 Fumata rallenta TUTTO: usala per fare combo con gli oggetti rari',
-              '🚔 Polizia è pericolosa: -2 vite e azzera la combo',
-              '⭐ Stella Oro è rarissima: +15pt base × il tuo moltiplicatore!',
+              '💎 Crystal rimbalza: anticipalo ai bordi dello schermo',
+              '🚔 Polizia SEGUE il cestino — schivala deviando di lato',
+              '⭐ Stella Oro fa zigzag lento: rarissima ma vale ×combo',
+              '💨 Fumata rallenta tutto: catturala per fare combo su Crystal e Stella',
             ].map((tip, i) => (
-              <div key={i} style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.55, padding: '3px 0', borderBottom: i < 3 ? '1px solid rgba(61,255,110,.05)' : 'none' }}>{tip}</div>
+              <div key={i} style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.55, padding: '4px 0', borderBottom: i < 3 ? '1px solid rgba(61,255,110,.05)' : 'none' }}>{tip}</div>
             ))}
           </div>
 
@@ -1040,6 +1101,7 @@ function GameView() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'radial-gradient(ellipse at 50% 40%,rgba(61,255,110,.1) 0%,transparent 70%)' }}>
           <div key={countdown} style={{ fontFamily: "'Fredoka One', cursive", fontSize: '9rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1, animation: 'bud-count .9s ease forwards' }}>{countdown}</div>
           <div style={{ color: 'var(--muted)', fontSize: '.9rem', letterSpacing: 2 }}>PREPARATI...</div>
+          <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.5)', marginTop: 4 }}>trascina il dito per muovere il cestino</div>
         </div>
       )}
 
@@ -1048,9 +1110,10 @@ function GameView() {
         <div
           key={shakeKey}
           ref={gameAreaRef}
-          onTouchStart={e => { e.preventDefault(); handleTap(e) }}
-          onClick={handleTap}
-          style={{ flex: 1, position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: 'none', cursor: 'crosshair', minHeight: 400, background: 'radial-gradient(ellipse at 50% 5%,rgba(61,255,110,.09) 0%,transparent 55%),radial-gradient(ellipse at 85% 90%,rgba(61,40,180,.05) 0%,transparent 45%)', animation: shakeKey > 0 ? 'bud-shake .35s ease' : 'none' }}
+          onTouchStart={e => { e.preventDefault(); handlePointerMove(e) }}
+          onTouchMove={e => { e.preventDefault(); handlePointerMove(e) }}
+          onMouseMove={handlePointerMove}
+          style={{ flex: 1, position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: 'none', minHeight: 400, background: 'radial-gradient(ellipse at 50% 5%,rgba(61,255,110,.09) 0%,transparent 55%),radial-gradient(ellipse at 85% 90%,rgba(61,40,180,.06) 0%,transparent 45%)', animation: shakeKey > 0 ? 'bud-shake .4s ease' : 'none' }}
         >
           {/* Animated bg stars */}
           {BG_STARS.map(s => (
@@ -1080,22 +1143,28 @@ function GameView() {
           {/* Combo indicator */}
           {displayCombo >= 3 && (
             <div style={{ position: 'absolute', top: 58, left: '50%', transform: 'translateX(-50%)', zIndex: 15, pointerEvents: 'none', textAlign: 'center', whiteSpace: 'nowrap' }}>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: displayCombo >= 8 ? '1.35rem' : '1.05rem', lineHeight: 1, color: displayCombo >= 8 ? '#ff6b35' : displayCombo >= 5 ? '#f5c842' : 'var(--green)', textShadow: displayCombo >= 8 ? '0 0 24px rgba(255,107,53,.8)' : displayCombo >= 5 ? '0 0 18px rgba(245,200,66,.7)' : 'var(--led-green)' }}>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: displayCombo >= 8 ? '1.35rem' : '1.05rem', lineHeight: 1, color: catcherColor, textShadow: displayCombo >= 8 ? '0 0 24px rgba(255,107,53,.8)' : displayCombo >= 5 ? '0 0 18px rgba(245,200,66,.7)' : 'var(--led-green)' }}>
                 {displayCombo >= 8 ? `🔥 ×${multi} FIRE!` : `⚡ ×${multi} COMBO`}
               </div>
               <div style={{ fontSize: '.54rem', color: 'var(--muted)', marginTop: 1 }}>{displayCombo} di fila</div>
             </div>
           )}
 
-          {/* Items */}
+          {/* Falling items */}
           {displayItems.map(item => (
-            <div key={item.id} style={{ position: 'absolute', left: item.x, top: item.y + 56, width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: item.def.isRare ? '2.5rem' : '2.1rem', pointerEvents: 'none', filter: `drop-shadow(0 0 ${item.def.isRare ? 12 : item.def.isDanger || item.def.isSuperDanger ? 8 : 5}px ${item.def.glow})` }}>{item.def.emoji}</div>
+            <div key={item.id} style={{ position: 'absolute', left: item.x, top: item.y + 56, width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: item.def.isRare ? '2.5rem' : '2.1rem', pointerEvents: 'none', filter: `drop-shadow(0 0 ${item.def.isRare ? 12 : item.def.isDanger || item.def.isSuperDanger ? 9 : 5}px ${item.def.glow})` }}>{item.def.emoji}</div>
           ))}
 
-          {/* Floating score feedback */}
+          {/* Score feedback */}
           {displayFb.map(fb => (
             <div key={fb.id} style={{ position: 'absolute', left: fb.x, top: fb.y + 44, fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', fontWeight: 900, color: fb.color, pointerEvents: 'none', animation: 'bud-fb .9s ease forwards', zIndex: 20, whiteSpace: 'nowrap', textShadow: `0 0 10px ${fb.color}` }}>{fb.text}</div>
           ))}
+
+          {/* Catcher */}
+          <div style={{ position: 'absolute', bottom: 18, left: displayCatcherX - CATCHER_HALF, width: CATCHER_HALF * 2, height: 40, borderRadius: 20, zIndex: 5, pointerEvents: 'none', background: `linear-gradient(135deg,${catcherColor}28,${catcherColor}10)`, border: `2.5px solid ${catcherColor}bb`, boxShadow: `0 0 ${displayCombo >= 5 ? 28 : 16}px ${catcherColor}55`, animation: catchAnim, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>🌿</div>
+
+          {/* Catcher ground glow */}
+          <div style={{ position: 'absolute', bottom: 0, left: displayCatcherX - CATCHER_HALF - 12, width: CATCHER_HALF * 2 + 24, height: 18, borderRadius: 10, background: `radial-gradient(ellipse at 50% 0%,${catcherColor}28 0%,transparent 70%)`, pointerEvents: 'none', zIndex: 4 }} />
         </div>
       )}
 
