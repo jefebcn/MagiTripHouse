@@ -3,11 +3,12 @@ import { useUIStore } from '@/store/uiStore'
 import { useCartStore } from '@/store/cartStore'
 
 const TABS = [
-  { id: 'catalog',    label: 'Catalogo',  icon: '☰' },
-  { id: 'news',       label: 'Canale',    icon: '📡' },
-  { id: 'orders',     label: 'Ordini',    icon: '📋' },
-  { id: 'affiliates', label: 'Affiliati', icon: '👥' },
-  { id: 'account',    label: 'Account',   icon: '👤' },
+  { id: 'game',       label: 'Gioca',    icon: '🎮', cart: false },
+  { id: 'catalog',    label: 'Catalogo', icon: '☰',  cart: false },
+  { id: 'news',       label: 'Canale',   icon: '📡', cart: false },
+  { id: 'cart',       label: 'Carrello', icon: '🛒', cart: true  },
+  { id: 'affiliates', label: 'Affiliati',icon: '👥', cart: false },
+  { id: 'account',    label: 'Account',  icon: '👤', cart: false },
 ] as const
 
 export default function BottomNav() {
@@ -27,47 +28,21 @@ export default function BottomNav() {
         boxShadow: '0 -4px 30px rgba(0,0,0,.5)',
       }}
     >
-      {/* Cart button */}
-      <button
-        onClick={() => setCartOpen(true)}
-        style={{
-          flex: 1, padding: '10px 0', background: 'none', border: 'none',
-          color: cartCount > 0 ? 'var(--green)' : 'var(--muted)',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', gap: 2, cursor: 'pointer', fontSize: '.6rem',
-          position: 'relative', fontFamily: 'inherit', fontWeight: 500,
-          transition: '.2s',
-          textShadow: cartCount > 0 ? 'var(--led-green)' : 'none',
-        }}
-      >
-        <span style={{ fontSize: '1.25rem' }}>🛒</span>
-        <span>Carrello</span>
-        {cartCount > 0 && (
-          <span className="cart-badge-pop" style={{
-            position: 'absolute', top: 7, right: '50%', transform: 'translateX(12px)',
-            background: 'linear-gradient(135deg,var(--green),var(--green2))',
-            color: '#000', borderRadius: '50%',
-            width: 17, height: 17, fontSize: '.58rem', fontWeight: 800,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 8px rgba(61,255,110,.5)',
-          }}>
-            {cartCount}
-          </span>
-        )}
-      </button>
-
       {TABS.map((tab) => {
-        const active = view === tab.id
+        const isCart = tab.cart
+        const active = !isCart && view === tab.id
         return (
           <button
             key={tab.id}
-            onClick={() => setView(tab.id)}
+            onClick={() => isCart ? setCartOpen(true) : setView(tab.id as Parameters<typeof setView>[0])}
             style={{
               flex: 1, padding: '10px 0', background: 'none', border: 'none',
-              color: active ? 'var(--green)' : 'var(--muted)',
+              color: isCart
+                ? cartCount > 0 ? 'var(--green)' : 'var(--muted)'
+                : active ? 'var(--green)' : 'var(--muted)',
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: 2, cursor: 'pointer', fontSize: '.6rem',
-              textShadow: active ? 'var(--led-green)' : 'none',
+              textShadow: (active || (isCart && cartCount > 0)) ? 'var(--led-green)' : 'none',
               transition: '.2s', fontFamily: 'inherit', fontWeight: active ? 600 : 400,
               position: 'relative',
             }}
@@ -83,15 +58,24 @@ export default function BottomNav() {
             )}
             <span style={{ fontSize: '1.25rem', position: 'relative', display: 'inline-block' }}>
               {tab.icon}
+              {isCart && cartCount > 0 && (
+                <span className="cart-badge-pop" style={{
+                  position: 'absolute', top: -4, right: -6,
+                  background: 'linear-gradient(135deg,var(--green),var(--green2))',
+                  color: '#000', borderRadius: '50%',
+                  width: 17, height: 17, fontSize: '.58rem', fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 0 8px rgba(61,255,110,.5)',
+                }}>
+                  {cartCount}
+                </span>
+              )}
               {tab.id === 'news' && hasUnreadNews && (
                 <span style={{
                   position: 'absolute', top: -2, right: -4,
-                  width: 9, height: 9,
-                  background: '#e83b3b',
-                  borderRadius: '50%',
-                  border: '1.5px solid rgba(8,12,8,.97)',
-                  boxShadow: '0 0 6px rgba(232,59,59,.8)',
-                  display: 'block',
+                  width: 9, height: 9, background: '#e83b3b',
+                  borderRadius: '50%', border: '1.5px solid rgba(8,12,8,.97)',
+                  boxShadow: '0 0 6px rgba(232,59,59,.8)', display: 'block',
                 }} />
               )}
             </span>
