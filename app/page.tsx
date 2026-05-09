@@ -18,7 +18,6 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-// LED accent line
 function LedLine() {
   return (
     <div style={{
@@ -39,7 +38,6 @@ export default function Home() {
     }
   }, [])
 
-  // Fetch latest news timestamp on mount so the badge can appear immediately
   React.useEffect(() => {
     fetch('/api/news')
       .then(r => r.json())
@@ -50,7 +48,6 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Mark news as read when opening the Canale tab
   React.useEffect(() => {
     if (view === 'news') {
       setLastReadNewsAt(new Date().toISOString())
@@ -58,14 +55,13 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view])
 
-  // Heartbeat every 60s while logged in — tracks time in app
   React.useEffect(() => {
     if (!sessionToken) return
     const ping = () => fetch('/api/activity', {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${sessionToken}` },
     }).catch(() => {})
-    ping() // immediate on login
+    ping()
     const id = setInterval(ping, 60_000)
     return () => clearInterval(id)
   }, [sessionToken])
@@ -76,6 +72,10 @@ export default function Home() {
   return (
     <main style={{ minHeight: '100dvh', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
       <LedLine />
+
+      <div style={{ display: view === 'game' ? 'block' : 'none' }}>
+        <GameView />
+      </div>
 
       <div style={{ display: view === 'catalog' ? 'block' : 'none' }}>
         {isLoggedIn ? (
@@ -96,10 +96,6 @@ export default function Home() {
 
       <div style={{ display: view === 'news' ? 'block' : 'none' }}>
         {gated(<NewsView />)}
-      </div>
-
-      <div style={{ display: view === 'orders' ? 'block' : 'none', padding: '16px 16px 100px' }}>
-        {gated(<OrdersView />)}
       </div>
 
       <div style={{ display: view === 'account' ? 'block' : 'none', padding: '16px 16px 100px' }}>
@@ -125,8 +121,6 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
   fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
 })
 
-// ---- Inline simple views ----
-
 function NewsView() {
   const { sessionToken, channelJoined, setChannelJoined, setView } = useUIStore()
 
@@ -151,10 +145,8 @@ function NewsView() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  // On mount (or token change): sync membership status from server so cross-device login works
   React.useEffect(() => {
     if (!sessionToken) {
-      // Not logged in — just fetch the public count
       fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
       return
     }
@@ -168,7 +160,6 @@ function NewsView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionToken])
 
-  // Enter channel: persist joined state, call API only first time
   function joinChannel() {
     if (!channelJoined) {
       setChannelJoined(true)
@@ -182,7 +173,6 @@ function NewsView() {
           .catch(() => {})
       }
     }
-    // Try push async regardless (idempotent — browser returns existing sub if already subscribed)
     if ('serviceWorker' in navigator && 'PushManager' in window && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
       navigator.serviceWorker.ready.then(async reg => {
         try {
@@ -199,10 +189,8 @@ function NewsView() {
     }
   }
 
-  /* ─── LANDING ─── */
   if (!channelJoined) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px 100px' }}>
-      {/* Channel avatar */}
       <div style={{
         width: 96, height: 96, borderRadius: '50%', marginBottom: 20,
         background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.4), rgba(61,255,110,.1))',
@@ -210,14 +198,12 @@ function NewsView() {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '2.8rem', boxShadow: '0 0 40px rgba(61,255,110,.25)',
       }}>📡</div>
-
       <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', textAlign: 'center', marginBottom: 6 }}>
         Magic Trip House
       </div>
       <div style={{ fontSize: '.82rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 24, lineHeight: 1.5 }}>
         Canale ufficiale<br />Novità, offerte &amp; aggiornamenti esclusivi
       </div>
-
       <div style={{
         display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32,
         background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '10px 24px',
@@ -232,83 +218,51 @@ function NewsView() {
           <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>canale</div>
         </div>
       </div>
-
-      <button
-        onClick={joinChannel}
-        style={{
-          width: '100%', maxWidth: 300, padding: '15px',
-          borderRadius: 14, fontFamily: 'inherit', fontWeight: 700,
-          fontSize: '1.05rem', cursor: 'pointer',
-          background: 'linear-gradient(135deg, rgba(61,255,110,.25), rgba(61,255,110,.12))',
-          border: '1.5px solid rgba(61,255,110,.6)',
-          color: 'var(--green)', boxShadow: '0 0 24px rgba(61,255,110,.2)',
-          marginBottom: 10,
-        }}
-      >📡 Entra nel Canale</button>
-      <div style={{ fontSize: '.7rem', color: 'var(--muted)', opacity: .7 }}>
-        Attiva le notifiche per non perderti nulla
-      </div>
+      <button onClick={joinChannel} style={{
+        width: '100%', maxWidth: 300, padding: '15px',
+        borderRadius: 14, fontFamily: 'inherit', fontWeight: 700,
+        fontSize: '1.05rem', cursor: 'pointer',
+        background: 'linear-gradient(135deg, rgba(61,255,110,.25), rgba(61,255,110,.12))',
+        border: '1.5px solid rgba(61,255,110,.6)',
+        color: 'var(--green)', boxShadow: '0 0 24px rgba(61,255,110,.2)', marginBottom: 10,
+      }}>📡 Entra nel Canale</button>
+      <div style={{ fontSize: '.7rem', color: 'var(--muted)', opacity: .7 }}>Attiva le notifiche per non perderti nulla</div>
     </div>
   )
 
   const showPwaBanner = !isStandalone && !pwaBannerDismissed
 
-  /* ─── INTERNO canale (stile Telegram) ─── */
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', paddingBottom: 80 }}>
-
-      {/* Sticky header */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 10,
         background: 'rgba(8,12,8,.95)', backdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(61,255,110,.12)',
-        padding: '12px 16px',
-        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
       }}>
-        <button onClick={() => setView('catalog')} style={{
-          background: 'none', border: 'none', color: 'var(--muted)',
-          fontSize: '1.3rem', cursor: 'pointer', padding: '0 4px', lineHeight: 1,
-        }}>‹</button>
-        <div style={{
-          width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-          background: 'rgba(61,255,110,.15)', border: '1.5px solid rgba(61,255,110,.35)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
-        }}>📡</div>
+        <button onClick={() => setView('catalog')} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1.3rem', cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}>‹</button>
+        <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: 'rgba(61,255,110,.15)', border: '1.5px solid rgba(61,255,110,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📡</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', lineHeight: 1.2 }}>Magic Trip House</div>
-          <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>
-            {memberCount ?? '—'} iscritti · {subscribed ? '🔔 notifiche attive' : '🔕 solo lettura'}
-          </div>
+          <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>{memberCount ?? '—'} iscritti · {subscribed ? '🔔 notifiche attive' : '🔕 solo lettura'}</div>
         </div>
       </div>
 
-      {/* PWA banner */}
       {showPwaBanner && (
-        <div style={{
-          margin: '10px 12px 0',
-          background: 'linear-gradient(135deg,rgba(61,255,110,.1),rgba(245,200,66,.06))',
-          border: '1px solid rgba(61,255,110,.25)', borderRadius: 12, padding: '12px 14px',
-          display: 'flex', gap: 10, alignItems: 'flex-start', position: 'relative',
-        }}>
-          <button onClick={() => { sessionStorage.setItem('pwa_banner_dismissed','1'); setPwaBannerDismissed(true) }}
-            style={{ position:'absolute', top:8, right:10, background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'.9rem' }}>✕</button>
+        <div style={{ margin: '10px 12px 0', background: 'linear-gradient(135deg,rgba(61,255,110,.1),rgba(245,200,66,.06))', border: '1px solid rgba(61,255,110,.25)', borderRadius: 12, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start', position: 'relative' }}>
+          <button onClick={() => { sessionStorage.setItem('pwa_banner_dismissed','1'); setPwaBannerDismissed(true) }} style={{ position:'absolute', top:8, right:10, background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'.9rem' }}>✕</button>
           <span style={{ fontSize:'1.5rem', flexShrink:0 }}>📲</span>
           <div style={{ paddingRight: 20 }}>
             <div style={{ fontWeight:700, fontSize:'.82rem', color:'var(--green)', marginBottom:3 }}>Installa l&apos;app!</div>
             <div style={{ fontSize:'.73rem', color:'var(--muted)', lineHeight:1.5 }}>
               {deferredPrompt
-                ? <button onClick={async () => { deferredPrompt.prompt(); await deferredPrompt.userChoice; setDeferredPrompt(null) }}
-                    style={{ background:'rgba(61,255,110,.15)', border:'1px solid rgba(61,255,110,.4)', borderRadius:8, padding:'5px 14px', color:'var(--green)', fontFamily:'inherit', fontWeight:700, fontSize:'.78rem', cursor:'pointer' }}>
-                    📲 Installa ora
-                  </button>
+                ? <button onClick={async () => { deferredPrompt.prompt(); await deferredPrompt.userChoice; setDeferredPrompt(null) }} style={{ background:'rgba(61,255,110,.15)', border:'1px solid rgba(61,255,110,.4)', borderRadius:8, padding:'5px 14px', color:'var(--green)', fontFamily:'inherit', fontWeight:700, fontSize:'.78rem', cursor:'pointer' }}>📲 Installa ora</button>
                 : <>iOS: Condividi → Aggiungi a Home · Android: menu → Aggiungi a schermata Home</>
               }
             </div>
           </div>
         </div>
       )}
-
-      {/* Feed messaggi */}
       <ChannelFeed />
     </div>
   )
@@ -324,23 +278,16 @@ function ChannelFeed() {
     setLoading(true)
     fetch('/api/news')
       .then(r => r.json())
-      .then((data: NewsItem[]) => {
-        setNews(data)
-        setLoading(false)
-        if (data.length > 0) setLatestNewsAt(data[0].createdAt)
-      })
+      .then((data: NewsItem[]) => { setNews(data); setLoading(false); if (data.length > 0) setLatestNewsAt(data[0].createdAt) })
       .catch(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view])
 
   if (loading) return (
     <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {[1, 2, 3].map(i => (
-        <div key={i} style={{ background: 'var(--card)', borderRadius: 16, height: 110, opacity: .4, animation: 'skeleton-shine 1.4s infinite' }} />
-      ))}
+      {[1,2,3].map(i => <div key={i} style={{ background: 'var(--card)', borderRadius: 16, height: 110, opacity: .4, animation: 'skeleton-shine 1.4s infinite' }} />)}
     </div>
   )
-
   if (!news.length) return (
     <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '60px 24px' }}>
       <div style={{ fontSize: '3rem', marginBottom: 12 }}>📭</div>
@@ -360,75 +307,33 @@ function ChannelFeed() {
         const prevItem = news[i - 1]
         const prevDt = prevItem ? new Date(prevItem.createdAt) : null
         const showDate = !prevDt || prevDt.toDateString() !== dt.toDateString()
-
         return (
           <React.Fragment key={item.id}>
             {showDate && (
               <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 6px' }}>
-                <span style={{
-                  background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.15)',
-                  borderRadius: 20, padding: '3px 14px', fontSize: '.68rem', color: 'var(--muted)',
-                }}>{dateLabel}</span>
+                <span style={{ background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.15)', borderRadius: 20, padding: '3px 14px', fontSize: '.68rem', color: 'var(--muted)' }}>{dateLabel}</span>
               </div>
             )}
-            {/* Channel post bubble */}
-            <div style={{
-              background: 'var(--bg2)',
-              border: '1px solid rgba(61,255,110,.1)',
-              borderRadius: '4px 16px 16px 16px',
-              padding: '0',
-              animation: 'fadeInUp .25s ease both',
-              animationDelay: `${Math.min(i, 6) * 0.04}s`,
-              overflow: 'hidden',
-              position: 'relative',
-            }}>
-              {/* Channel name bar */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '10px 14px 6px',
-                borderBottom: '1px solid rgba(61,255,110,.07)',
-              }}>
-                <div style={{
-                  width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                  background: 'rgba(61,255,110,.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.85rem',
-                }}>📡</div>
-                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--green)', flex: 1 }}>
-                  Magic Trip House
-                </span>
+            <div style={{ background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.1)', borderRadius: '4px 16px 16px 16px', padding: '0', animation: 'fadeInUp .25s ease both', animationDelay: `${Math.min(i,6)*0.04}s`, overflow: 'hidden', position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px 6px', borderBottom: '1px solid rgba(61,255,110,.07)' }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: 'rgba(61,255,110,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.85rem' }}>📡</div>
+                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--green)', flex: 1 }}>Magic Trip House</span>
               </div>
-
-              {/* Post content */}
               <div style={{ padding: '10px 14px 12px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
                   <span style={{ fontSize: '1.5rem', lineHeight: 1, flexShrink: 0 }}>{item.emoji}</span>
-                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', letterSpacing: '.2px', flex: 1, paddingTop: 2 }}>
-                    {item.title}
-                  </div>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', letterSpacing: '.2px', flex: 1, paddingTop: 2 }}>{item.title}</div>
                 </div>
-                <div style={{ fontSize: '.85rem', color: '#cce8d0', lineHeight: 1.65, marginBottom: (item.imageUrl || item.productLink) ? 10 : 6 }}>
-                  {item.content}
-                </div>
+                <div style={{ fontSize: '.85rem', color: '#cce8d0', lineHeight: 1.65, marginBottom: (item.imageUrl || item.productLink) ? 10 : 6 }}>{item.content}</div>
                 {item.imageUrl && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.imageUrl} alt="" style={{
-                    width: '100%', borderRadius: 10, marginBottom: 10,
-                    maxHeight: 320, objectFit: 'cover', display: 'block',
-                  }} />
+                  <img src={item.imageUrl} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 320, objectFit: 'cover', display: 'block' }} />
                 )}
                 {item.productLink && (
-                  <a href={item.productLink} target="_blank" rel="noopener" style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    background: 'rgba(61,255,110,.1)', border: '1px solid rgba(61,255,110,.3)',
-                    borderRadius: 20, padding: '6px 14px',
-                    color: 'var(--green)', fontSize: '.78rem', fontWeight: 700, textDecoration: 'none',
-                  }}>🛒 Scopri il prodotto →</a>
+                  <a href={item.productLink} target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(61,255,110,.1)', border: '1px solid rgba(61,255,110,.3)', borderRadius: 20, padding: '6px 14px', color: 'var(--green)', fontSize: '.78rem', fontWeight: 700, textDecoration: 'none' }}>🛒 Scopri il prodotto →</a>
                 )}
-                {/* Timestamp */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                  <span style={{ fontSize: '.65rem', color: 'var(--muted)', opacity: .7 }}>
-                    {dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} ✓
-                  </span>
+                  <span style={{ fontSize: '.65rem', color: 'var(--muted)', opacity: .7 }}>{dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} ✓</span>
                 </div>
               </div>
             </div>
@@ -439,38 +344,10 @@ function ChannelFeed() {
   )
 }
 
-interface NewsItem {
-  id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string
-}
-
-function OrdersView() {
-  const [orders, setOrders] = React.useState<OrderItem[]>([])
-  React.useEffect(() => {
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('tp_orders') : null
-    if (saved) setOrders(JSON.parse(saved))
-  }, [])
-
-  if (!orders.length) return (
-    <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 48, fontSize: '.88rem' }}>
-      <div style={{ fontSize: '3rem', marginBottom: 8 }}>📋</div>Nessun ordine effettuato
-    </div>
-  )
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', marginBottom: 8 }}>📋 I Miei Ordini</div>
-      {orders.map((o) => (
-        <div key={o.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem' }}>{o.id}</span>
-            <span style={{ fontSize: '.75rem', color: 'var(--green)' }}>€{o.total}</span>
-          </div>
-          <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{o.date}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
+interface NewsItem { id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string }
+interface FItem { id: number; emoji: string; pts: number; x: number; y: number; speed: number }
+interface FbItem { id: number; x: number; y: number; text: string }
+interface LeaderEntry { id: string; handle: string; name: string; score: number; month: string }
 interface OrderItem { id: string; total: number; date: string }
 
 function urlBase64ToUint8Array(base64String: string) {
@@ -491,58 +368,34 @@ interface MeData {
 
 function PushToggle({ enabled, loading, onToggle }: { enabled: boolean; loading: boolean; onToggle: () => void }) {
   return (
-    <button
-      onClick={onToggle}
-      disabled={loading}
-      style={{
-        width: 50, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer',
-        background: enabled ? 'var(--green)' : 'rgba(106,138,106,.2)',
-        position: 'relative', transition: '.25s', flexShrink: 0,
-        boxShadow: enabled ? '0 0 12px rgba(61,255,110,.35)' : 'none',
-      }}
-    >
-      <div style={{
-        width: 22, height: 22, borderRadius: '50%', background: '#fff',
-        position: 'absolute', top: 3, transition: '.25s',
-        left: enabled ? 25 : 3,
-        boxShadow: '0 1px 4px rgba(0,0,0,.4)',
-      }} />
+    <button onClick={onToggle} disabled={loading} style={{ width: 50, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer', background: enabled ? 'var(--green)' : 'rgba(106,138,106,.2)', position: 'relative', transition: '.25s', flexShrink: 0, boxShadow: enabled ? '0 0 12px rgba(61,255,110,.35)' : 'none' }}>
+      <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, transition: '.25s', left: enabled ? 25 : 3, boxShadow: '0 1px 4px rgba(0,0,0,.4)' }} />
     </button>
   )
 }
 
 function AccountView() {
   const { userName, userHandle, userRole, userAvatar, sessionToken, login, logout, setView, setUserAvatar } = useUIStore()
-
-  // Inline edit name
   const [editingName, setEditingName] = React.useState(false)
   const [nameVal, setNameVal] = React.useState('')
-
-  // Avatar upload
   const avatarInputRef = React.useRef<HTMLInputElement>(null)
   const [avatarLoading, setAvatarLoading] = React.useState(false)
-
-  // Push
   const [pushEnabled, setPushEnabled] = React.useState(false)
   const [pushLoading, setPushLoading] = React.useState(false)
   const [hasSW, setHasSW] = React.useState(false)
   const [pushMsg, setPushMsg] = React.useState<{ ok: boolean; text: string } | null>(null)
   const [permissionDenied, setPermissionDenied] = React.useState(false)
   const [isIos, setIsIos] = React.useState(false)
-
-  // Password change
+  const [orders, setOrders] = React.useState<OrderItem[]>([])
+  const [showOrders, setShowOrders] = React.useState(false)
   const [showPwd, setShowPwd] = React.useState(false)
   const [pwdCurrent, setPwdCurrent] = React.useState('')
   const [pwdNew, setPwdNew] = React.useState('')
   const [pwdConfirm, setPwdConfirm] = React.useState('')
   const [pwdLoading, setPwdLoading] = React.useState(false)
   const [pwdMsg, setPwdMsg] = React.useState<{ ok: boolean; text: string } | null>(null)
-
-  // Server data
   const [meData, setMeData] = React.useState<MeData | null>(null)
   const [codeCopied, setCodeCopied] = React.useState(false)
-
-  // Orders count from localStorage
   const [orderCount, setOrderCount] = React.useState(0)
 
   React.useEffect(() => {
@@ -550,42 +403,27 @@ function AccountView() {
     setIsIos(/iphone|ipad|ipod/i.test(navigator.userAgent))
     const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
     setHasSW(supported)
-    if (supported) {
-      navigator.serviceWorker.ready.then((reg) =>
-        reg.pushManager.getSubscription().then((sub) => setPushEnabled(!!sub))
-      )
-    }
-    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
-      setPermissionDenied(true)
-    }
+    if (supported) navigator.serviceWorker.ready.then(reg => reg.pushManager.getSubscription().then(sub => setPushEnabled(!!sub)))
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') setPermissionDenied(true)
     const saved = localStorage.getItem('tp_orders')
-    if (saved) { try { setOrderCount(JSON.parse(saved).length) } catch { /* */ } }
-
+    if (saved) { try { const parsed = JSON.parse(saved); setOrders(parsed); setOrderCount(parsed.length) } catch { /* */ } }
     if (sessionToken) {
       fetch('/api/me', { headers: { Authorization: `Bearer ${sessionToken}` } })
         .then(r => r.json())
-        .then((d: MeData) => {
-          setMeData(d)
-          if (d.avatarUrl && d.avatarUrl !== userAvatar) setUserAvatar(d.avatarUrl)
-        })
+        .then((d: MeData) => { setMeData(d); if (d.avatarUrl && d.avatarUrl !== userAvatar) setUserAvatar(d.avatarUrl) })
         .catch(() => {})
     }
   }, [userName, sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file) return
-    if (!file.type.startsWith('image/')) return
+    if (!file || !file.type.startsWith('image/')) return
     setAvatarLoading(true)
     try {
       const { upload } = await import('@vercel/blob/client')
       const filename = `avatars/${userHandle}-${Date.now()}.${file.name.split('.').pop()}`
       const blob = await upload(filename, file, { access: 'public', handleUploadUrl: '/api/upload' })
-      await fetch('/api/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
-        body: JSON.stringify({ avatarUrl: blob.url }),
-      })
+      await fetch('/api/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ avatarUrl: blob.url }) })
       setUserAvatar(blob.url)
     } catch { /* upload failed silently */ }
     finally { setAvatarLoading(false); if (avatarInputRef.current) avatarInputRef.current.value = '' }
@@ -598,62 +436,29 @@ function AccountView() {
   }
 
   async function togglePush() {
-    if (!hasSW) {
-      setPushMsg({ ok: false, text: 'Notifiche non supportate su questo browser' })
-      return
-    }
-    setPushLoading(true)
-    setPushMsg(null)
+    if (!hasSW) { setPushMsg({ ok: false, text: 'Notifiche non supportate su questo browser' }); return }
+    setPushLoading(true); setPushMsg(null)
     try {
       if (pushEnabled) {
-        // Unsubscribe — no permission needed, serviceWorker.ready first is fine
         const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.getSubscription()
-        if (sub) {
-          await sub.unsubscribe()
-          await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
-        }
-        setPushEnabled(false)
-        setPushMsg({ ok: true, text: 'Notifiche disattivate' })
+        if (sub) { await sub.unsubscribe(); await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) }) }
+        setPushEnabled(false); setPushMsg({ ok: true, text: 'Notifiche disattivate' })
       } else {
-        // Subscribe — requestPermission MUST come before any await on iOS PWA
-        // to keep the user-gesture context intact
-        if (Notification.permission === 'denied') {
-          setPermissionDenied(true)
-          setPushLoading(false)
-          return
-        }
+        if (Notification.permission === 'denied') { setPermissionDenied(true); setPushLoading(false); return }
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-        if (!vapidKey) {
-          setPushMsg({ ok: false, text: 'Chiavi VAPID non configurate — imposta NEXT_PUBLIC_VAPID_PUBLIC_KEY su Vercel' })
-          setPushLoading(false)
-          return
-        }
-        // Request permission immediately (user gesture still active)
+        if (!vapidKey) { setPushMsg({ ok: false, text: 'Chiavi VAPID non configurate' }); setPushLoading(false); return }
         const permission = await Notification.requestPermission()
-        if (permission === 'denied') {
-          setPermissionDenied(true)
-          setPushLoading(false)
-          return
-        }
-        if (permission !== 'granted') {
-          setPushMsg({ ok: false, text: 'Permesso non concesso' })
-          setPushLoading(false)
-          return
-        }
-        // Permission granted — now we can safely await serviceWorker
+        if (permission === 'denied') { setPermissionDenied(true); setPushLoading(false); return }
+        if (permission !== 'granted') { setPushMsg({ ok: false, text: 'Permesso non concesso' }); setPushLoading(false); return }
         setPermissionDenied(false)
         const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) })
         await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
-        setPushEnabled(true)
-        setPushMsg({ ok: true, text: '🔔 Notifiche attivate!' })
+        setPushEnabled(true); setPushMsg({ ok: true, text: '🔔 Notifiche attivate!' })
         setTimeout(() => setPushMsg(null), 3000)
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Errore'
-      setPushMsg({ ok: false, text: msg })
-    }
+    } catch (err) { setPushMsg({ ok: false, text: err instanceof Error ? err.message : 'Errore' }) }
     setPushLoading(false)
   }
 
@@ -662,11 +467,7 @@ function AccountView() {
     if (pwdNew.length < 6) { setPwdMsg({ ok: false, text: 'Minimo 6 caratteri' }); return }
     setPwdLoading(true); setPwdMsg(null)
     try {
-      const res = await fetch('/api/users/password', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
-        body: JSON.stringify({ currentPassword: pwdCurrent, newPassword: pwdNew }),
-      })
+      const res = await fetch('/api/users/password', { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ currentPassword: pwdCurrent, newPassword: pwdNew }) })
       const d = await res.json()
       if (!res.ok) { setPwdMsg({ ok: false, text: d.error ?? 'Errore' }); return }
       setPwdMsg({ ok: true, text: 'Password aggiornata!' })
@@ -677,134 +478,49 @@ function AccountView() {
   }
 
   function copyCode(code: string) {
-    navigator.clipboard.writeText(code).then(() => {
-      setCodeCopied(true)
-      setTimeout(() => setCodeCopied(false), 2000)
-    }).catch(() => {})
+    navigator.clipboard.writeText(code).then(() => { setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2000) }).catch(() => {})
   }
 
   const initial = userName ? userName[0].toUpperCase() : '?'
   const joinedDate = meData?.joinedAt ? new Date(meData.joinedAt).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : null
-
-  const rowStyle: React.CSSProperties = {
-    background: 'var(--card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)', padding: '15px 18px',
-    display: 'flex', alignItems: 'center', gap: 14,
-  }
-  const iconCircle = (bg: string, emoji: string) => (
-    <div style={{
-      width: 44, height: 44, borderRadius: '50%', background: bg, flexShrink: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem',
-    }}>{emoji}</div>
-  )
+  const rowStyle: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14 }
+  const iconCircle = (bg: string, emoji: string) => (<div style={{ width: 44, height: 44, borderRadius: '50%', background: bg, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>{emoji}</div>)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-      {/* ── Hero card ── */}
-      <div style={{
-        background: 'linear-gradient(160deg,#0d1f0f 0%,var(--card) 60%)',
-        border: '1px solid rgba(61,255,110,.18)',
-        borderRadius: 'var(--radius)', padding: '28px 20px 22px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-        position: 'relative', overflow: 'hidden',
-      }}>
-        {/* Background glow */}
-        <div style={{
-          position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)',
-          width: 200, height: 200, borderRadius: '50%',
-          background: 'radial-gradient(circle,rgba(61,255,110,.08) 0%,transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-
-        {/* Avatar — tap to change */}
+      <div style={{ background: 'linear-gradient(160deg,#0d1f0f 0%,var(--card) 60%)', border: '1px solid rgba(61,255,110,.18)', borderRadius: 'var(--radius)', padding: '28px 20px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle,rgba(61,255,110,.08) 0%,transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => !avatarLoading && avatarInputRef.current?.click()}>
-          <div style={{
-            width: 88, height: 88, borderRadius: '50%', overflow: 'hidden',
-            background: 'linear-gradient(135deg,var(--green),var(--green2))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '2.6rem', fontWeight: 800, color: '#000',
-            fontFamily: "'Fredoka One', cursive",
-            boxShadow: '0 0 0 4px rgba(61,255,110,.15), var(--led-green)',
-            flexShrink: 0,
-          }}>
+          <div style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', background: 'linear-gradient(135deg,var(--green),var(--green2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.6rem', fontWeight: 800, color: '#000', fontFamily: "'Fredoka One', cursive", boxShadow: '0 0 0 4px rgba(61,255,110,.15), var(--led-green)', flexShrink: 0 }}>
             {userAvatar ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={userAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : initial}
           </div>
-          {/* Camera overlay */}
-          <div style={{
-            position: 'absolute', bottom: 0, right: 0,
-            width: 26, height: 26, borderRadius: '50%',
-            background: avatarLoading ? 'rgba(61,255,110,.3)' : 'var(--bg2)',
-            border: '2px solid var(--bg)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '.75rem', transition: '.2s',
-          }}>
-            {avatarLoading ? '⏳' : '📷'}
-          </div>
-          <input
-            ref={avatarInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleAvatarChange}
-          />
+          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%', background: avatarLoading ? 'rgba(61,255,110,.3)' : 'var(--bg2)', border: '2px solid var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.75rem', transition: '.2s' }}>{avatarLoading ? '⏳' : '📷'}</div>
+          <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
         </div>
 
-        {/* Name / edit */}
         {editingName ? (
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-            <input
-              autoFocus value={nameVal}
-              onChange={(e) => setNameVal(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && saveName()}
-              placeholder="Il tuo nome..."
-              style={{
-                flex: 1, background: 'var(--bg3)', borderRadius: 10, outline: 'none',
-                border: '1px solid rgba(61,255,110,.4)', padding: '10px 14px',
-                color: 'var(--text)', fontSize: '.92rem', fontFamily: 'inherit',
-              }}
-            />
-            <button onClick={saveName} style={{
-              background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.4)',
-              borderRadius: 10, padding: '0 16px', color: 'var(--green)',
-              fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer', fontSize: '1.2rem',
-            }}>✓</button>
+            <input autoFocus value={nameVal} onChange={e => setNameVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveName()} placeholder="Il tuo nome..." style={{ flex: 1, background: 'var(--bg3)', borderRadius: 10, outline: 'none', border: '1px solid rgba(61,255,110,.4)', padding: '10px 14px', color: 'var(--text)', fontSize: '.92rem', fontFamily: 'inherit' }} />
+            <button onClick={saveName} style={{ background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.4)', borderRadius: 10, padding: '0 16px', color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer', fontSize: '1.2rem' }}>✓</button>
           </div>
         ) : (
-          <>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', letterSpacing: '.3px' }}>
-                {userName}
-              </div>
-              {userHandle && (
-                <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 2 }}>@{userHandle}</div>
-              )}
-              {joinedDate && (
-                <div style={{ fontSize: '.68rem', color: 'rgba(106,138,106,.6)', marginTop: 4 }}>
-                  🗓 Membro da {joinedDate}
-                </div>
-              )}
-            </div>
-          </>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', letterSpacing: '.3px' }}>{userName}</div>
+            {userHandle && <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 2 }}>@{userHandle}</div>}
+            {joinedDate && <div style={{ fontSize: '.68rem', color: 'rgba(106,138,106,.6)', marginTop: 4 }}>🗓 Membro da {joinedDate}</div>}
+          </div>
         )}
 
-        {/* Stats row */}
         <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 4 }}>
           {[
-            { label: 'Ordini', value: orderCount, icon: '📋', onClick: () => setView('orders') },
+            { label: 'Ordini', value: orderCount, icon: '📋', onClick: () => setShowOrders(v => !v) },
             { label: 'Referral', value: meData?.affiliate?.referralCount ?? 0, icon: '👥', onClick: undefined },
             { label: 'Canale', value: meData?.channelMember ? '✓' : '—', icon: '📡', onClick: () => setView('news') },
           ].map(s => (
-            <button key={s.label} onClick={s.onClick ?? undefined}
-              style={{
-                flex: 1, background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.1)',
-                borderRadius: 12, padding: '10px 0', cursor: s.onClick ? 'pointer' : 'default',
-                textAlign: 'center', transition: '.15s',
-              }}
-            >
+            <button key={s.label} onClick={s.onClick ?? undefined} style={{ flex: 1, background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.1)', borderRadius: 12, padding: '10px 0', cursor: s.onClick ? 'pointer' : 'default', textAlign: 'center', transition: '.15s' }}>
               <div style={{ fontSize: '1rem', marginBottom: 2 }}>{s.icon}</div>
               <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: 'var(--text)' }}>{s.value}</div>
               <div style={{ fontSize: '.6rem', color: 'var(--muted)', marginTop: 1, letterSpacing: '.3px' }}>{s.label}</div>
@@ -812,289 +528,141 @@ function AccountView() {
           ))}
         </div>
 
-        {/* Action buttons */}
         {!editingName && (
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-            <button
-              onClick={() => { setEditingName(true); setNameVal(userName) }}
-              style={{
-                flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)',
-                borderRadius: 20, padding: '8px 0', color: 'var(--muted)',
-                fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
-              }}
-            >✏️ Modifica nome</button>
-            <button
-              onClick={logout}
-              style={{
-                background: 'rgba(232,59,59,.08)', border: '1px solid rgba(232,59,59,.22)',
-                borderRadius: 20, padding: '8px 18px', color: 'var(--red)',
-                fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer',
-              }}
-            >Esci</button>
+            <button onClick={() => { setEditingName(true); setNameVal(userName) }} style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '8px 0', color: 'var(--muted)', fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer' }}>✏️ Modifica nome</button>
+            <button onClick={logout} style={{ background: 'rgba(232,59,59,.08)', border: '1px solid rgba(232,59,59,.22)', borderRadius: 20, padding: '8px 18px', color: 'var(--red)', fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer' }}>Esci</button>
           </div>
         )}
       </div>
 
-      {/* ── Referral code ── */}
-      {meData?.affiliate && (
-        <div style={{
-          background: 'var(--card)', border: '1px solid rgba(245,200,66,.2)',
-          borderRadius: 'var(--radius)', padding: '16px 18px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>🎫 Il tuo codice referral</div>
-            {meData.affiliate.referralCount > 0 && (
-              <div style={{ fontSize: '.7rem', color: 'var(--gold)', fontWeight: 600 }}>
-                {meData.affiliate.referralCount} {meData.affiliate.referralCount === 1 ? 'amico' : 'amici'} iscritti
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => copyCode(meData.affiliate!.code)}
-            style={{
-              width: '100%', background: 'linear-gradient(135deg,rgba(245,200,66,.08),rgba(245,200,66,.04))',
-              border: '1.5px solid rgba(245,200,66,.35)', borderRadius: 12,
-              padding: '14px 18px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}
-          >
-            <span style={{
-              fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem',
-              letterSpacing: '8px', color: 'var(--gold)',
-              textShadow: 'var(--led-gold)',
-            }}>
-              {meData.affiliate.code}
-            </span>
-            <span style={{
-              fontSize: '.72rem', fontWeight: 700,
-              color: codeCopied ? 'var(--green)' : 'var(--muted)',
-              transition: '.2s',
-            }}>
-              {codeCopied ? '✓ Copiato!' : '📋 Copia'}
-            </span>
+      {orders.length > 0 && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+          <button onClick={() => setShowOrders(v => !v)} style={{ width: '100%', padding: '15px 18px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit' }}>
+            {iconCircle('rgba(61,255,110,.1)', '📋')}
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div style={{ fontWeight: 700, fontSize: '.88rem' }}>I Miei Ordini</div>
+              <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{orderCount} ordine{orderCount !== 1 ? 'i' : ''}</div>
+            </div>
+            <span style={{ color: 'var(--muted)', transition: '.2s', transform: showOrders ? 'rotate(90deg)' : 'none' }}>›</span>
           </button>
-          <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.6)', marginTop: 8, lineHeight: 1.5 }}>
-            Condividi questo codice — ogni amico che si registra con il tuo codice ti viene attribuito.
-          </div>
+          {showOrders && (
+            <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {orders.map(o => (
+                <div key={o.id} style={{ background: 'var(--bg3)', borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem' }}>{o.id}</div>
+                    <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{o.date}</div>
+                  </div>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", color: 'var(--green)', fontSize: '.92rem' }}>€{o.total}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Push notifications ── */}
+      {meData?.affiliate && (
+        <div style={{ background: 'var(--card)', border: '1px solid rgba(245,200,66,.2)', borderRadius: 'var(--radius)', padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>🎫 Il tuo codice referral</div>
+            {meData.affiliate.referralCount > 0 && <div style={{ fontSize: '.7rem', color: 'var(--gold)', fontWeight: 600 }}>{meData.affiliate.referralCount} {meData.affiliate.referralCount === 1 ? 'amico' : 'amici'} iscritti</div>}
+          </div>
+          <button onClick={() => copyCode(meData.affiliate!.code)} style={{ width: '100%', background: 'linear-gradient(135deg,rgba(245,200,66,.08),rgba(245,200,66,.04))', border: '1.5px solid rgba(245,200,66,.35)', borderRadius: 12, padding: '14px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', letterSpacing: '8px', color: 'var(--gold)', textShadow: 'var(--led-gold)' }}>{meData.affiliate.code}</span>
+            <span style={{ fontSize: '.72rem', fontWeight: 700, color: codeCopied ? 'var(--green)' : 'var(--muted)', transition: '.2s' }}>{codeCopied ? '✓ Copiato!' : '📋 Copia'}</span>
+          </button>
+          <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.6)', marginTop: 8, lineHeight: 1.5 }}>Condividi questo codice — ogni amico che si registra con il tuo codice ti viene attribuito.</div>
+        </div>
+      )}
+
       <div style={{ ...rowStyle, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: '.88rem' }}>🔔 Notifiche Push</div>
             <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 3 }}>
-              {!hasSW
-                ? 'Non supportate su questo browser'
-                : pushEnabled
-                  ? 'Attive · ricevi news e offerte'
-                  : permissionDenied
-                    ? '🔕 Permesso bloccato'
-                    : 'Disattive · tocca per abilitare'}
+              {!hasSW ? 'Non supportate su questo browser' : pushEnabled ? 'Attive · ricevi news e offerte' : permissionDenied ? '🔕 Permesso bloccato' : 'Disattive · tocca per abilitare'}
             </div>
           </div>
           <PushToggle enabled={pushEnabled} loading={pushLoading} onToggle={togglePush} />
         </div>
-
-        {/* Permission denied — instruction panel */}
         {permissionDenied && (
-          <div style={{
-            background: 'rgba(232,59,59,.06)', border: '1px solid rgba(232,59,59,.2)',
-            borderRadius: 10, padding: '12px 14px',
-          }}>
-            <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#e83b3b', marginBottom: 8 }}>
-              🔕 Il browser ha bloccato le notifiche
-            </div>
+          <div style={{ background: 'rgba(232,59,59,.06)', border: '1px solid rgba(232,59,59,.2)', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#e83b3b', marginBottom: 8 }}>🔕 Il browser ha bloccato le notifiche</div>
             <div style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.7, marginBottom: 10 }}>
-              {isIos ? (
-                <>
-                  <strong style={{ color: 'var(--text)' }}>Come sbloccare su iPhone/iPad:</strong><br />
-                  1. Apri <strong style={{ color: 'var(--text)' }}>Impostazioni</strong><br />
-                  2. Scorri fino a <strong style={{ color: 'var(--text)' }}>Safari</strong> (o cerca il nome dell&apos;app se installata)<br />
-                  3. Tocca <strong style={{ color: 'var(--text)' }}>Notifiche</strong><br />
-                  4. Imposta su <strong style={{ color: 'var(--text)' }}>Consenti</strong><br />
-                  5. Torna qui e tocca il pulsante qui sotto
-                </>
-              ) : (
-                <>
-                  <strong style={{ color: 'var(--text)' }}>Come sbloccare:</strong><br />
-                  1. Tocca l&apos;icona 🔒 nella barra del browser<br />
-                  2. Tocca <strong style={{ color: 'var(--text)' }}>Notifiche → Consenti</strong><br />
-                  3. Ricarica la pagina e tocca il pulsante qui sotto
-                </>
-              )}
+              {isIos ? (<><strong style={{ color: 'var(--text)' }}>Come sbloccare su iPhone/iPad:</strong><br />1. Apri <strong style={{ color: 'var(--text)' }}>Impostazioni</strong><br />2. Scorri fino a <strong style={{ color: 'var(--text)' }}>Safari</strong><br />3. Tocca <strong style={{ color: 'var(--text)' }}>Notifiche</strong><br />4. Imposta su <strong style={{ color: 'var(--text)' }}>Consenti</strong><br />5. Torna qui e tocca il pulsante qui sotto</>) : (<><strong style={{ color: 'var(--text)' }}>Come sbloccare:</strong><br />1. Tocca l&apos;icona 🔒 nella barra del browser<br />2. Tocca <strong style={{ color: 'var(--text)' }}>Notifiche → Consenti</strong><br />3. Ricarica la pagina e tocca il pulsante qui sotto</>)}
             </div>
-            <button
-              onClick={togglePush}
-              disabled={pushLoading}
-              style={{
-                width: '100%', background: 'rgba(61,255,110,.12)',
-                border: '1px solid rgba(61,255,110,.4)', borderRadius: 8,
-                padding: '9px', color: 'var(--green)', fontFamily: 'inherit',
-                fontWeight: 700, fontSize: '.8rem', cursor: 'pointer',
-              }}
-            >
+            <button onClick={togglePush} disabled={pushLoading} style={{ width: '100%', background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.4)', borderRadius: 8, padding: '9px', color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}>
               {pushLoading ? '...' : '✓ Ho abilitato — Attiva notifiche'}
             </button>
           </div>
         )}
-
         {pushMsg && !permissionDenied && (
-          <div style={{
-            fontSize: '.72rem', fontWeight: 600,
-            color: pushMsg.ok ? 'var(--green)' : '#e83b3b',
-            background: pushMsg.ok ? 'rgba(61,255,110,.08)' : 'rgba(232,59,59,.08)',
-            border: `1px solid ${pushMsg.ok ? 'rgba(61,255,110,.2)' : 'rgba(232,59,59,.2)'}`,
-            borderRadius: 8, padding: '6px 10px',
-          }}>
-            {pushMsg.text}
-          </div>
+          <div style={{ fontSize: '.72rem', fontWeight: 600, color: pushMsg.ok ? 'var(--green)' : '#e83b3b', background: pushMsg.ok ? 'rgba(61,255,110,.08)' : 'rgba(232,59,59,.08)', border: `1px solid ${pushMsg.ok ? 'rgba(61,255,110,.2)' : 'rgba(232,59,59,.2)'}`, borderRadius: 8, padding: '6px 10px' }}>{pushMsg.text}</div>
         )}
       </div>
 
-      {/* ── Links group ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-        <a href="https://t.me/magichous8" target="_blank" rel="noopener" style={{
-          background: 'var(--card)', border: '1px solid rgba(59,130,246,.2)',
-          borderBottom: 'none', borderRadius: '16px 16px 0 0',
-          padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14,
-          textDecoration: 'none', color: 'var(--text)',
-        }}>
+        <a href="https://t.me/magichous8" target="_blank" rel="noopener" style={{ background: 'var(--card)', border: '1px solid rgba(59,130,246,.2)', borderBottom: 'none', borderRadius: '16px 16px 0 0', padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'var(--text)' }}>
           {iconCircle('rgba(59,130,246,.15)', '✈️')}
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>Scrivici su Telegram</div>
-            <div style={{ fontSize: '.72rem', color: '#3b82f6', marginTop: 2 }}>@magichous8</div>
-          </div>
+          <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: '.88rem' }}>Scrivici su Telegram</div><div style={{ fontSize: '.72rem', color: '#3b82f6', marginTop: 2 }}>@magichous8</div></div>
           <span style={{ color: 'var(--muted)' }}>›</span>
         </a>
-        <button onClick={() => setView('news')} style={{
-          width: '100%', background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)',
-          borderRadius: '0 0 16px 16px',
-          padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14,
-          cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit',
-        }}>
+        <button onClick={() => setView('news')} style={{ width: '100%', background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)', borderRadius: '0 0 16px 16px', padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit' }}>
           {iconCircle('rgba(61,255,110,.1)', '📢')}
-          <div style={{ flex: 1, textAlign: 'left' }}>
-            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>Canale Ufficiale</div>
-            <div style={{ fontSize: '.72rem', color: 'var(--green)', marginTop: 2 }}>Novità & Offerte esclusive</div>
-          </div>
+          <div style={{ flex: 1, textAlign: 'left' }}><div style={{ fontWeight: 700, fontSize: '.88rem' }}>Canale Ufficiale</div><div style={{ fontSize: '.72rem', color: 'var(--green)', marginTop: 2 }}>Novità & Offerte esclusive</div></div>
           <span style={{ color: 'var(--muted)' }}>›</span>
         </button>
       </div>
 
-      {/* ── Social ── */}
-      <a href="https://www.instagram.com/magictriphouse_4.0" target="_blank" rel="noopener" style={{
-        background: 'var(--card)',
-        border: '1px solid rgba(193,53,132,.25)',
-        borderRadius: 'var(--radius)', padding: '15px 18px',
-        display: 'flex', alignItems: 'center', gap: 14,
-        textDecoration: 'none', color: 'var(--text)',
-      }}>
+      <a href="https://www.instagram.com/magictriphouse_4.0" target="_blank" rel="noopener" style={{ background: 'var(--card)', border: '1px solid rgba(193,53,132,.25)', borderRadius: 'var(--radius)', padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'var(--text)' }}>
         {iconCircle('rgba(193,53,132,.15)', '📸')}
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: '.88rem' }}>Seguici su Instagram</div>
-          <div style={{ fontSize: '.72rem', color: '#e1306c', marginTop: 2 }}>@magictriphouse_4.0</div>
-        </div>
+        <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: '.88rem' }}>Seguici su Instagram</div><div style={{ fontSize: '.72rem', color: '#e1306c', marginTop: 2 }}>@magictriphouse_4.0</div></div>
         <span style={{ color: 'var(--muted)' }}>›</span>
       </a>
 
-      {/* ── Change password ── */}
-      <div style={{
-        background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)', overflow: 'hidden',
-      }}>
-        <button
-          onClick={() => { setShowPwd(v => !v); setPwdMsg(null) }}
-          style={{
-            width: '100%', padding: '15px 18px', background: 'none', border: 'none',
-            display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', color: 'var(--text)',
-            fontFamily: 'inherit',
-          }}
-        >
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+        <button onClick={() => { setShowPwd(v => !v); setPwdMsg(null) }} style={{ width: '100%', padding: '15px 18px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit' }}>
           {iconCircle('rgba(106,138,106,.12)', '🔑')}
-          <div style={{ flex: 1, textAlign: 'left' }}>
-            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>Cambia Password</div>
-            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>Aggiorna le tue credenziali di accesso</div>
-          </div>
+          <div style={{ flex: 1, textAlign: 'left' }}><div style={{ fontWeight: 700, fontSize: '.88rem' }}>Cambia Password</div><div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>Aggiorna le tue credenziali di accesso</div></div>
           <span style={{ color: 'var(--muted)', transition: '.2s', transform: showPwd ? 'rotate(90deg)' : 'none' }}>›</span>
         </button>
-
         {showPwd && (
           <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {(['Password attuale', 'Nuova password', 'Conferma nuova'] as const).map((label, i) => {
               const vals = [pwdCurrent, pwdNew, pwdConfirm]
               const setters = [setPwdCurrent, setPwdNew, setPwdConfirm]
-              return (
-                <input
-                  key={i}
-                  type="password"
-                  placeholder={label}
-                  value={vals[i]}
-                  onChange={(e) => setters[i](e.target.value)}
-                  style={{
-                    background: 'var(--bg3)', borderRadius: 10, outline: 'none',
-                    border: '1px solid rgba(61,255,110,.2)', padding: '11px 14px',
-                    color: 'var(--text)', fontSize: '.88rem', fontFamily: 'inherit', width: '100%',
-                  }}
-                />
-              )
+              return <input key={i} type="password" placeholder={label} value={vals[i]} onChange={e => setters[i](e.target.value)} style={{ background: 'var(--bg3)', borderRadius: 10, outline: 'none', border: '1px solid rgba(61,255,110,.2)', padding: '11px 14px', color: 'var(--text)', fontSize: '.88rem', fontFamily: 'inherit', width: '100%' }} />
             })}
-            {pwdMsg && (
-              <div style={{ fontSize: '.75rem', color: pwdMsg.ok ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
-                {pwdMsg.ok ? '✓' : '⚠️'} {pwdMsg.text}
-              </div>
-            )}
-            <button
-              onClick={changePassword}
-              disabled={pwdLoading || !pwdCurrent || !pwdNew || !pwdConfirm}
-              style={{
-                background: 'linear-gradient(135deg,rgba(61,255,110,.2),rgba(61,255,110,.1))',
-                border: '1px solid rgba(61,255,110,.4)', borderRadius: 10, padding: '11px',
-                color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700,
-                fontSize: '.88rem', cursor: 'pointer',
-              }}
-            >
+            {pwdMsg && <div style={{ fontSize: '.75rem', color: pwdMsg.ok ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{pwdMsg.ok ? '✓' : '⚠️'} {pwdMsg.text}</div>}
+            <button onClick={changePassword} disabled={pwdLoading || !pwdCurrent || !pwdNew || !pwdConfirm} style={{ background: 'linear-gradient(135deg,rgba(61,255,110,.2),rgba(61,255,110,.1))', border: '1px solid rgba(61,255,110,.4)', borderRadius: 10, padding: '11px', color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.88rem', cursor: 'pointer' }}>
               {pwdLoading ? 'Salvataggio...' : 'Aggiorna password'}
             </button>
           </div>
         )}
       </div>
 
-      {/* ── Disclaimer ── */}
-      <div style={{
-        background: 'rgba(255,107,53,.05)', border: '1px solid rgba(255,107,53,.18)',
-        borderRadius: 12, padding: '12px 16px',
-        fontSize: '.72rem', color: 'rgba(106,138,106,.7)', lineHeight: 1.6,
-      }}>
+      <div style={{ background: 'rgba(255,107,53,.05)', border: '1px solid rgba(255,107,53,.18)', borderRadius: 12, padding: '12px 16px', fontSize: '.72rem', color: 'rgba(106,138,106,.7)', lineHeight: 1.6 }}>
         ⚠️ Account Telegram limitato? Salva prima il contatto{' '}
-        <span style={{ color: '#ffcf99', fontWeight: 700 }}>@magichous8</span>{' '}
-        prima di scrivere.
+        <span style={{ color: '#ffcf99', fontWeight: 700 }}>@magichous8</span>{' '}prima di scrivere.
       </div>
-
     </div>
   )
 }
 
-/* ---- Auth components ---- */
-
 function AuthView() {
   const { login } = useUIStore()
   const [mode, setMode] = React.useState<'register' | 'login'>('register')
-
   const [regName, setRegName] = React.useState('')
   const [regHandle, setRegHandle] = React.useState('')
   const [regPwd, setRegPwd] = React.useState('')
   const [regPwd2, setRegPwd2] = React.useState('')
   const [adminCode, setAdminCode] = React.useState('')
   const [showAdmin, setShowAdmin] = React.useState(false)
-
   const [logHandle, setLogHandle] = React.useState('')
   const [logPwd, setLogPwd] = React.useState('')
-
   const [error, setError] = React.useState('')
   const [loading, setLoading] = React.useState(false)
-
   function reset() { setError('') }
 
   async function handleRegister() {
@@ -1105,11 +673,7 @@ function AuthView() {
     if (regPwd !== regPwd2) return setError('Le password non coincidono')
     setLoading(true)
     try {
-      const res = await fetch('/api/users/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: regName.trim(), handle: regHandle.trim(), password: regPwd, adminCode }),
-      })
+      const res = await fetch('/api/users/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: regName.trim(), handle: regHandle.trim(), password: regPwd, adminCode }) })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Errore di registrazione'); setLoading(false); return }
       login(data.name, data.handle, data.role, data.token)
@@ -1122,11 +686,7 @@ function AuthView() {
     if (!logPwd) return setError('Inserisci password')
     setLoading(true)
     try {
-      const res = await fetch('/api/users/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handle: logHandle.trim(), password: logPwd }),
-      })
+      const res = await fetch('/api/users/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ handle: logHandle.trim(), password: logPwd }) })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Credenziali non valide'); setLoading(false); return }
       login(data.name, data.handle, data.role, data.token)
@@ -1134,103 +694,37 @@ function AuthView() {
     setLoading(false)
   }
 
-  function switchMode(m: 'register' | 'login') { setMode(m); reset() }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 20 }}>
-      <div style={{
-        width: 74, height: 74, borderRadius: '50%',
-        background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.22), rgba(61,255,110,.05))',
-        border: '2px solid rgba(61,255,110,.3)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '2rem', marginBottom: 16, boxShadow: '0 0 20px rgba(61,255,110,.12)',
-      }}>👤</div>
-
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', marginBottom: 4 }}>
-        {mode === 'register' ? 'Crea Account' : 'Bentornato'}
-      </div>
-      <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginBottom: 16, textAlign: 'center' }}>
-        {mode === 'register'
-          ? 'Registrati per accedere al Canale, Ordini e Affiliati'
-          : 'Accedi con le tue credenziali'}
-      </div>
+      <div style={{ width: 74, height: 74, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.22), rgba(61,255,110,.05))', border: '2px solid rgba(61,255,110,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: 16, boxShadow: '0 0 20px rgba(61,255,110,.12)' }}>👤</div>
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', marginBottom: 4 }}>{mode === 'register' ? 'Crea Account' : 'Bentornato'}</div>
+      <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginBottom: 16, textAlign: 'center' }}>{mode === 'register' ? 'Registrati per accedere al Canale, Ordini e Affiliati' : 'Accedi con le tue credenziali'}</div>
       {mode === 'login' && (
-        <div style={{
-          background: 'rgba(61,255,110,.06)', border: '1px solid rgba(61,255,110,.15)',
-          borderRadius: 10, padding: '9px 14px', marginBottom: 16, width: '100%', maxWidth: 340, boxSizing: 'border-box',
-        }}>
-          <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-            💡 <strong style={{ color: 'var(--text)' }}>Suggerimento:</strong> salva le credenziali nel tuo browser/portachiavi iPhone — si compilerà automaticamente la prossima volta.<br />
-            Se hai dimenticato la password, contatta l&apos;admin su <strong style={{ color: '#3b82f6' }}>@magichous8</strong> per il reset.
-          </div>
+        <div style={{ background: 'rgba(61,255,110,.06)', border: '1px solid rgba(61,255,110,.15)', borderRadius: 10, padding: '9px 14px', marginBottom: 16, width: '100%', maxWidth: 340, boxSizing: 'border-box' }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.5 }}>💡 <strong style={{ color: 'var(--text)' }}>Suggerimento:</strong> salva le credenziali nel tuo browser/portachiavi iPhone.<br />Se hai dimenticato la password, contatta l&apos;admin su <strong style={{ color: '#3b82f6' }}>@magichous8</strong>.</div>
         </div>
       )}
-
       <div style={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {mode === 'register' ? (
           <>
-            <input placeholder="Nome" value={regName}
-              onChange={e => { setRegName(e.target.value); reset() }}
-              style={inputStyle()} autoComplete="name" />
-            <input placeholder="Username (es. mario_97)" value={regHandle}
-              onChange={e => { setRegHandle(e.target.value.replace(/\s/g, '')); reset() }}
-              style={inputStyle()} autoComplete="username" />
-            <input type="password" placeholder="Password (min. 6 caratteri)" value={regPwd}
-              onChange={e => { setRegPwd(e.target.value); reset() }}
-              style={inputStyle()} autoComplete="new-password" />
-            <input type="password" placeholder="Conferma password" value={regPwd2}
-              onChange={e => { setRegPwd2(e.target.value); reset() }}
-              onKeyDown={e => e.key === 'Enter' && handleRegister()}
-              style={inputStyle(!!error && regPwd2 !== regPwd)} autoComplete="new-password" />
-            {showAdmin && (
-              <input placeholder="Codice admin (opzionale)" value={adminCode}
-                onChange={e => setAdminCode(e.target.value)}
-                style={inputStyle()} autoComplete="off" />
-            )}
-            <button onClick={() => setShowAdmin(v => !v)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '.7rem', cursor: 'pointer', textAlign: 'left', padding: '0 2px' }}>
-              {showAdmin ? '▲ Nascondi codice admin' : '▼ Ho un codice admin'}
-            </button>
+            <input placeholder="Nome" value={regName} onChange={e => { setRegName(e.target.value); reset() }} style={inputStyle()} autoComplete="name" />
+            <input placeholder="Username (es. mario_97)" value={regHandle} onChange={e => { setRegHandle(e.target.value.replace(/\s/g, '')); reset() }} style={inputStyle()} autoComplete="username" />
+            <input type="password" placeholder="Password (min. 6 caratteri)" value={regPwd} onChange={e => { setRegPwd(e.target.value); reset() }} style={inputStyle()} autoComplete="new-password" />
+            <input type="password" placeholder="Conferma password" value={regPwd2} onChange={e => { setRegPwd2(e.target.value); reset() }} onKeyDown={e => e.key === 'Enter' && handleRegister()} style={inputStyle(!!error && regPwd2 !== regPwd)} autoComplete="new-password" />
+            {showAdmin && <input placeholder="Codice admin (opzionale)" value={adminCode} onChange={e => setAdminCode(e.target.value)} style={inputStyle()} autoComplete="off" />}
+            <button onClick={() => setShowAdmin(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '.7rem', cursor: 'pointer', textAlign: 'left', padding: '0 2px' }}>{showAdmin ? '▲ Nascondi codice admin' : '▼ Ho un codice admin'}</button>
           </>
         ) : (
           <>
-            <input placeholder="Username" value={logHandle}
-              onChange={e => { setLogHandle(e.target.value.replace(/\s/g, '')); reset() }}
-              style={inputStyle()} autoComplete="username" />
-            <input type="password" placeholder="Password" value={logPwd}
-              onChange={e => { setLogPwd(e.target.value); reset() }}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              style={inputStyle()} autoComplete="current-password" />
+            <input placeholder="Username" value={logHandle} onChange={e => { setLogHandle(e.target.value.replace(/\s/g, '')); reset() }} style={inputStyle()} autoComplete="username" />
+            <input type="password" placeholder="Password" value={logPwd} onChange={e => { setLogPwd(e.target.value); reset() }} onKeyDown={e => e.key === 'Enter' && handleLogin()} style={inputStyle()} autoComplete="current-password" />
           </>
         )}
-
-        {error && (
-          <div style={{ fontSize: '.75rem', color: 'var(--red)', marginTop: -2, paddingLeft: 4 }}>
-            ⚠️ {error}
-          </div>
-        )}
-
-        <button
-          onClick={mode === 'register' ? handleRegister : handleLogin}
-          disabled={loading}
-          style={{
-            padding: '14px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
-            fontSize: '1rem', cursor: loading ? 'default' : 'pointer', transition: '.2s',
-            background: loading ? 'rgba(61,255,110,.08)' : 'rgba(61,255,110,.18)',
-            border: '1.5px solid rgba(61,255,110,.5)',
-            color: 'var(--green)', boxShadow: '0 0 16px rgba(61,255,110,.1)', marginTop: 4,
-          }}
-        >
+        {error && <div style={{ fontSize: '.75rem', color: 'var(--red)', marginTop: -2, paddingLeft: 4 }}>⚠️ {error}</div>}
+        <button onClick={mode === 'register' ? handleRegister : handleLogin} disabled={loading} style={{ padding: '14px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: '1rem', cursor: loading ? 'default' : 'pointer', transition: '.2s', background: loading ? 'rgba(61,255,110,.08)' : 'rgba(61,255,110,.18)', border: '1.5px solid rgba(61,255,110,.5)', color: 'var(--green)', boxShadow: '0 0 16px rgba(61,255,110,.1)', marginTop: 4 }}>
           {loading ? '...' : mode === 'register' ? '🚀 Crea Account' : '🔑 Accedi'}
         </button>
-
-        <button
-          onClick={() => switchMode(mode === 'register' ? 'login' : 'register')}
-          style={{
-            background: 'none', border: 'none', color: 'var(--muted)',
-            fontSize: '.78rem', cursor: 'pointer', fontFamily: 'inherit', padding: '6px 4px',
-          }}
-        >
+        <button onClick={() => { setMode(m => m === 'register' ? 'login' : 'register'); reset() }} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '.78rem', cursor: 'pointer', fontFamily: 'inherit', padding: '6px 4px' }}>
           {mode === 'register' ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
         </button>
       </div>
@@ -1241,25 +735,11 @@ function AuthView() {
 function AuthGate() {
   const { setView } = useUIStore()
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 60, gap: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 60 }}>
       <div style={{ fontSize: '3.5rem', marginBottom: 16, opacity: .7 }}>🔒</div>
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', marginBottom: 8 }}>
-        Accesso richiesto
-      </div>
-      <div style={{ fontSize: '.82rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 28, maxWidth: 240 }}>
-        Registrati o accedi con il tuo account per vedere questa sezione
-      </div>
-      <button
-        onClick={() => setView('account')}
-        style={{
-          padding: '13px 36px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
-          fontSize: '.95rem', cursor: 'pointer',
-          background: 'rgba(61,255,110,.18)', border: '1.5px solid rgba(61,255,110,.5)',
-          color: 'var(--green)', boxShadow: '0 0 16px rgba(61,255,110,.12)',
-        }}
-      >
-        👤 Vai all&apos;Account
-      </button>
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', marginBottom: 8 }}>Accesso richiesto</div>
+      <div style={{ fontSize: '.82rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 28, maxWidth: 240 }}>Registrati o accedi con il tuo account per vedere questa sezione</div>
+      <button onClick={() => setView('account')} style={{ padding: '13px 36px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: '.95rem', cursor: 'pointer', background: 'rgba(61,255,110,.18)', border: '1.5px solid rgba(61,255,110,.5)', color: 'var(--green)', boxShadow: '0 0 16px rgba(61,255,110,.12)' }}>👤 Vai all&apos;Account</button>
     </div>
   )
 }
@@ -1269,6 +749,228 @@ function AffiliatesView() {
     <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 32, fontSize: '.88rem' }}>
       <div style={{ fontSize: '3rem', marginBottom: 8 }}>👥</div>
       Programma affiliati disponibile prossimamente
+    </div>
+  )
+}
+
+function GameLeaderboard({ entries }: { entries: LeaderEntry[] }) {
+  const month = new Date().toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
+  const MEDALS = ['🥇', '🥈', '🥉']
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid rgba(245,200,66,.15)', borderRadius: 'var(--radius)', padding: '14px' }}>
+      <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>🏆 Classifica</span>
+        <span style={{ fontSize: '.68rem', color: 'var(--muted)', fontWeight: 400 }}>{month}</span>
+      </div>
+      {entries.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.78rem', padding: '12px 0' }}>Nessuna partita ancora · sii il primo! 🌿</div>
+      ) : entries.map((e, i) => (
+        <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < entries.length - 1 ? '1px solid rgba(61,255,110,.06)' : 'none' }}>
+          <div style={{ width: 26, textAlign: 'center', fontSize: i < 3 ? '1.1rem' : '.75rem', color: i < 3 ? undefined : 'var(--muted)', fontWeight: 700 }}>{i < 3 ? MEDALS[i] : i + 1}</div>
+          <div style={{ flex: 1, fontSize: '.82rem', color: i === 0 ? 'var(--gold)' : 'var(--text)', fontWeight: i === 0 ? 700 : 400 }}>@{e.handle}</div>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: i === 0 ? 'var(--gold)' : 'var(--green)' }}>{e.score}</div>
+        </div>
+      ))}
+      <div style={{ fontSize: '.62rem', color: 'rgba(106,138,106,.5)', marginTop: 10, textAlign: 'center' }}>Il vincitore di fine mese riceve un premio speciale 🎁</div>
+    </div>
+  )
+}
+
+function GameView() {
+  const { sessionToken, isLoggedIn } = useUIStore()
+  type GPhase = 'idle' | 'counting' | 'playing' | 'ended'
+  const [phase, setPhase] = React.useState<GPhase>('idle')
+  const [countdown, setCountdown] = React.useState(3)
+  const [displayScore, setDisplayScore] = React.useState(0)
+  const [displayTime, setDisplayTime] = React.useState(60)
+  const [displayItems, setDisplayItems] = React.useState<FItem[]>([])
+  const [displayFb, setDisplayFb] = React.useState<FbItem[]>([])
+  const [result, setResult] = React.useState<{ score: number; rank: number | null; bestScore: number } | null>(null)
+  const [leaderboard, setLeaderboard] = React.useState<LeaderEntry[]>([])
+  const [playsToday, setPlaysToday] = React.useState(0)
+  const MAX_PLAYS = 3
+  const scoreRef = React.useRef(0)
+  const itemsRef = React.useRef<FItem[]>([])
+  const fbRef = React.useRef<FbItem[]>([])
+  const lastSpawnRef = React.useRef(0)
+  const startTimeRef = React.useRef(0)
+  const rafRef = React.useRef<number>()
+  const nextIdRef = React.useRef(0)
+  const nextFbIdRef = React.useRef(0)
+  const gameAreaRef = React.useRef<HTMLDivElement>(null)
+  const phaseRef = React.useRef<GPhase>('idle')
+  const todayKey = () => `game_plays_${new Date().toISOString().slice(0, 10)}`
+
+  React.useEffect(() => {
+    setPlaysToday(parseInt(localStorage.getItem(todayKey()) ?? '0'))
+    fetchLeaderboard()
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function fetchLeaderboard() { fetch('/api/game').then(r => r.json()).then(setLeaderboard).catch(() => {}) }
+
+  function pickItem() {
+    const r = Math.random()
+    if (r < 0.42) return { emoji: '🌿', pts: 1, speed: 2.2 }
+    if (r < 0.67) return { emoji: '💚', pts: 3, speed: 3.0 }
+    if (r < 0.82) return { emoji: '⭐', pts: 5, speed: 3.8 }
+    if (r < 0.92) return { emoji: '💎', pts: 10, speed: 5.0 }
+    return { emoji: '💣', pts: -5, speed: 3.2 }
+  }
+
+  function spawnMs(elapsed: number) {
+    if (elapsed < 15) return 1300
+    if (elapsed < 30) return 1000
+    if (elapsed < 45) return 800
+    return 640
+  }
+
+  function startCountdown() {
+    setPhase('counting'); phaseRef.current = 'counting'; setCountdown(3)
+    let c = 3
+    const iv = setInterval(() => { c--; if (c <= 0) { clearInterval(iv); startGame() } else setCountdown(c) }, 1000)
+  }
+
+  function startGame() {
+    scoreRef.current = 0; itemsRef.current = []; fbRef.current = []
+    setDisplayScore(0); setDisplayTime(60); setDisplayItems([]); setDisplayFb([])
+    startTimeRef.current = performance.now(); lastSpawnRef.current = 0
+    setPhase('playing'); phaseRef.current = 'playing'
+    const n = parseInt(localStorage.getItem(todayKey()) ?? '0') + 1
+    localStorage.setItem(todayKey(), String(n)); setPlaysToday(n)
+    rafRef.current = requestAnimationFrame(loop)
+  }
+
+  function loop(now: number) {
+    if (phaseRef.current !== 'playing') return
+    const elapsed = (now - startTimeRef.current) / 1000
+    const remaining = Math.max(0, 60 - elapsed)
+    if (remaining <= 0) { endGame(); return }
+    const ga = gameAreaRef.current
+    if (!ga) { rafRef.current = requestAnimationFrame(loop); return }
+    const gH = ga.clientHeight, gW = ga.clientWidth
+    if (now - lastSpawnRef.current > spawnMs(elapsed)) {
+      const t = pickItem()
+      itemsRef.current.push({ id: nextIdRef.current++, ...t, x: 8 + Math.random() * Math.max(0, gW - 72), y: -60 })
+      lastSpawnRef.current = now
+    }
+    itemsRef.current = itemsRef.current.map(i => ({ ...i, y: i.y + i.speed })).filter(i => i.y < gH + 60)
+    setDisplayScore(scoreRef.current); setDisplayTime(Math.ceil(remaining))
+    setDisplayItems([...itemsRef.current]); setDisplayFb([...fbRef.current])
+    rafRef.current = requestAnimationFrame(loop)
+  }
+
+  function handleTap(e: React.TouchEvent | React.MouseEvent) {
+    if (phaseRef.current !== 'playing') return
+    const rect = gameAreaRef.current!.getBoundingClientRect()
+    const cx = 'changedTouches' in e ? (e as React.TouchEvent).changedTouches[0].clientX : (e as React.MouseEvent).clientX
+    const cy = 'changedTouches' in e ? (e as React.TouchEvent).changedTouches[0].clientY : (e as React.MouseEvent).clientY
+    const tx = cx - rect.left, ty = cy - rect.top
+    for (let i = itemsRef.current.length - 1; i >= 0; i--) {
+      const item = itemsRef.current[i]
+      const dx = tx - item.x - 28, dy = ty - item.y - 28
+      if (dx * dx + dy * dy < 38 * 38) {
+        scoreRef.current = Math.max(0, scoreRef.current + item.pts)
+        const fbId = nextFbIdRef.current++
+        fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: item.pts >= 0 ? `+${item.pts}` : String(item.pts) }]
+        setTimeout(() => { fbRef.current = fbRef.current.filter(f => f.id !== fbId) }, 700)
+        itemsRef.current.splice(i, 1); break
+      }
+    }
+  }
+
+  function endGame() {
+    phaseRef.current = 'ended'; setPhase('ended')
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    const score = scoreRef.current
+    setResult({ score, rank: null, bestScore: score })
+    if (isLoggedIn && sessionToken) {
+      fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify({ score }) })
+        .then(r => r.json()).then(d => { setResult({ score, rank: d.rank ?? null, bestScore: d.bestScore ?? score }); fetchLeaderboard() })
+        .catch(() => fetchLeaderboard())
+    } else { fetchLeaderboard() }
+  }
+
+  const canPlay = playsToday < MAX_PLAYS
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 60px)' }}>
+      <style>{`@keyframes bud-fb{from{opacity:1;transform:translateY(0) scale(1.2)}to{opacity:0;transform:translateY(-50px) scale(.9)}}`}</style>
+      <div style={{ padding: '12px 16px 8px', background: 'rgba(8,12,8,.97)', borderBottom: '1px solid rgba(61,255,110,.12)', flexShrink: 0 }}>
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>🎮 Bud Rain</div>
+        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>Cattura i buds · il top scorer mensile vince un premio 🏆</div>
+      </div>
+
+      {phase === 'idle' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px' }}>
+            <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: 10 }}>Come si gioca</div>
+            {([['🌿','Foglia','+1'],['💚','Cuore','+3'],['⭐','Stella','+5'],['💎','Diamante','+10'],['💣','Bomba','-5']] as const).map(([icon,label,pts]) => (
+              <div key={icon} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', borderBottom: '1px solid rgba(61,255,110,.06)' }}>
+                <span style={{ fontSize: '1.2rem', width: 26 }}>{icon}</span>
+                <span style={{ flex: 1, fontSize: '.8rem', color: 'var(--muted)' }}>{label}</span>
+                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: pts.startsWith('-') ? '#e83b3b' : 'var(--green)' }}>{pts} pt</span>
+              </div>
+            ))}
+            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>⏱ 60 secondi · {MAX_PLAYS} partite al giorno · tocca gli oggetti per catturarli — evita le bombe!</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 10 }}>Partite oggi: <strong style={{ color: canPlay ? 'var(--green)' : '#e83b3b' }}>{playsToday}/{MAX_PLAYS}</strong></div>
+            <button onClick={() => canPlay && startCountdown()} disabled={!canPlay} style={{ background: canPlay ? 'linear-gradient(135deg,rgba(61,255,110,.22),rgba(61,255,110,.1))' : 'rgba(106,138,106,.06)', border: `1.5px solid ${canPlay ? 'rgba(61,255,110,.5)' : 'rgba(106,138,106,.15)'}`, borderRadius: 14, padding: '13px 36px', fontFamily: 'inherit', fontWeight: 700, fontSize: '1rem', color: canPlay ? 'var(--green)' : 'var(--muted)', cursor: canPlay ? 'pointer' : 'default', boxShadow: canPlay ? '0 0 24px rgba(61,255,110,.2)' : 'none' }}>
+              {canPlay ? '🎮 Inizia partita' : '⏰ Torna domani'}
+            </button>
+          </div>
+          <GameLeaderboard entries={leaderboard} />
+        </div>
+      )}
+
+      {phase === 'counting' && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '6rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{countdown}</div>
+          <div style={{ color: 'var(--muted)', fontSize: '.9rem' }}>Preparati...</div>
+        </div>
+      )}
+
+      {phase === 'playing' && (
+        <div ref={gameAreaRef} onTouchStart={e => { e.preventDefault(); handleTap(e) }} onClick={handleTap} style={{ flex: 1, position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: 'none', cursor: 'crosshair', background: 'radial-gradient(ellipse at 50% 0%,rgba(61,255,110,.05) 0%,transparent 65%)' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', background: 'rgba(8,12,8,.88)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(61,255,110,.1)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '.58rem', color: 'var(--muted)', letterSpacing: '.5px' }}>PUNTI</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.8rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{displayScore}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '.58rem', color: 'var(--muted)', letterSpacing: '.5px' }}>TEMPO</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.8rem', lineHeight: 1, color: displayTime <= 10 ? '#e83b3b' : 'var(--text)', transition: 'color .3s' }}>{displayTime}</div>
+            </div>
+          </div>
+          {displayItems.map(item => (
+            <div key={item.id} style={{ position: 'absolute', left: item.x, top: item.y + 56, width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.1rem', pointerEvents: 'none', filter: item.pts < 0 ? 'drop-shadow(0 0 8px rgba(232,59,59,.8))' : 'drop-shadow(0 0 6px rgba(61,255,110,.6))' }}>{item.emoji}</div>
+          ))}
+          {displayFb.map(fb => (
+            <div key={fb.id} style={{ position: 'absolute', left: fb.x + 56, top: fb.y + 56, fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', fontWeight: 900, color: fb.text.startsWith('-') ? '#e83b3b' : 'var(--green)', textShadow: fb.text.startsWith('-') ? '0 0 8px rgba(232,59,59,.9)' : 'var(--led-green)', pointerEvents: 'none', animation: 'bud-fb .7s ease forwards', zIndex: 20 }}>{fb.text}</div>
+          ))}
+        </div>
+      )}
+
+      {phase === 'ended' && result && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 6 }}>{result.rank === 1 ? '👑' : result.rank && result.rank <= 3 ? '🏆' : '🌿'}</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', marginBottom: 4 }}>Partita finita!</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '3.5rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{result.score}</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 6 }}>
+              {result.rank != null ? result.rank === 1 ? '🥇 Sei il leader questo mese!' : result.rank <= 3 ? `🏆 Sei #${result.rank} in classifica!` : `Sei #${result.rank} in classifica questo mese` : isLoggedIn ? 'Caricamento classifica...' : '⚠️ Accedi per salvare il punteggio'}
+            </div>
+            {result.bestScore > result.score && <div style={{ fontSize: '.7rem', color: 'var(--gold)', marginTop: 4 }}>Il tuo record: {result.bestScore}</div>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+            {canPlay && <button onClick={startCountdown} style={{ flex: 1, padding: '11px', background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.35)', borderRadius: 12, color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>🎮 Rigioca ({MAX_PLAYS - playsToday})</button>}
+            <button onClick={() => { setPhase('idle'); phaseRef.current = 'idle'; setResult(null) }} style={{ flex: 1, padding: '11px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--muted)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>📊 Classifica</button>
+          </div>
+          <GameLeaderboard entries={leaderboard} />
+        </div>
+      )}
     </div>
   )
 }
