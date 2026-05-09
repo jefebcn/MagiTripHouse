@@ -8,12 +8,14 @@ interface Product {
   id: string; name: string; description?: string; category: string; tags: string[];
   variants: Variant[]; stock?: number | null; imageUrl?: string; mediaType?: string;
   emoji: string; badge?: string; origin?: string; sortOrder: number;
+  isOnSale?: boolean; isComingSoon?: boolean;
 }
 
 const EMPTY: Omit<Product, 'id' | 'sortOrder'> = {
   name: '', description: '', category: 'premium', tags: [],
   variants: [{ label: '', price: 0 }], stock: null,
   imageUrl: '', mediaType: 'image', emoji: '🌿', badge: '', origin: '',
+  isOnSale: false, isComingSoon: false,
 }
 
 export default function AdminProducts() {
@@ -48,6 +50,7 @@ export default function AdminProducts() {
       stock: p.stock ?? null, imageUrl: p.imageUrl ?? '',
       mediaType: p.mediaType ?? 'image', emoji: p.emoji,
       badge: p.badge ?? '', origin: p.origin ?? '',
+      isOnSale: p.isOnSale ?? false, isComingSoon: p.isComingSoon ?? false,
     })
   }
 
@@ -56,7 +59,6 @@ export default function AdminProducts() {
     if (!file) return
     setUploading(true)
     setUploadProgress(0)
-    // Simulate progress while uploading (no native progress in this SDK version)
     const timer = setInterval(() => setUploadProgress(p => p < 90 ? p + 5 : p), 400)
     try {
       const ext = file.name.split('.').pop() ?? 'bin'
@@ -83,6 +85,8 @@ export default function AdminProducts() {
         ...form,
         tags: typeof form.tags === 'string' ? (form.tags as string).split(',').map((t: string) => t.trim()).filter(Boolean) : form.tags,
         stock: form.stock !== null && form.stock !== undefined ? Number(form.stock) : null,
+        isOnSale: form.isOnSale ?? false,
+        isComingSoon: form.isComingSoon ?? false,
       }
       const res = editing
         ? await fetch(`/api/products/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -159,7 +163,6 @@ export default function AdminProducts() {
               Foto / Video
             </div>
 
-            {/* Preview */}
             {form.imageUrl && (
               <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden' }}>
                 {form.mediaType === 'video'
@@ -176,7 +179,6 @@ export default function AdminProducts() {
               </div>
             )}
 
-            {/* File upload */}
             <div
               onClick={() => fileRef.current?.click()}
               style={{
@@ -188,7 +190,6 @@ export default function AdminProducts() {
             </div>
             <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={handleUpload} />
 
-            {/* Paste URL */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted)', fontSize: '.75rem' }}>
               <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
               oppure incolla URL
@@ -196,7 +197,7 @@ export default function AdminProducts() {
             </div>
             <input
               type="url"
-              placeholder="https://firebasestorage.googleapis.com/..."
+              placeholder="https://..."
               value={form.imageUrl}
               onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
               style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
@@ -213,7 +214,7 @@ export default function AdminProducts() {
                     border: `1px solid ${form.mediaType === t ? 'rgba(61,255,110,.4)' : 'var(--border)'}`,
                   }}
                 >
-                  {t === 'image' ? '🖼 Immagine' : '🎬 Video'}
+                  {t === 'image' ? '🖼 Immagine' : '🎦 Video'}
                 </button>
               ))}
             </div>
@@ -245,7 +246,34 @@ export default function AdminProducts() {
             />
           </div>
 
-          {inp('Giacenza (vuoto = illimitata)', 'stock', 'number')}
+          {inp('Giacenza (vuoto = illimitata, 0 = esaurito)', 'stock', 'number')}
+
+          {/* Stato prodotto */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Stato speciale</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, isOnSale: !f.isOnSale, isComingSoon: false }))}
+                style={{
+                  flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700, border: '1px solid',
+                  background: form.isOnSale ? 'rgba(232,59,59,.15)' : 'var(--bg3)',
+                  color:      form.isOnSale ? '#e83b3b'             : 'var(--muted)',
+                  borderColor: form.isOnSale ? 'rgba(232,59,59,.4)' : 'var(--border)',
+                }}
+              >🏷 In sconto</button>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, isComingSoon: !f.isComingSoon, isOnSale: false }))}
+                style={{
+                  flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700, border: '1px solid',
+                  background: form.isComingSoon ? 'rgba(59,130,246,.15)' : 'var(--bg3)',
+                  color:      form.isComingSoon ? '#7ec8f8'              : 'var(--muted)',
+                  borderColor: form.isComingSoon ? 'rgba(59,130,246,.4)' : 'var(--border)',
+                }}
+              >🕐 In arrivo</button>
+            </div>
+          </div>
 
           {/* Variants */}
           <div>
@@ -330,7 +358,7 @@ export default function AdminProducts() {
               <div style={{ fontWeight: 600, fontSize: '.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
               <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>
                 {p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
-                {p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
+                {p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
