@@ -30,7 +30,7 @@ function LedLine() {
 }
 
 export default function Home() {
-  const { view, isLoggedIn, setView, sessionToken } = useUIStore()
+  const { view, isLoggedIn, setView, sessionToken, setLastReadNewsAt, setLatestNewsAt } = useUIStore()
   useTelegram()
 
   React.useEffect(() => {
@@ -38,6 +38,25 @@ export default function Home() {
       navigator.serviceWorker.register('/sw.js').catch(() => {})
     }
   }, [])
+
+  // Fetch latest news timestamp on mount so the badge can appear immediately
+  React.useEffect(() => {
+    fetch('/api/news')
+      .then(r => r.json())
+      .then((data: { createdAt: string }[]) => {
+        if (data.length > 0) setLatestNewsAt(data[0].createdAt)
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Mark news as read when opening the Canale tab
+  React.useEffect(() => {
+    if (view === 'news') {
+      setLastReadNewsAt(new Date().toISOString())
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view])
 
   // Heartbeat every 60s while logged in — tracks time in app
   React.useEffect(() => {
@@ -296,7 +315,7 @@ function NewsView() {
 }
 
 function ChannelFeed() {
-  const { view } = useUIStore()
+  const { view, setLatestNewsAt } = useUIStore()
   const [news, setNews] = React.useState<NewsItem[]>([])
   const [loading, setLoading] = React.useState(true)
 
@@ -305,8 +324,13 @@ function ChannelFeed() {
     setLoading(true)
     fetch('/api/news')
       .then(r => r.json())
-      .then(data => { setNews(data); setLoading(false) })
+      .then((data: NewsItem[]) => {
+        setNews(data)
+        setLoading(false)
+        if (data.length > 0) setLatestNewsAt(data[0].createdAt)
+      })
       .catch(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view])
 
   if (loading) return (
@@ -1185,4 +1209,3 @@ function AffiliatesView() {
     </div>
   )
 }
-

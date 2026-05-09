@@ -11,9 +11,10 @@ const TABS = [
 ] as const
 
 export default function BottomNav() {
-  const { view, setView, setCartOpen } = useUIStore()
+  const { view, setView, setCartOpen, latestNewsAt, lastReadNewsAt } = useUIStore()
   const items = useCartStore((s) => s.items)
   const cartCount = items.reduce((sum, x) => sum + x.qty, 0)
+  const hasUnreadNews = !!latestNewsAt && latestNewsAt > lastReadNewsAt
 
   return (
     <nav
@@ -80,7 +81,20 @@ export default function BottomNav() {
                 borderRadius: 1,
               }} />
             )}
-            <span style={{ fontSize: '1.25rem' }}>{tab.icon}</span>
+            <span style={{ fontSize: '1.25rem', position: 'relative', display: 'inline-block' }}>
+              {tab.icon}
+              {tab.id === 'news' && hasUnreadNews && (
+                <span style={{
+                  position: 'absolute', top: -2, right: -4,
+                  width: 9, height: 9,
+                  background: '#e83b3b',
+                  borderRadius: '50%',
+                  border: '1.5px solid rgba(8,12,8,.97)',
+                  boxShadow: '0 0 6px rgba(232,59,59,.8)',
+                  display: 'block',
+                }} />
+              )}
+            </span>
             <span>{tab.label}</span>
           </button>
         )
