@@ -33,6 +33,11 @@ interface UIState {
   // Channel
   channelJoined: boolean
   setChannelJoined: (v: boolean) => void
+  // News badge
+  lastReadNewsAt: string
+  setLastReadNewsAt: (t: string) => void
+  latestNewsAt: string
+  setLatestNewsAt: (t: string) => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -69,6 +74,11 @@ export const useUIStore = create<UIState>()(
       // Channel
       channelJoined: false,
       setChannelJoined: (channelJoined) => set({ channelJoined }),
+      // News badge
+      lastReadNewsAt: '',
+      setLastReadNewsAt: (lastReadNewsAt) => set({ lastReadNewsAt }),
+      latestNewsAt: '',
+      setLatestNewsAt: (latestNewsAt) => set({ latestNewsAt }),
     }),
     {
       name: 'tp_ui',
@@ -80,6 +90,7 @@ export const useUIStore = create<UIState>()(
         sessionToken: s.sessionToken,
         isLoggedIn: s.isLoggedIn,
         channelJoined: s.channelJoined,
+        lastReadNewsAt: s.lastReadNewsAt,
       }),
     }
   )
