@@ -90,3 +90,13 @@ model UserActivity {
   loginCount   Int      @default(1)
   totalMinutes Int      @default(0)
 }
+
+model GameScore {
+  id        String   @id @default(cuid())
+  userId    String
+  handle    String
+  name      String
+  score     Int
+  month     String
+  createdAt DateTime @default(now())
+}

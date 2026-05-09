@@ -77,6 +77,10 @@ export default function Home() {
     <main style={{ minHeight: '100dvh', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
       <LedLine />
 
+      <div style={{ display: view === 'game' ? 'block' : 'none' }}>
+        <GameView />
+      </div>
+
       <div style={{ display: view === 'catalog' ? 'block' : 'none' }}>
         {isLoggedIn ? (
           <>
@@ -96,10 +100,6 @@ export default function Home() {
 
       <div style={{ display: view === 'news' ? 'block' : 'none' }}>
         {gated(<NewsView />)}
-      </div>
-
-      <div style={{ display: view === 'orders' ? 'block' : 'none', padding: '16px 16px 100px' }}>
-        {gated(<OrdersView />)}
       </div>
 
       <div style={{ display: view === 'account' ? 'block' : 'none', padding: '16px 16px 100px' }}>
@@ -443,6 +443,10 @@ interface NewsItem {
   id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string
 }
 
+interface FItem { id: number; emoji: string; pts: number; x: number; y: number; speed: number }
+interface FbItem { id: number; x: number; y: number; text: string }
+interface LeaderEntry { id: string; handle: string; name: string; score: number; month: string }
+
 function OrdersView() {
   const [orders, setOrders] = React.useState<OrderItem[]>([])
   React.useEffect(() => {
@@ -530,6 +534,10 @@ function AccountView() {
   const [permissionDenied, setPermissionDenied] = React.useState(false)
   const [isIos, setIsIos] = React.useState(false)
 
+  // Orders (local)
+  const [orders, setOrders] = React.useState<OrderItem[]>([])
+  const [showOrders, setShowOrders] = React.useState(false)
+
   // Password change
   const [showPwd, setShowPwd] = React.useState(false)
   const [pwdCurrent, setPwdCurrent] = React.useState('')
@@ -559,7 +567,7 @@ function AccountView() {
       setPermissionDenied(true)
     }
     const saved = localStorage.getItem('tp_orders')
-    if (saved) { try { setOrderCount(JSON.parse(saved).length) } catch { /* */ } }
+    if (saved) { try { const parsed = JSON.parse(saved); setOrders(parsed); setOrderCount(parsed.length) } catch { /* */ } }
 
     if (sessionToken) {
       fetch('/api/me', { headers: { Authorization: `Bearer ${sessionToken}` } })
@@ -794,7 +802,7 @@ function AccountView() {
         {/* Stats row */}
         <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 4 }}>
           {[
-            { label: 'Ordini', value: orderCount, icon: '📋', onClick: () => setView('orders') },
+            { label: 'Ordini', value: orderCount, icon: '📋', onClick: () => setShowOrders(v => !v) },
             { label: 'Referral', value: meData?.affiliate?.referralCount ?? 0, icon: '👥', onClick: undefined },
             { label: 'Canale', value: meData?.channelMember ? '✓' : '—', icon: '📡', onClick: () => setView('news') },
           ].map(s => (
@@ -834,6 +842,33 @@ function AccountView() {
           </div>
         )}
       </div>
+
+      {/* ── Ordini ── */}
+      {orders.length > 0 && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+          <button onClick={() => setShowOrders(v => !v)} style={{ width: '100%', padding: '15px 18px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit' }}>
+            {iconCircle('rgba(61,255,110,.1)', '📋')}
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div style={{ fontWeight: 700, fontSize: '.88rem' }}>I Miei Ordini</div>
+              <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{orderCount} ordine{orderCount !== 1 ? 'i' : ''}</div>
+            </div>
+            <span style={{ color: 'var(--muted)', transition: '.2s', transform: showOrders ? 'rotate(90deg)' : 'none' }}>›</span>
+          </button>
+          {showOrders && (
+            <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {orders.map(o => (
+                <div key={o.id} style={{ background: 'var(--bg3)', borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem' }}>{o.id}</div>
+                    <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{o.date}</div>
+                  </div>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", color: 'var(--green)', fontSize: '.92rem' }}>€{o.total}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Referral code ── */}
       {meData?.affiliate && (
@@ -1269,6 +1304,319 @@ function AffiliatesView() {
     <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 32, fontSize: '.88rem' }}>
       <div style={{ fontSize: '3rem', marginBottom: 8 }}>👥</div>
       Programma affiliati disponibile prossimamente
+    </div>
+  )
+}
+
+function GameLeaderboard({ entries }: { entries: LeaderEntry[] }) {
+  const month = new Date().toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
+  const MEDALS = ['🥇', '🥈', '🥉']
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid rgba(245,200,66,.15)', borderRadius: 'var(--radius)', padding: '14px' }}>
+      <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>🏆 Classifica</span>
+        <span style={{ fontSize: '.68rem', color: 'var(--muted)', fontWeight: 400 }}>{month}</span>
+      </div>
+      {entries.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.78rem', padding: '12px 0' }}>
+          Nessuna partita ancora · sii il primo! 🌿
+        </div>
+      ) : entries.map((e, i) => (
+        <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < entries.length - 1 ? '1px solid rgba(61,255,110,.06)' : 'none' }}>
+          <div style={{ width: 26, textAlign: 'center', fontSize: i < 3 ? '1.1rem' : '.75rem', color: i < 3 ? undefined : 'var(--muted)', fontWeight: 700 }}>
+            {i < 3 ? MEDALS[i] : i + 1}
+          </div>
+          <div style={{ flex: 1, fontSize: '.82rem', color: i === 0 ? 'var(--gold)' : 'var(--text)', fontWeight: i === 0 ? 700 : 400 }}>
+            @{e.handle}
+          </div>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: i === 0 ? 'var(--gold)' : 'var(--green)' }}>
+            {e.score}
+          </div>
+        </div>
+      ))}
+      <div style={{ fontSize: '.62rem', color: 'rgba(106,138,106,.5)', marginTop: 10, textAlign: 'center' }}>
+        Il vincitore di fine mese riceve un premio speciale 🎁
+      </div>
+    </div>
+  )
+}
+
+function GameView() {
+  const { sessionToken, isLoggedIn } = useUIStore()
+
+  type GPhase = 'idle' | 'counting' | 'playing' | 'ended'
+  const [phase, setPhase] = React.useState<GPhase>('idle')
+  const [countdown, setCountdown] = React.useState(3)
+  const [displayScore, setDisplayScore] = React.useState(0)
+  const [displayTime, setDisplayTime] = React.useState(60)
+  const [displayItems, setDisplayItems] = React.useState<FItem[]>([])
+  const [displayFb, setDisplayFb] = React.useState<FbItem[]>([])
+  const [result, setResult] = React.useState<{ score: number; rank: number | null; bestScore: number } | null>(null)
+  const [leaderboard, setLeaderboard] = React.useState<LeaderEntry[]>([])
+  const [playsToday, setPlaysToday] = React.useState(0)
+  const MAX_PLAYS = 3
+
+  const scoreRef = React.useRef(0)
+  const itemsRef = React.useRef<FItem[]>([])
+  const fbRef = React.useRef<FbItem[]>([])
+  const lastSpawnRef = React.useRef(0)
+  const startTimeRef = React.useRef(0)
+  const rafRef = React.useRef<number>()
+  const nextIdRef = React.useRef(0)
+  const nextFbIdRef = React.useRef(0)
+  const gameAreaRef = React.useRef<HTMLDivElement>(null)
+  const phaseRef = React.useRef<GPhase>('idle')
+
+  const todayKey = () => `game_plays_${new Date().toISOString().slice(0, 10)}`
+
+  React.useEffect(() => {
+    setPlaysToday(parseInt(localStorage.getItem(todayKey()) ?? '0'))
+    fetchLeaderboard()
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function fetchLeaderboard() {
+    fetch('/api/game').then(r => r.json()).then(setLeaderboard).catch(() => {})
+  }
+
+  function pickItem() {
+    const r = Math.random()
+    if (r < 0.42) return { emoji: '🌿', pts: 1, speed: 2.2 }
+    if (r < 0.67) return { emoji: '💚', pts: 3, speed: 3.0 }
+    if (r < 0.82) return { emoji: '⭐', pts: 5, speed: 3.8 }
+    if (r < 0.92) return { emoji: '💎', pts: 10, speed: 5.0 }
+    return { emoji: '💣', pts: -5, speed: 3.2 }
+  }
+
+  function spawnMs(elapsed: number) {
+    if (elapsed < 15) return 1300
+    if (elapsed < 30) return 1000
+    if (elapsed < 45) return 800
+    return 640
+  }
+
+  function startCountdown() {
+    setPhase('counting'); phaseRef.current = 'counting'
+    setCountdown(3)
+    let c = 3
+    const iv = setInterval(() => {
+      c--
+      if (c <= 0) { clearInterval(iv); startGame() }
+      else setCountdown(c)
+    }, 1000)
+  }
+
+  function startGame() {
+    scoreRef.current = 0
+    itemsRef.current = []; fbRef.current = []
+    setDisplayScore(0); setDisplayTime(60); setDisplayItems([]); setDisplayFb([])
+    startTimeRef.current = performance.now()
+    lastSpawnRef.current = 0
+    setPhase('playing'); phaseRef.current = 'playing'
+    const n = parseInt(localStorage.getItem(todayKey()) ?? '0') + 1
+    localStorage.setItem(todayKey(), String(n))
+    setPlaysToday(n)
+    rafRef.current = requestAnimationFrame(loop)
+  }
+
+  function loop(now: number) {
+    if (phaseRef.current !== 'playing') return
+    const elapsed = (now - startTimeRef.current) / 1000
+    const remaining = Math.max(0, 60 - elapsed)
+    if (remaining <= 0) { endGame(); return }
+
+    const ga = gameAreaRef.current
+    if (!ga) { rafRef.current = requestAnimationFrame(loop); return }
+    const gH = ga.clientHeight, gW = ga.clientWidth
+
+    if (now - lastSpawnRef.current > spawnMs(elapsed)) {
+      const t = pickItem()
+      itemsRef.current.push({ id: nextIdRef.current++, ...t, x: 8 + Math.random() * Math.max(0, gW - 72), y: -60 })
+      lastSpawnRef.current = now
+    }
+
+    itemsRef.current = itemsRef.current.map(i => ({ ...i, y: i.y + i.speed })).filter(i => i.y < gH + 60)
+
+    setDisplayScore(scoreRef.current)
+    setDisplayTime(Math.ceil(remaining))
+    setDisplayItems([...itemsRef.current])
+    setDisplayFb([...fbRef.current])
+    rafRef.current = requestAnimationFrame(loop)
+  }
+
+  function handleTap(e: React.TouchEvent | React.MouseEvent) {
+    if (phaseRef.current !== 'playing') return
+    const rect = gameAreaRef.current!.getBoundingClientRect()
+    const cx = 'changedTouches' in e ? (e as React.TouchEvent).changedTouches[0].clientX : (e as React.MouseEvent).clientX
+    const cy = 'changedTouches' in e ? (e as React.TouchEvent).changedTouches[0].clientY : (e as React.MouseEvent).clientY
+    const tx = cx - rect.left, ty = cy - rect.top
+
+    for (let i = itemsRef.current.length - 1; i >= 0; i--) {
+      const item = itemsRef.current[i]
+      const dx = tx - item.x - 28, dy = ty - item.y - 28
+      if (dx * dx + dy * dy < 38 * 38) {
+        scoreRef.current = Math.max(0, scoreRef.current + item.pts)
+        const fbId = nextFbIdRef.current++
+        fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: item.pts >= 0 ? `+${item.pts}` : String(item.pts) }]
+        setTimeout(() => { fbRef.current = fbRef.current.filter(f => f.id !== fbId) }, 700)
+        itemsRef.current.splice(i, 1)
+        break
+      }
+    }
+  }
+
+  function endGame() {
+    phaseRef.current = 'ended'; setPhase('ended')
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    const score = scoreRef.current
+    setResult({ score, rank: null, bestScore: score })
+    if (isLoggedIn && sessionToken) {
+      fetch('/api/game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+        body: JSON.stringify({ score }),
+      }).then(r => r.json()).then(d => {
+        setResult({ score, rank: d.rank ?? null, bestScore: d.bestScore ?? score })
+        fetchLeaderboard()
+      }).catch(() => fetchLeaderboard())
+    } else { fetchLeaderboard() }
+  }
+
+  const canPlay = playsToday < MAX_PLAYS
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 60px)' }}>
+      <style>{`@keyframes bud-fb{from{opacity:1;transform:translateY(0) scale(1.2)}to{opacity:0;transform:translateY(-50px) scale(.9)}}`}</style>
+
+      {/* Header */}
+      <div style={{ padding: '12px 16px 8px', background: 'rgba(8,12,8,.97)', borderBottom: '1px solid rgba(61,255,110,.12)', flexShrink: 0 }}>
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>
+          🎮 Bud Rain
+        </div>
+        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>
+          Cattura i buds · il top scorer mensile vince un premio 🏆
+        </div>
+      </div>
+
+      {/* IDLE */}
+      {phase === 'idle' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px' }}>
+            <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: 10 }}>Come si gioca</div>
+            {([['🌿','Foglia','+1'],['💚','Cuore','+3'],['⭐','Stella','+5'],['💎','Diamante','+10'],['💣','Bomba','-5']] as const).map(([icon,label,pts]) => (
+              <div key={icon} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', borderBottom: '1px solid rgba(61,255,110,.06)' }}>
+                <span style={{ fontSize: '1.2rem', width: 26 }}>{icon}</span>
+                <span style={{ flex: 1, fontSize: '.8rem', color: 'var(--muted)' }}>{label}</span>
+                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: pts.startsWith('-') ? '#e83b3b' : 'var(--green)' }}>{pts} pt</span>
+              </div>
+            ))}
+            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
+              ⏱ 60 secondi · {MAX_PLAYS} partite al giorno · tocca gli oggetti per catturarli — evita le bombe!
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 10 }}>
+              Partite oggi: <strong style={{ color: canPlay ? 'var(--green)' : '#e83b3b' }}>{playsToday}/{MAX_PLAYS}</strong>
+            </div>
+            <button onClick={() => canPlay && startCountdown()} disabled={!canPlay} style={{
+              background: canPlay ? 'linear-gradient(135deg,rgba(61,255,110,.22),rgba(61,255,110,.1))' : 'rgba(106,138,106,.06)',
+              border: `1.5px solid ${canPlay ? 'rgba(61,255,110,.5)' : 'rgba(106,138,106,.15)'}`,
+              borderRadius: 14, padding: '13px 36px', fontFamily: 'inherit', fontWeight: 700, fontSize: '1rem',
+              color: canPlay ? 'var(--green)' : 'var(--muted)', cursor: canPlay ? 'pointer' : 'default',
+              boxShadow: canPlay ? '0 0 24px rgba(61,255,110,.2)' : 'none',
+            }}>
+              {canPlay ? '🎮 Inizia partita' : '⏰ Torna domani'}
+            </button>
+          </div>
+          <GameLeaderboard entries={leaderboard} />
+        </div>
+      )}
+
+      {/* COUNTDOWN */}
+      {phase === 'counting' && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '6rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>
+            {countdown}
+          </div>
+          <div style={{ color: 'var(--muted)', fontSize: '.9rem' }}>Preparati...</div>
+        </div>
+      )}
+
+      {/* PLAYING */}
+      {phase === 'playing' && (
+        <div
+          ref={gameAreaRef}
+          onTouchStart={(e) => { e.preventDefault(); handleTap(e) }}
+          onClick={handleTap}
+          style={{ flex: 1, position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: 'none', cursor: 'crosshair', background: 'radial-gradient(ellipse at 50% 0%,rgba(61,255,110,.05) 0%,transparent 65%)' }}
+        >
+          {/* HUD */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', background: 'rgba(8,12,8,.88)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(61,255,110,.1)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '.58rem', color: 'var(--muted)', letterSpacing: '.5px' }}>PUNTI</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.8rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{displayScore}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '.58rem', color: 'var(--muted)', letterSpacing: '.5px' }}>TEMPO</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.8rem', lineHeight: 1, color: displayTime <= 10 ? '#e83b3b' : 'var(--text)', transition: 'color .3s' }}>{displayTime}</div>
+            </div>
+          </div>
+
+          {/* Falling items */}
+          {displayItems.map(item => (
+            <div key={item.id} style={{ position: 'absolute', left: item.x, top: item.y + 56, width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.1rem', pointerEvents: 'none', filter: item.pts < 0 ? 'drop-shadow(0 0 8px rgba(232,59,59,.8))' : 'drop-shadow(0 0 6px rgba(61,255,110,.6))' }}>
+              {item.emoji}
+            </div>
+          ))}
+
+          {/* Score feedback */}
+          {displayFb.map(fb => (
+            <div key={fb.id} style={{ position: 'absolute', left: fb.x + 56, top: fb.y + 56, fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', fontWeight: 900, color: fb.text.startsWith('-') ? '#e83b3b' : 'var(--green)', textShadow: fb.text.startsWith('-') ? '0 0 8px rgba(232,59,59,.9)' : 'var(--led-green)', pointerEvents: 'none', animation: 'bud-fb .7s ease forwards', zIndex: 20 }}>
+              {fb.text}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ENDED */}
+      {phase === 'ended' && result && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 6 }}>
+              {result.rank === 1 ? '👑' : result.rank && result.rank <= 3 ? '🏆' : '🌿'}
+            </div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', marginBottom: 4 }}>Partita finita!</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '3.5rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{result.score}</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 6 }}>
+              {result.rank != null
+                ? result.rank === 1 ? '🥇 Sei il leader questo mese!'
+                  : result.rank <= 3 ? `🏆 Sei #${result.rank} in classifica!`
+                  : `Sei #${result.rank} in classifica questo mese`
+                : isLoggedIn ? 'Caricamento classifica...' : '⚠️ Accedi per salvare il punteggio'}
+            </div>
+            {result.bestScore > result.score && (
+              <div style={{ fontSize: '.7rem', color: 'var(--gold)', marginTop: 4 }}>
+                Il tuo record: {result.bestScore}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+            {canPlay && (
+              <button onClick={startCountdown} style={{ flex: 1, padding: '11px', background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.35)', borderRadius: 12, color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+                🎮 Rigioca ({MAX_PLAYS - playsToday})
+              </button>
+            )}
+            <button onClick={() => { setPhase('idle'); phaseRef.current = 'idle'; setResult(null) }} style={{ flex: 1, padding: '11px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--muted)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>
+              📊 Classifica
+            </button>
+          </div>
+
+          <GameLeaderboard entries={leaderboard} />
+        </div>
+      )}
     </div>
   )
 }
