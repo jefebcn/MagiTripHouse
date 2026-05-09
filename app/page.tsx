@@ -599,8 +599,9 @@ function AccountView() {
     setPushLoading(true)
     setPushMsg(null)
     try {
-      const reg = await navigator.serviceWorker.ready
       if (pushEnabled) {
+        // Unsubscribe — no permission needed, serviceWorker.ready first is fine
+        const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.getSubscription()
         if (sub) {
           await sub.unsubscribe()
@@ -609,15 +610,13 @@ function AccountView() {
         setPushEnabled(false)
         setPushMsg({ ok: true, text: 'Notifiche disattivate' })
       } else {
-        // Richiedi permesso esplicitamente
-        const permission = await Notification.requestPermission()
-        if (permission === 'denied') {
-          setPushMsg({ ok: false, text: 'Permesso bloccato — abilitalo nelle impostazioni del browser' })
-          setPushLoading(false)
-          return
-        }
-        if (permission !== 'granted') {
-          setPushMsg({ ok: false, text: 'Permesso non concesso' })
+        // Subscribe — requestPermission MUST come before any await on iOS PWA
+        // to keep the user-gesture context intact
+        if (Notification.permission === 'denied') {
+          const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+          setPushMsg({ ok: false, text: isIos
+            ? 'Permesso bloccato — vai in Impostazioni → Safari → Notifiche e rimuovi il blocco per questo sito'
+            : 'Permesso bloccato — abilitalo nelle impostazioni del browser' })
           setPushLoading(false)
           return
         }
@@ -627,6 +626,23 @@ function AccountView() {
           setPushLoading(false)
           return
         }
+        // Request permission immediately (user gesture still active)
+        const permission = await Notification.requestPermission()
+        if (permission === 'denied') {
+          const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+          setPushMsg({ ok: false, text: isIos
+            ? 'Permesso negato — vai in Impostazioni → Safari → Notifiche e abilita per questo sito'
+            : 'Permesso bloccato — abilitalo nelle impostazioni del browser' })
+          setPushLoading(false)
+          return
+        }
+        if (permission !== 'granted') {
+          setPushMsg({ ok: false, text: 'Permesso non concesso' })
+          setPushLoading(false)
+          return
+        }
+        // Permission granted — now we can safely await serviceWorker
+        const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) })
         await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
         setPushEnabled(true)
