@@ -323,8 +323,38 @@ function ChannelFeed() {
 }
 
 interface NewsItem { id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string }
-interface FItem { id: number; emoji: string; pts: number; x: number; y: number; speed: number }
-interface FbItem { id: number; x: number; y: number; text: string }
+interface GameItemDef {
+  emoji: string; label: string; pts: number; speed: number; weight: number; glow: string
+  isSlow?: boolean; isLife?: boolean; isDanger?: boolean; isSuperDanger?: boolean; isRare?: boolean
+}
+const GAME_ITEMS: GameItemDef[] = [
+  { emoji: '🌿', label: 'Erba',       pts: 2,   speed: 2.5, weight: 38, glow: 'rgba(61,255,110,.7)'   },
+  { emoji: '🍃', label: 'Foglia',     pts: 3,   speed: 2.1, weight: 20, glow: 'rgba(80,220,100,.8)'   },
+  { emoji: '🍯', label: 'Hash',       pts: 5,   speed: 1.8, weight: 12, glow: 'rgba(245,200,66,.7)'   },
+  { emoji: '💎', label: 'Crystal',    pts: 8,   speed: 1.4, weight: 6,  glow: 'rgba(100,180,255,.9)',  isRare: true },
+  { emoji: '⭐', label: 'Stella Oro', pts: 15,  speed: 0.9, weight: 3,  glow: 'rgba(255,215,0,.95)',   isRare: true },
+  { emoji: '💨', label: 'Fumata',     pts: 0,   speed: 2.0, weight: 8,  glow: 'rgba(180,150,255,.7)',  isSlow: true },
+  { emoji: '❤️', label: 'Vita',       pts: 0,   speed: 1.7, weight: 4,  glow: 'rgba(255,80,80,.8)',    isLife: true },
+  { emoji: '💣', label: 'Bomba',      pts: -5,  speed: 3.0, weight: 6,  glow: 'rgba(232,59,59,.9)',    isDanger: true },
+  { emoji: '🚔', label: 'Polizia',    pts: -10, speed: 2.3, weight: 3,  glow: 'rgba(255,100,0,.9)',    isSuperDanger: true },
+]
+function pickItemDef(): GameItemDef {
+  let r = Math.random() * 100
+  for (const def of GAME_ITEMS) { r -= def.weight; if (r <= 0) return def }
+  return GAME_ITEMS[0]
+}
+function comboMultiplier(combo: number) {
+  if (combo >= 8) return 3
+  if (combo >= 5) return 2
+  if (combo >= 3) return 1.5
+  return 1
+}
+const BG_STARS = Array.from({ length: 18 }, (_, i) => ({
+  id: i, left: (i * 37 + 11) % 100, top: (i * 53 + 7) % 100,
+  size: 1.5 + (i % 3) * 0.8, dur: 2.5 + (i % 4) * 0.7, delay: (i * 0.3) % 3,
+}))
+interface FItem { id: number; def: GameItemDef; x: number; y: number; wobble: number }
+interface FbItem { id: number; x: number; y: number; text: string; color: string }
 interface LeaderEntry { id: string; handle: string; name: string; score: number; month: string }
 interface OrderItem { id: string; total: number; date: string }
 
@@ -734,19 +764,25 @@ function GameLeaderboard({ entries }: { entries: LeaderEntry[] }) {
   return (
     <div style={{ background: 'var(--card)', border: '1px solid rgba(245,200,66,.15)', borderRadius: 'var(--radius)', padding: '14px' }}>
       <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>🏆 Classifica</span>
+        <span>🏆 Classifica Mensile</span>
         <span style={{ fontSize: '.68rem', color: 'var(--muted)', fontWeight: 400 }}>{month}</span>
       </div>
       {entries.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.78rem', padding: '12px 0' }}>Nessuna partita ancora · sii il primo! 🌿</div>
+        <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.78rem', padding: '18px 0' }}>
+          <div style={{ fontSize: '1.8rem', marginBottom: 6 }}>🌿</div>
+          Nessuna partita ancora · sii il primo!
+        </div>
       ) : entries.map((e, i) => (
-        <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < entries.length - 1 ? '1px solid rgba(61,255,110,.06)' : 'none' }}>
-          <div style={{ width: 26, textAlign: 'center', fontSize: i < 3 ? '1.1rem' : '.75rem', color: i < 3 ? undefined : 'var(--muted)', fontWeight: 700 }}>{i < 3 ? MEDALS[i] : i + 1}</div>
-          <div style={{ flex: 1, fontSize: '.82rem', color: i === 0 ? 'var(--gold)' : 'var(--text)', fontWeight: i === 0 ? 700 : 400 }}>@{e.handle}</div>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: i === 0 ? 'var(--gold)' : 'var(--green)' }}>{e.score}</div>
+        <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < entries.length - 1 ? '1px solid rgba(61,255,110,.06)' : 'none' }}>
+          <div style={{ width: 28, textAlign: 'center', fontSize: i < 3 ? '1.15rem' : '.75rem', color: i >= 3 ? 'var(--muted)' : undefined, fontWeight: 700 }}>{i < 3 ? MEDALS[i] : i + 1}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '.82rem', color: i === 0 ? 'var(--gold)' : 'var(--text)', fontWeight: i === 0 ? 700 : 400 }}>@{e.handle}</div>
+            {e.name && <div style={{ fontSize: '.63rem', color: 'var(--muted)' }}>{e.name}</div>}
+          </div>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', color: i === 0 ? 'var(--gold)' : i < 3 ? 'var(--green)' : 'var(--muted)' }}>{e.score}</div>
         </div>
       ))}
-      <div style={{ fontSize: '.62rem', color: 'rgba(106,138,106,.5)', marginTop: 10, textAlign: 'center' }}>Il vincitore di fine mese riceve un premio speciale 🎁</div>
+      <div style={{ fontSize: '.62rem', color: 'rgba(106,138,106,.45)', marginTop: 10, textAlign: 'center', lineHeight: 1.55 }}>Il vincitore di fine mese riceve un premio speciale 🎁<br />Classifica resettata ogni 1° del mese</div>
     </div>
   )
 }
@@ -757,17 +793,25 @@ function GameView() {
   const [countdown, setCountdown] = React.useState(3)
   const [displayScore, setDisplayScore] = React.useState(0)
   const [displayTime, setDisplayTime] = React.useState(60)
+  const [displayLives, setDisplayLives] = React.useState(3)
+  const [displayCombo, setDisplayCombo] = React.useState(0)
   const [displayItems, setDisplayItems] = React.useState<FItem[]>([])
   const [displayFb, setDisplayFb] = React.useState<FbItem[]>([])
+  const [displaySlowed, setDisplaySlowed] = React.useState(false)
+  const [shakeKey, setShakeKey] = React.useState(0)
   const [result, setResult] = React.useState<{ score: number; rank: number | null; bestScore: number } | null>(null)
   const [leaderboard, setLeaderboard] = React.useState<LeaderEntry[]>([])
   const [playsToday, setPlaysToday] = React.useState(0)
   const MAX_PLAYS = 3
+
   const scoreRef = React.useRef(0)
+  const livesRef = React.useRef(3)
+  const comboRef = React.useRef(0)
   const itemsRef = React.useRef<FItem[]>([])
   const fbRef = React.useRef<FbItem[]>([])
   const lastSpawnRef = React.useRef(0)
   const startTimeRef = React.useRef(0)
+  const slowEndRef = React.useRef(0)
   const rafRef = React.useRef<number>(0)
   const nextIdRef = React.useRef(0)
   const nextFbIdRef = React.useRef(0)
@@ -786,20 +830,11 @@ function GameView() {
     fetch('/api/game').then(r => r.json()).then((d: LeaderEntry[]) => { if (Array.isArray(d)) setLeaderboard(d) }).catch(() => {})
   }
 
-  function pickItem() {
-    const r = Math.random()
-    if (r < 0.42) return { emoji: '🌿', pts: 1, speed: 2.2 }
-    if (r < 0.67) return { emoji: '💚', pts: 3, speed: 3.0 }
-    if (r < 0.82) return { emoji: '⭐', pts: 5, speed: 3.8 }
-    if (r < 0.92) return { emoji: '💎', pts: 10, speed: 5.0 }
-    return { emoji: '💣', pts: -5, speed: 3.2 }
-  }
-
   function spawnMs(elapsed: number) {
-    if (elapsed < 15) return 1300
-    if (elapsed < 30) return 1000
-    if (elapsed < 45) return 800
-    return 640
+    if (elapsed < 15) return 1200
+    if (elapsed < 30) return 950
+    if (elapsed < 45) return 740
+    return 570
   }
 
   function startCountdown() {
@@ -809,8 +844,10 @@ function GameView() {
   }
 
   function startGame() {
-    scoreRef.current = 0; itemsRef.current = []; fbRef.current = []
-    setDisplayScore(0); setDisplayTime(60); setDisplayItems([]); setDisplayFb([])
+    scoreRef.current = 0; livesRef.current = 3; comboRef.current = 0
+    itemsRef.current = []; fbRef.current = []; slowEndRef.current = 0
+    setDisplayScore(0); setDisplayTime(60); setDisplayLives(3); setDisplayCombo(0)
+    setDisplayItems([]); setDisplayFb([]); setDisplaySlowed(false); setResult(null)
     startTimeRef.current = performance.now(); lastSpawnRef.current = 0
     setPhase('playing'); phaseRef.current = 'playing'
     const n = parseInt(localStorage.getItem(todayKey()) ?? '0') + 1
@@ -822,18 +859,24 @@ function GameView() {
     if (phaseRef.current !== 'playing') return
     const elapsed = (now - startTimeRef.current) / 1000
     const remaining = Math.max(0, 60 - elapsed)
-    if (remaining <= 0) { endGame(); return }
+    if (remaining <= 0 || livesRef.current <= 0) { endGame(); return }
     const ga = gameAreaRef.current
     if (!ga) { rafRef.current = requestAnimationFrame(loop); return }
     const gH = ga.clientHeight, gW = ga.clientWidth
+    const slowed = now < slowEndRef.current
     if (now - lastSpawnRef.current > spawnMs(elapsed)) {
-      const t = pickItem()
-      itemsRef.current.push({ id: nextIdRef.current++, ...t, x: 8 + Math.random() * Math.max(0, gW - 72), y: -60 })
+      const def = pickItemDef()
+      itemsRef.current.push({ id: nextIdRef.current++, def, x: 8 + Math.random() * Math.max(0, gW - 72), y: -70, wobble: Math.random() * Math.PI * 2 })
       lastSpawnRef.current = now
     }
-    itemsRef.current = itemsRef.current.map(i => ({ ...i, y: i.y + i.speed })).filter(i => i.y < gH + 60)
+    const sf = slowed ? 0.35 : 1
+    itemsRef.current = itemsRef.current
+      .map(i => ({ ...i, y: i.y + i.def.speed * sf, x: i.x + Math.sin(elapsed * 1.8 + i.wobble) * 0.5 }))
+      .filter(i => i.y < gH + 70)
     setDisplayScore(scoreRef.current); setDisplayTime(Math.ceil(remaining))
+    setDisplayLives(livesRef.current); setDisplayCombo(comboRef.current)
     setDisplayItems([...itemsRef.current]); setDisplayFb([...fbRef.current])
+    setDisplaySlowed(slowed)
     rafRef.current = requestAnimationFrame(loop)
   }
 
@@ -846,12 +889,37 @@ function GameView() {
     for (let i = itemsRef.current.length - 1; i >= 0; i--) {
       const item = itemsRef.current[i]
       const dx = tx - item.x - 28, dy = ty - item.y - 28
-      if (dx * dx + dy * dy < 38 * 38) {
-        scoreRef.current = Math.max(0, scoreRef.current + item.pts)
+      if (dx * dx + dy * dy < 40 * 40) {
+        const def = item.def
+        itemsRef.current.splice(i, 1)
         const fbId = nextFbIdRef.current++
-        fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: item.pts >= 0 ? `+${item.pts}` : String(item.pts) }]
-        setTimeout(() => { fbRef.current = fbRef.current.filter(f => f.id !== fbId) }, 700)
-        itemsRef.current.splice(i, 1); break
+        if (def.isSlow) {
+          slowEndRef.current = performance.now() + 3000
+          comboRef.current++
+          fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: '⏱ SLOW!', color: 'rgba(200,160,255,1)' }]
+        } else if (def.isLife) {
+          livesRef.current = Math.min(5, livesRef.current + 1)
+          comboRef.current++
+          fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: '+1 ❤️', color: 'rgba(255,100,100,1)' }]
+        } else if (def.isDanger || def.isSuperDanger) {
+          const lost = def.isSuperDanger ? 2 : 1
+          livesRef.current = Math.max(0, livesRef.current - lost)
+          comboRef.current = 0
+          setShakeKey(k => k + 1)
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([60, 20, 60])
+          fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: def.isSuperDanger ? '🚔 -2❤️' : '💥 -1❤️', color: 'rgba(232,59,59,1)' }]
+        } else {
+          const newCombo = comboRef.current + 1
+          const multi = comboMultiplier(newCombo)
+          const earned = Math.round(def.pts * multi)
+          scoreRef.current += earned
+          comboRef.current = newCombo
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
+          const label = multi > 1 ? `+${earned} ×${multi}` : `+${earned}`
+          fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: label, color: def.isRare ? 'rgba(255,215,0,1)' : 'rgba(61,255,110,1)' }]
+        }
+        setTimeout(() => { fbRef.current = fbRef.current.filter(f => f.id !== fbId) }, 900)
+        break
       }
     }
   }
@@ -869,82 +937,197 @@ function GameView() {
   }
 
   const canPlay = playsToday < MAX_PLAYS
+  const multi = comboMultiplier(displayCombo)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 62px)', paddingBottom: 80 }}>
-      <style>{`@keyframes bud-fb{from{opacity:1;transform:translateY(0) scale(1.2)}to{opacity:0;transform:translateY(-50px) scale(.9)}}`}</style>
+      <style>{`
+        @keyframes bud-fb{from{opacity:1;transform:translateY(0) scale(1.3)}to{opacity:0;transform:translateY(-70px) scale(.8)}}
+        @keyframes bud-shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-5px,3px)}40%{transform:translate(5px,-3px)}60%{transform:translate(-3px,2px)}80%{transform:translate(3px,-1px)}}
+        @keyframes bud-star{0%,100%{opacity:.22;transform:scale(1)}50%{opacity:.7;transform:scale(1.4)}}
+        @keyframes bud-slow{0%,100%{opacity:.6}50%{opacity:1}}
+        @keyframes bud-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+        @keyframes bud-count{0%{transform:scale(1.6);opacity:0}35%{transform:scale(1);opacity:1}80%{transform:scale(.97);opacity:1}100%{transform:scale(.8);opacity:0}}
+      `}</style>
 
-      <div style={{ padding: '12px 16px 8px', background: 'var(--bg2)', borderBottom: '1px solid rgba(61,255,110,.12)', flexShrink: 0 }}>
-        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>🎮 Bud Rain</div>
-        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>Cattura i buds · il top scorer mensile vince un premio 🏆</div>
+      {/* ── Header ── */}
+      <div style={{ padding: '12px 16px 8px', background: 'var(--bg2)', borderBottom: '1px solid rgba(61,255,110,.15)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>🎮 Bud Rush</div>
+          <div style={{ fontSize: '.6rem', color: 'rgba(61,255,110,.7)', background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 20, padding: '2px 8px', letterSpacing: 1 }}>BETA</div>
+        </div>
+        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>Cattura i buds · costruisci combo · il top scorer mensile vince 🏆</div>
       </div>
 
+      {/* ── IDLE ── */}
       {phase === 'idle' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px' }}>
-            <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: 10, color: 'var(--text)' }}>Come si gioca</div>
-            {([['🌿','Foglia','+1'],['💚','Cuore','+3'],['⭐','Stella','+5'],['💎','Diamante','+10'],['💣','Bomba','-5']] as const).map(([icon,label,pts]) => (
-              <div key={icon} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', borderBottom: '1px solid rgba(61,255,110,.06)' }}>
-                <span style={{ fontSize: '1.2rem', width: 26 }}>{icon}</span>
-                <span style={{ flex: 1, fontSize: '.8rem', color: 'var(--muted)' }}>{label}</span>
-                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: pts.startsWith('-') ? '#e83b3b' : 'var(--green)' }}>{pts} pt</span>
-              </div>
-            ))}
-            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>⏱ 60 secondi · {MAX_PLAYS} partite al giorno · tocca gli oggetti — evita le bombe!</div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Rules */}
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px' }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', marginBottom: 6, color: 'var(--green)' }}>📖 Come si gioca</div>
+            <div style={{ fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.65, marginBottom: 16 }}>
+              Gli oggetti cadono dall&apos;alto: <strong style={{ color: 'var(--text)' }}>tocca</strong> per raccoglierli!
+              Prese consecutive costruiscono la tua <strong style={{ color: 'var(--gold)' }}>combo</strong> — più alta è, più punti guadagni.
+              Hai <strong style={{ color: 'var(--text)' }}>3 ❤️ vite</strong> e <strong style={{ color: 'var(--text)' }}>60 secondi</strong>: finisci le vite e la partita termina subito!
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
+              {GAME_ITEMS.map(def => {
+                const isDmg = def.isDanger || def.isSuperDanger
+                const isPow = def.isSlow || def.isLife
+                return (
+                  <div key={def.emoji} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: isDmg ? 'rgba(232,59,59,.05)' : isPow ? 'rgba(180,150,255,.05)' : 'rgba(61,255,110,.04)', border: `1px solid ${isDmg ? 'rgba(232,59,59,.14)' : isPow ? 'rgba(180,150,255,.14)' : 'rgba(61,255,110,.1)'}` }}>
+                    <span style={{ fontSize: '1.5rem', lineHeight: 1, filter: `drop-shadow(0 0 5px ${def.glow})` }}>{def.emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '.73rem', color: 'var(--text)', fontWeight: 600 }}>{def.label}</div>
+                      <div style={{ fontSize: '.63rem', color: isDmg ? '#e83b3b' : isPow ? 'rgba(200,160,255,1)' : 'var(--green)' }}>
+                        {def.isSlow ? '⏱ Rallenta 3s' : def.isLife ? '+1 ❤️ vita' : def.pts > 0 ? `+${def.pts} pt base` : `${def.pts} pt · -${def.isSuperDanger ? 2 : 1}❤️`}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 10 }}>Partite oggi: <strong style={{ color: canPlay ? 'var(--green)' : '#e83b3b' }}>{playsToday}/{MAX_PLAYS}</strong></div>
-            <button onClick={() => canPlay && startCountdown()} disabled={!canPlay} style={{ background: canPlay ? 'linear-gradient(135deg,rgba(61,255,110,.22),rgba(61,255,110,.1))' : 'rgba(106,138,106,.06)', border: `1.5px solid ${canPlay ? 'rgba(61,255,110,.5)' : 'rgba(106,138,106,.15)'}`, borderRadius: 14, padding: '13px 36px', fontFamily: 'inherit', fontWeight: 700, fontSize: '1rem', color: canPlay ? 'var(--green)' : 'var(--muted)', cursor: canPlay ? 'pointer' : 'default', boxShadow: canPlay ? '0 0 24px rgba(61,255,110,.2)' : 'none' }}>
-              {canPlay ? '🎮 Inizia partita' : '⏰ Torna domani'}
+
+          {/* Combo system */}
+          <div style={{ background: 'rgba(245,200,66,.04)', border: '1px solid rgba(245,200,66,.14)', borderRadius: 'var(--radius)', padding: '14px' }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', color: 'var(--gold)', marginBottom: 10 }}>⚡ Sistema Combo</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {([['3+', '×1.5', '#3dff6e'], ['5+', '×2', '#f5c842'], ['8+', '×3 🔥', '#ff6b35']] as const).map(([hits, m, color]) => (
+                <div key={hits} style={{ flex: 1, textAlign: 'center', padding: '9px 4px', background: 'rgba(0,0,0,.2)', border: `1px solid ${color}22`, borderRadius: 10 }}>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color, lineHeight: 1 }}>{m}</div>
+                  <div style={{ fontSize: '.62rem', color: 'var(--muted)', marginTop: 3 }}>{hits} di fila</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.6)', marginTop: 10, textAlign: 'center' }}>Il moltiplicatore si azzera colpendo una trappola 💣🚔</div>
+          </div>
+
+          {/* Tips */}
+          <div style={{ background: 'rgba(61,255,110,.03)', border: '1px solid rgba(61,255,110,.08)', borderRadius: 'var(--radius)', padding: '12px 14px' }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem', color: 'var(--text)', marginBottom: 8 }}>💡 Consigli</div>
+            {[
+              '🍯 Hash e 💎 Crystal valgono di più — prioritizza quelli ad alta quota',
+              '💨 Fumata rallenta TUTTO: usala per fare combo con gli oggetti rari',
+              '🚔 Polizia è pericolosa: -2 vite e azzera la combo',
+              '⭐ Stella Oro è rarissima: +15pt base × il tuo moltiplicatore!',
+            ].map((tip, i) => (
+              <div key={i} style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.55, padding: '3px 0', borderBottom: i < 3 ? '1px solid rgba(61,255,110,.05)' : 'none' }}>{tip}</div>
+            ))}
+          </div>
+
+          {/* Start */}
+          <div style={{ textAlign: 'center', padding: '4px 0' }}>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 12 }}>
+              Partite oggi: <strong style={{ color: canPlay ? 'var(--green)' : '#e83b3b' }}>{playsToday}/{MAX_PLAYS}</strong>
+            </div>
+            <button
+              onClick={() => canPlay && startCountdown()}
+              disabled={!canPlay}
+              style={{ background: canPlay ? 'linear-gradient(135deg,rgba(61,255,110,.24),rgba(61,255,110,.1))' : 'rgba(106,138,106,.06)', border: `1.5px solid ${canPlay ? 'rgba(61,255,110,.55)' : 'rgba(106,138,106,.15)'}`, borderRadius: 18, padding: '15px 50px', fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: canPlay ? 'var(--green)' : 'var(--muted)', cursor: canPlay ? 'pointer' : 'default', boxShadow: canPlay ? '0 0 36px rgba(61,255,110,.22)' : 'none', animation: canPlay ? 'bud-pulse 2.5s ease infinite' : 'none', transition: 'all .2s' }}
+            >
+              {canPlay ? '🎮 Inizia Partita' : '⏰ Torna Domani'}
             </button>
           </div>
+
           <GameLeaderboard entries={leaderboard} />
         </div>
       )}
 
+      {/* ── COUNTING ── */}
       {phase === 'counting' && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '6rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{countdown}</div>
-          <div style={{ color: 'var(--muted)', fontSize: '.9rem' }}>Preparati...</div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'radial-gradient(ellipse at 50% 40%,rgba(61,255,110,.1) 0%,transparent 70%)' }}>
+          <div key={countdown} style={{ fontFamily: "'Fredoka One', cursive", fontSize: '9rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1, animation: 'bud-count .9s ease forwards' }}>{countdown}</div>
+          <div style={{ color: 'var(--muted)', fontSize: '.9rem', letterSpacing: 2 }}>PREPARATI...</div>
         </div>
       )}
 
+      {/* ── PLAYING ── */}
       {phase === 'playing' && (
-        <div ref={gameAreaRef} onTouchStart={e => { e.preventDefault(); handleTap(e) }} onClick={handleTap}
-          style={{ flex: 1, position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: 'none', cursor: 'crosshair', background: 'radial-gradient(ellipse at 50% 0%,rgba(61,255,110,.05) 0%,transparent 65%)', minHeight: 400 }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', background: 'rgba(8,12,8,.88)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(61,255,110,.1)' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '.58rem', color: 'var(--muted)', letterSpacing: '.5px' }}>PUNTI</div>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.8rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{displayScore}</div>
+        <div
+          key={shakeKey}
+          ref={gameAreaRef}
+          onTouchStart={e => { e.preventDefault(); handleTap(e) }}
+          onClick={handleTap}
+          style={{ flex: 1, position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: 'none', cursor: 'crosshair', minHeight: 400, background: 'radial-gradient(ellipse at 50% 5%,rgba(61,255,110,.09) 0%,transparent 55%),radial-gradient(ellipse at 85% 90%,rgba(61,40,180,.05) 0%,transparent 45%)', animation: shakeKey > 0 ? 'bud-shake .35s ease' : 'none' }}
+        >
+          {/* Animated bg stars */}
+          {BG_STARS.map(s => (
+            <div key={s.id} style={{ position: 'absolute', left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, borderRadius: '50%', background: 'rgba(61,255,110,.28)', pointerEvents: 'none', animation: `bud-star ${s.dur}s ${s.delay}s infinite ease-in-out` }} />
+          ))}
+
+          {/* HUD */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '7px 14px 6px', background: 'rgba(8,12,8,.92)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(61,255,110,.12)' }}>
+            <div>
+              <div style={{ fontSize: '.5rem', color: 'var(--muted)', letterSpacing: '.8px', textTransform: 'uppercase' }}>Punti</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.85rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{displayScore}</div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '.58rem', color: 'var(--muted)', letterSpacing: '.5px' }}>TEMPO</div>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.8rem', lineHeight: 1, color: displayTime <= 10 ? '#e83b3b' : 'var(--text)', transition: 'color .3s' }}>{displayTime}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+              <div style={{ fontSize: '1rem', letterSpacing: 3 }}>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <span key={i} style={{ opacity: i < displayLives ? 1 : .18, filter: i < displayLives ? 'drop-shadow(0 0 3px rgba(255,80,80,.7))' : 'none' }}>❤️</span>
+                ))}
+              </div>
+              {displaySlowed && <div style={{ fontSize: '.52rem', color: 'rgba(200,160,255,1)', letterSpacing: 1, animation: 'bud-slow .7s infinite' }}>⏱ SLOW</div>}
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '.5rem', color: 'var(--muted)', letterSpacing: '.8px', textTransform: 'uppercase' }}>Tempo</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.85rem', lineHeight: 1, color: displayTime <= 10 ? '#e83b3b' : 'var(--text)', transition: 'color .3s' }}>{displayTime}</div>
             </div>
           </div>
+
+          {/* Combo indicator */}
+          {displayCombo >= 3 && (
+            <div style={{ position: 'absolute', top: 58, left: '50%', transform: 'translateX(-50%)', zIndex: 15, pointerEvents: 'none', textAlign: 'center', whiteSpace: 'nowrap' }}>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: displayCombo >= 8 ? '1.35rem' : '1.05rem', lineHeight: 1, color: displayCombo >= 8 ? '#ff6b35' : displayCombo >= 5 ? '#f5c842' : 'var(--green)', textShadow: displayCombo >= 8 ? '0 0 24px rgba(255,107,53,.8)' : displayCombo >= 5 ? '0 0 18px rgba(245,200,66,.7)' : 'var(--led-green)' }}>
+                {displayCombo >= 8 ? `🔥 ×${multi} FIRE!` : `⚡ ×${multi} COMBO`}
+              </div>
+              <div style={{ fontSize: '.54rem', color: 'var(--muted)', marginTop: 1 }}>{displayCombo} di fila</div>
+            </div>
+          )}
+
+          {/* Items */}
           {displayItems.map(item => (
-            <div key={item.id} style={{ position: 'absolute', left: item.x, top: item.y + 56, width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.1rem', pointerEvents: 'none', filter: item.pts < 0 ? 'drop-shadow(0 0 8px rgba(232,59,59,.8))' : 'drop-shadow(0 0 6px rgba(61,255,110,.6))' }}>{item.emoji}</div>
+            <div key={item.id} style={{ position: 'absolute', left: item.x, top: item.y + 56, width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: item.def.isRare ? '2.5rem' : '2.1rem', pointerEvents: 'none', filter: `drop-shadow(0 0 ${item.def.isRare ? 12 : item.def.isDanger || item.def.isSuperDanger ? 8 : 5}px ${item.def.glow})` }}>{item.def.emoji}</div>
           ))}
+
+          {/* Floating score feedback */}
           {displayFb.map(fb => (
-            <div key={fb.id} style={{ position: 'absolute', left: fb.x + 56, top: fb.y + 56, fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', fontWeight: 900, color: fb.text.startsWith('-') ? '#e83b3b' : 'var(--green)', textShadow: fb.text.startsWith('-') ? '0 0 8px rgba(232,59,59,.9)' : 'var(--led-green)', pointerEvents: 'none', animation: 'bud-fb .7s ease forwards', zIndex: 20 }}>{fb.text}</div>
+            <div key={fb.id} style={{ position: 'absolute', left: fb.x, top: fb.y + 44, fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', fontWeight: 900, color: fb.color, pointerEvents: 'none', animation: 'bud-fb .9s ease forwards', zIndex: 20, whiteSpace: 'nowrap', textShadow: `0 0 10px ${fb.color}` }}>{fb.text}</div>
           ))}
         </div>
       )}
 
+      {/* ── ENDED ── */}
       {phase === 'ended' && result && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '22px 14px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: 6 }}>{result.rank === 1 ? '👑' : result.rank && result.rank <= 3 ? '🏆' : '🌿'}</div>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', marginBottom: 4, color: 'var(--text)' }}>Partita finita!</div>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '3.5rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{result.score}</div>
-            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 6 }}>
-              {result.rank != null ? result.rank === 1 ? '🥇 Sei il leader questo mese!' : result.rank <= 3 ? `🏆 Sei #${result.rank} in classifica!` : `Sei #${result.rank} in classifica questo mese` : isLoggedIn ? 'Caricamento classifica...' : '⚠️ Accedi per salvare il punteggio'}
+            <div style={{ fontSize: '3.2rem', marginBottom: 10, lineHeight: 1 }}>
+              {result.rank === 1 ? '👑' : result.rank && result.rank <= 3 ? '🏆' : result.score >= 50 ? '🌿' : '🎮'}
             </div>
-            {result.bestScore > result.score && <div style={{ fontSize: '.7rem', color: 'var(--gold)', marginTop: 4 }}>Il tuo record: {result.bestScore}</div>}
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', marginBottom: 6, color: 'var(--text)' }}>Partita finita!</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '4rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{result.score}</div>
+            <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 }}>
+              {result.rank != null
+                ? result.rank === 1 ? '🥇 Sei il leader di questo mese!'
+                  : result.rank <= 3 ? `🏆 Sei #${result.rank} in classifica!`
+                  : `Sei #${result.rank} nella classifica mensile`
+                : isLoggedIn ? '⏳ Aggiornamento classifica...' : '⚠️ Accedi per salvare il punteggio'}
+            </div>
+            {result.bestScore > result.score && (
+              <div style={{ fontSize: '.7rem', color: 'var(--gold)', marginTop: 6 }}>Il tuo record: <strong>{result.bestScore}</strong> 🏅</div>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-            {canPlay && <button onClick={startCountdown} style={{ flex: 1, padding: '11px', background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.35)', borderRadius: 12, color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>🎮 Rigioca ({MAX_PLAYS - playsToday})</button>}
-            <button onClick={() => { setPhase('idle'); phaseRef.current = 'idle'; setResult(null) }} style={{ flex: 1, padding: '11px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--muted)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>📊 Classifica</button>
+          <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+            {canPlay && (
+              <button onClick={startCountdown} style={{ flex: 1, padding: '12px', background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.35)', borderRadius: 13, color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.85rem', cursor: 'pointer' }}>
+                🎮 Rigioca ({MAX_PLAYS - playsToday})
+              </button>
+            )}
+            <button onClick={() => { setPhase('idle'); phaseRef.current = 'idle'; setResult(null) }} style={{ flex: 1, padding: '12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 13, color: 'var(--muted)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.85rem', cursor: 'pointer' }}>
+              📊 Classifica
+            </button>
           </div>
           <GameLeaderboard entries={leaderboard} />
         </div>
