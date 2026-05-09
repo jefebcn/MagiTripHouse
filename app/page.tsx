@@ -73,9 +73,7 @@ export default function Home() {
     <main style={{ minHeight: '100dvh', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
       <LedLine />
 
-      <div style={{ display: view === 'game' ? 'block' : 'none' }}>
-        <GameView />
-      </div>
+      {view === 'game' && <GameView />}
 
       <div style={{ display: view === 'catalog' ? 'block' : 'none' }}>
         {isLoggedIn ? (
@@ -198,16 +196,9 @@ function NewsView() {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '2.8rem', boxShadow: '0 0 40px rgba(61,255,110,.25)',
       }}>📡</div>
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', textAlign: 'center', marginBottom: 6 }}>
-        Magic Trip House
-      </div>
-      <div style={{ fontSize: '.82rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 24, lineHeight: 1.5 }}>
-        Canale ufficiale<br />Novità, offerte &amp; aggiornamenti esclusivi
-      </div>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32,
-        background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '10px 24px',
-      }}>
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', textAlign: 'center', marginBottom: 6 }}>Magic Trip House</div>
+      <div style={{ fontSize: '.82rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 24, lineHeight: 1.5 }}>Canale ufficiale<br />Novità, offerte &amp; aggiornamenti esclusivi</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '10px 24px' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--green)' }}>{memberCount ?? '—'}</div>
           <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>iscritti</div>
@@ -218,14 +209,7 @@ function NewsView() {
           <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>canale</div>
         </div>
       </div>
-      <button onClick={joinChannel} style={{
-        width: '100%', maxWidth: 300, padding: '15px',
-        borderRadius: 14, fontFamily: 'inherit', fontWeight: 700,
-        fontSize: '1.05rem', cursor: 'pointer',
-        background: 'linear-gradient(135deg, rgba(61,255,110,.25), rgba(61,255,110,.12))',
-        border: '1.5px solid rgba(61,255,110,.6)',
-        color: 'var(--green)', boxShadow: '0 0 24px rgba(61,255,110,.2)', marginBottom: 10,
-      }}>📡 Entra nel Canale</button>
+      <button onClick={joinChannel} style={{ width: '100%', maxWidth: 300, padding: '15px', borderRadius: 14, fontFamily: 'inherit', fontWeight: 700, fontSize: '1.05rem', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(61,255,110,.25), rgba(61,255,110,.12))', border: '1.5px solid rgba(61,255,110,.6)', color: 'var(--green)', boxShadow: '0 0 24px rgba(61,255,110,.2)', marginBottom: 10 }}>📡 Entra nel Canale</button>
       <div style={{ fontSize: '.7rem', color: 'var(--muted)', opacity: .7 }}>Attiva le notifiche per non perderti nulla</div>
     </div>
   )
@@ -234,12 +218,7 @@ function NewsView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', paddingBottom: 80 }}>
-      <div style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        background: 'rgba(8,12,8,.95)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(61,255,110,.12)',
-        padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
-      }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(8,12,8,.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(61,255,110,.12)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={() => setView('catalog')} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1.3rem', cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}>‹</button>
         <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: 'rgba(61,255,110,.15)', border: '1.5px solid rgba(61,255,110,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📡</div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -247,7 +226,6 @@ function NewsView() {
           <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>{memberCount ?? '—'} iscritti · {subscribed ? '🔔 notifiche attive' : '🔕 solo lettura'}</div>
         </div>
       </div>
-
       {showPwaBanner && (
         <div style={{ margin: '10px 12px 0', background: 'linear-gradient(135deg,rgba(61,255,110,.1),rgba(245,200,66,.06))', border: '1px solid rgba(61,255,110,.25)', borderRadius: 12, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start', position: 'relative' }}>
           <button onClick={() => { sessionStorage.setItem('pwa_banner_dismissed','1'); setPwaBannerDismissed(true) }} style={{ position:'absolute', top:8, right:10, background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'.9rem' }}>✕</button>
@@ -314,7 +292,7 @@ function ChannelFeed() {
                 <span style={{ background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.15)', borderRadius: 20, padding: '3px 14px', fontSize: '.68rem', color: 'var(--muted)' }}>{dateLabel}</span>
               </div>
             )}
-            <div style={{ background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.1)', borderRadius: '4px 16px 16px 16px', padding: '0', animation: 'fadeInUp .25s ease both', animationDelay: `${Math.min(i,6)*0.04}s`, overflow: 'hidden', position: 'relative' }}>
+            <div style={{ background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.1)', borderRadius: '4px 16px 16px 16px', overflow: 'hidden', position: 'relative', animation: 'fadeInUp .25s ease both', animationDelay: `${Math.min(i,6)*0.04}s` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px 6px', borderBottom: '1px solid rgba(61,255,110,.07)' }}>
                 <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: 'rgba(61,255,110,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.85rem' }}>📡</div>
                 <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--green)', flex: 1 }}>Magic Trip House</span>
@@ -500,7 +478,6 @@ function AccountView() {
           <div style={{ position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%', background: avatarLoading ? 'rgba(61,255,110,.3)' : 'var(--bg2)', border: '2px solid var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.75rem', transition: '.2s' }}>{avatarLoading ? '⏳' : '📷'}</div>
           <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
         </div>
-
         {editingName ? (
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
             <input autoFocus value={nameVal} onChange={e => setNameVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveName()} placeholder="Il tuo nome..." style={{ flex: 1, background: 'var(--bg3)', borderRadius: 10, outline: 'none', border: '1px solid rgba(61,255,110,.4)', padding: '10px 14px', color: 'var(--text)', fontSize: '.92rem', fontFamily: 'inherit' }} />
@@ -513,7 +490,6 @@ function AccountView() {
             {joinedDate && <div style={{ fontSize: '.68rem', color: 'rgba(106,138,106,.6)', marginTop: 4 }}>🗓 Membro da {joinedDate}</div>}
           </div>
         )}
-
         <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 4 }}>
           {[
             { label: 'Ordini', value: orderCount, icon: '📋', onClick: () => setShowOrders(v => !v) },
@@ -527,7 +503,6 @@ function AccountView() {
             </button>
           ))}
         </div>
-
         {!editingName && (
           <div style={{ display: 'flex', gap: 8, width: '100%' }}>
             <button onClick={() => { setEditingName(true); setNameVal(userName) }} style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '8px 0', color: 'var(--muted)', fontFamily: 'inherit', fontSize: '.8rem', cursor: 'pointer' }}>✏️ Modifica nome</button>
@@ -778,8 +753,7 @@ function GameLeaderboard({ entries }: { entries: LeaderEntry[] }) {
 
 function GameView() {
   const { sessionToken, isLoggedIn } = useUIStore()
-  type GPhase = 'idle' | 'counting' | 'playing' | 'ended'
-  const [phase, setPhase] = React.useState<GPhase>('idle')
+  const [phase, setPhase] = React.useState<'idle' | 'counting' | 'playing' | 'ended'>('idle')
   const [countdown, setCountdown] = React.useState(3)
   const [displayScore, setDisplayScore] = React.useState(0)
   const [displayTime, setDisplayTime] = React.useState(60)
@@ -794,21 +768,23 @@ function GameView() {
   const fbRef = React.useRef<FbItem[]>([])
   const lastSpawnRef = React.useRef(0)
   const startTimeRef = React.useRef(0)
-  const rafRef = React.useRef<number>()
+  const rafRef = React.useRef<number>(0)
   const nextIdRef = React.useRef(0)
   const nextFbIdRef = React.useRef(0)
   const gameAreaRef = React.useRef<HTMLDivElement>(null)
-  const phaseRef = React.useRef<GPhase>('idle')
+  const phaseRef = React.useRef<'idle' | 'counting' | 'playing' | 'ended'>('idle')
   const todayKey = () => `game_plays_${new Date().toISOString().slice(0, 10)}`
 
   React.useEffect(() => {
     setPlaysToday(parseInt(localStorage.getItem(todayKey()) ?? '0'))
-    fetchLeaderboard()
+    fetch('/api/game').then(r => r.json()).then((d: LeaderEntry[]) => { if (Array.isArray(d)) setLeaderboard(d) }).catch(() => {})
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function fetchLeaderboard() { fetch('/api/game').then(r => r.json()).then(setLeaderboard).catch(() => {}) }
+  function fetchLeaderboard() {
+    fetch('/api/game').then(r => r.json()).then((d: LeaderEntry[]) => { if (Array.isArray(d)) setLeaderboard(d) }).catch(() => {})
+  }
 
   function pickItem() {
     const r = Math.random()
@@ -895,9 +871,10 @@ function GameView() {
   const canPlay = playsToday < MAX_PLAYS
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 60px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 62px)', paddingBottom: 80 }}>
       <style>{`@keyframes bud-fb{from{opacity:1;transform:translateY(0) scale(1.2)}to{opacity:0;transform:translateY(-50px) scale(.9)}}`}</style>
-      <div style={{ padding: '12px 16px 8px', background: 'rgba(8,12,8,.97)', borderBottom: '1px solid rgba(61,255,110,.12)', flexShrink: 0 }}>
+
+      <div style={{ padding: '12px 16px 8px', background: 'var(--bg2)', borderBottom: '1px solid rgba(61,255,110,.12)', flexShrink: 0 }}>
         <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>🎮 Bud Rain</div>
         <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>Cattura i buds · il top scorer mensile vince un premio 🏆</div>
       </div>
@@ -905,7 +882,7 @@ function GameView() {
       {phase === 'idle' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px' }}>
-            <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: 10 }}>Come si gioca</div>
+            <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: 10, color: 'var(--text)' }}>Come si gioca</div>
             {([['🌿','Foglia','+1'],['💚','Cuore','+3'],['⭐','Stella','+5'],['💎','Diamante','+10'],['💣','Bomba','-5']] as const).map(([icon,label,pts]) => (
               <div key={icon} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', borderBottom: '1px solid rgba(61,255,110,.06)' }}>
                 <span style={{ fontSize: '1.2rem', width: 26 }}>{icon}</span>
@@ -913,7 +890,7 @@ function GameView() {
                 <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: pts.startsWith('-') ? '#e83b3b' : 'var(--green)' }}>{pts} pt</span>
               </div>
             ))}
-            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>⏱ 60 secondi · {MAX_PLAYS} partite al giorno · tocca gli oggetti per catturarli — evita le bombe!</div>
+            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>⏱ 60 secondi · {MAX_PLAYS} partite al giorno · tocca gli oggetti — evita le bombe!</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 10 }}>Partite oggi: <strong style={{ color: canPlay ? 'var(--green)' : '#e83b3b' }}>{playsToday}/{MAX_PLAYS}</strong></div>
@@ -933,7 +910,8 @@ function GameView() {
       )}
 
       {phase === 'playing' && (
-        <div ref={gameAreaRef} onTouchStart={e => { e.preventDefault(); handleTap(e) }} onClick={handleTap} style={{ flex: 1, position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: 'none', cursor: 'crosshair', background: 'radial-gradient(ellipse at 50% 0%,rgba(61,255,110,.05) 0%,transparent 65%)' }}>
+        <div ref={gameAreaRef} onTouchStart={e => { e.preventDefault(); handleTap(e) }} onClick={handleTap}
+          style={{ flex: 1, position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: 'none', cursor: 'crosshair', background: 'radial-gradient(ellipse at 50% 0%,rgba(61,255,110,.05) 0%,transparent 65%)', minHeight: 400 }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px', background: 'rgba(8,12,8,.88)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(61,255,110,.1)' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '.58rem', color: 'var(--muted)', letterSpacing: '.5px' }}>PUNTI</div>
@@ -957,7 +935,7 @@ function GameView() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: 6 }}>{result.rank === 1 ? '👑' : result.rank && result.rank <= 3 ? '🏆' : '🌿'}</div>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', marginBottom: 4 }}>Partita finita!</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem', marginBottom: 4, color: 'var(--text)' }}>Partita finita!</div>
             <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '3.5rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{result.score}</div>
             <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 6 }}>
               {result.rank != null ? result.rank === 1 ? '🥇 Sei il leader questo mese!' : result.rank <= 3 ? `🏆 Sei #${result.rank} in classifica!` : `Sei #${result.rank} in classifica questo mese` : isLoggedIn ? 'Caricamento classifica...' : '⚠️ Accedi per salvare il punteggio'}
