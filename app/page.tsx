@@ -1253,7 +1253,7 @@ function GameView() {
       {showGame && (
         <div
           ref={gameAreaRef}
-          onClick={throwProjectile}
+          onPointerDown={e => { e.preventDefault(); throwProjectile() }}
           style={{
             flex: 1, position: 'relative', overflow: 'hidden',
             userSelect: 'none', touchAction: 'none', cursor: 'pointer', minHeight: 380,
@@ -1345,12 +1345,12 @@ function GameView() {
               )
             }
             const bodyBg = isObs
-              ? 'linear-gradient(90deg,rgba(80,20,10,.8) 0%,rgba(200,60,40,.7) 30%,rgba(220,80,60,.55) 65%,rgba(150,30,20,.7) 100%)'
-              : 'linear-gradient(90deg,rgba(90,55,12,.8) 0%,#e8d888 18%,#f4ecc8 48%,#dece78 80%,#9a6020 100%)'
+              ? 'linear-gradient(90deg,rgba(80,20,10,.85) 0%,rgba(200,60,40,.75) 30%,rgba(230,90,70,.6) 65%,rgba(150,30,20,.75) 100%)'
+              : 'linear-gradient(90deg,rgba(80,48,10,.85) 0%,#d4b060 10%,#f9f1d3 30%,#ead998 55%,#d4c070 82%,#8b5820 100%)'
             const capBg = isObs
-              ? 'radial-gradient(circle at 35% 35%,#ff7060,#8b2020)'
-              : 'radial-gradient(circle at 35% 35%,#d4a448,#7a4820)'
-            const capShadow = isObs ? '0 0 6px rgba(220,60,40,.55)' : '0 0 5px rgba(180,120,40,.4)'
+              ? 'radial-gradient(circle at 35% 32%,#ff8070,#9b2222)'
+              : 'radial-gradient(circle at 35% 32%,#e8b858,#8b5020)'
+            const capShadow = isObs ? '0 0 8px rgba(220,60,40,.62), inset 0 1px 0 rgba(255,150,130,.3)' : '0 0 7px rgba(180,120,40,.55), inset 0 1px 0 rgba(255,220,140,.35)'
             return (
               <React.Fragment key={item.id}>
                 <div style={{ position: 'absolute', left: inner.x, top: inner.y - 5.5, width: lineLen, height: 11, borderRadius: 4, background: bodyBg, transformOrigin: '0 50%', transform: `rotate(${lineAngle}deg)`, pointerEvents: 'none', zIndex: 2, boxShadow: '0 2px 5px rgba(0,0,0,.45)', animation: isObs ? 'none' : 'kh-stick .15s ease' }} />
@@ -1366,21 +1366,45 @@ function GameView() {
 
           {/* Projectile — flying */}
           {displayProjFlying && (
-            <div style={{ position: 'absolute', left: displayCX - 6.5, top: displayProjY - 44, width: 13, height: 60, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%,#fffde0,#ff9800 55%,#ff5500)', boxShadow: '0 0 9px #ff9800, 0 0 18px rgba(255,152,0,.6)', flexShrink: 0 }} />
-              <div style={{ width: 8, height: 5, background: 'linear-gradient(180deg,#bbb,#777)', borderRadius: '0 0 2px 2px', flexShrink: 0 }} />
-              <div style={{ width: 13, height: 32, background: 'linear-gradient(180deg,#f8f0d0 0%,#ede0a0 50%,#d8c878 100%)', backgroundImage: 'linear-gradient(180deg,#f8f0d0 0%,#ede0a0 50%,#d8c878 100%), repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(160,130,50,.14) 3px,rgba(160,130,50,.14) 4px)', borderRadius: 3, border: '1px solid rgba(180,150,60,.35)', boxShadow: 'inset 2px 0 4px rgba(255,240,180,.4)', flexShrink: 0 }} />
-              <div style={{ width: 13, height: 14, background: 'linear-gradient(180deg,#c89848,#7a4820)', backgroundImage: 'linear-gradient(90deg,rgba(255,200,100,.2) 0%,transparent 45%,rgba(0,0,0,.12) 100%)', borderRadius: '0 0 5px 5px', border: '1px solid rgba(80,40,10,.4)', flexShrink: 0 }} />
+            <div style={{ position: 'absolute', left: displayCX - 6.5, top: displayProjY - 46, width: 13, height: 62, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              {/* Brace: lit ember tip */}
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'radial-gradient(circle at 38% 32%,#fff7c0,#ffb300 45%,#e65000)', boxShadow: '0 0 10px #ff9800, 0 0 20px rgba(255,140,0,.65)', flexShrink: 0 }} />
+              {/* Ash cone */}
+              <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderBottom: '7px solid #a0a090', flexShrink: 0 }} />
+              {/* Paper body with highlight strip */}
+              <div style={{ width: 13, height: 33, position: 'relative', flexShrink: 0,
+                background: 'linear-gradient(180deg,#f9f1d3 0%,#ead998 55%,#d4c070 100%)',
+                backgroundImage: 'linear-gradient(180deg,#f9f1d3 0%,#ead998 55%,#d4c070 100%), repeating-linear-gradient(0deg,transparent,transparent 4px,rgba(150,120,40,.13) 4px,rgba(150,120,40,.13) 5px)',
+                borderRadius: '2px 2px 0 0', border: '1px solid rgba(180,148,55,.4)',
+                boxShadow: 'inset 3px 0 5px rgba(255,248,200,.5), inset -2px 0 4px rgba(0,0,0,.1)' }} />
+              {/* Filter — brown with rim groove */}
+              <div style={{ width: 13, height: 15, flexShrink: 0,
+                background: 'linear-gradient(180deg,#d4a050 0%,#8b5020 60%,#6a3810 100%)',
+                backgroundImage: 'linear-gradient(90deg,rgba(255,210,120,.28) 0%,transparent 42%,rgba(0,0,0,.18) 100%)',
+                borderRadius: '0 0 5px 5px',
+                boxShadow: 'inset 0 2px 0 rgba(255,200,100,.22), 0 2px 4px rgba(0,0,0,.4)',
+                border: '1px solid rgba(70,35,8,.5)' }} />
             </div>
           )}
 
           {/* Projectile — ready at bottom */}
           {!displayProjFlying && phase === 'playing' && (
-            <div style={{ position: 'absolute', left: displayCX - 6.5, top: displayProjY - 44, width: 13, height: 60, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'kh-proj 1.4s ease infinite' }}>
-              <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%,rgba(255,250,180,.72),rgba(200,120,20,.52))', boxShadow: '0 0 6px rgba(200,130,0,.44)', flexShrink: 0 }} />
-              <div style={{ width: 8, height: 5, background: 'linear-gradient(180deg,#999,#666)', borderRadius: '0 0 2px 2px', flexShrink: 0, opacity: .72 }} />
-              <div style={{ width: 13, height: 32, background: 'linear-gradient(180deg,rgba(248,240,208,.85),rgba(237,224,160,.7),rgba(216,200,120,.55))', backgroundImage: 'linear-gradient(180deg,rgba(248,240,208,.85),rgba(237,224,160,.7),rgba(216,200,120,.55)), repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(160,130,50,.1) 3px,rgba(160,130,50,.1) 4px)', borderRadius: 3, border: '1px solid rgba(180,150,60,.22)', flexShrink: 0 }} />
-              <div style={{ width: 13, height: 14, background: 'linear-gradient(180deg,rgba(200,152,72,.8),rgba(122,72,32,.7))', borderRadius: '0 0 5px 5px', border: '1px solid rgba(80,40,10,.22)', flexShrink: 0 }} />
+            <div style={{ position: 'absolute', left: displayCX - 6.5, top: displayProjY - 46, width: 13, height: 62, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'kh-proj 1.4s ease infinite' }}>
+              {/* Ember tip (dimmer) */}
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'radial-gradient(circle at 38% 32%,rgba(255,245,160,.68),rgba(200,110,0,.45))', boxShadow: '0 0 7px rgba(200,120,0,.45)', flexShrink: 0 }} />
+              {/* Ash cone */}
+              <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderBottom: '7px solid rgba(160,160,145,.65)', flexShrink: 0 }} />
+              {/* Paper body */}
+              <div style={{ width: 13, height: 33, flexShrink: 0,
+                background: 'linear-gradient(180deg,rgba(249,241,211,.82),rgba(234,217,152,.68),rgba(212,196,112,.52))',
+                backgroundImage: 'linear-gradient(180deg,rgba(249,241,211,.82),rgba(234,217,152,.68),rgba(212,196,112,.52)), repeating-linear-gradient(0deg,transparent,transparent 4px,rgba(150,120,40,.1) 4px,rgba(150,120,40,.1) 5px)',
+                borderRadius: '2px 2px 0 0', border: '1px solid rgba(180,148,55,.25)',
+                boxShadow: 'inset 3px 0 5px rgba(255,248,200,.3)' }} />
+              {/* Filter */}
+              <div style={{ width: 13, height: 15, flexShrink: 0,
+                background: 'linear-gradient(180deg,rgba(212,160,80,.78),rgba(140,80,32,.68),rgba(106,56,16,.6))',
+                borderRadius: '0 0 5px 5px',
+                border: '1px solid rgba(70,35,8,.3)' }} />
             </div>
           )}
 
