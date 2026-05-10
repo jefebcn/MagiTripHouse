@@ -323,41 +323,48 @@ function ChannelFeed() {
 }
 
 interface NewsItem { id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string }
-interface GameItemDef {
-  emoji: string; label: string; pts: number; speed: number; weight: number; glow: string
-  physics: 'straight' | 'drift' | 'bounce' | 'zigzag' | 'chase'
-  isSlow?: boolean; isLife?: boolean; isDanger?: boolean; isSuperDanger?: boolean; isRare?: boolean
-}
-const GAME_ITEMS: GameItemDef[] = [
-  { emoji: '🌿', label: 'Erba',       pts: 2,   speed: 2.6, weight: 38, physics: 'straight', glow: 'rgba(61,255,110,.7)'   },
-  { emoji: '🍃', label: 'Foglia',     pts: 3,   speed: 2.1, weight: 20, physics: 'drift',    glow: 'rgba(80,220,100,.8)'   },
-  { emoji: '🍯', label: 'Hash',       pts: 5,   speed: 3.1, weight: 12, physics: 'straight', glow: 'rgba(245,200,66,.7)'   },
-  { emoji: '💎', label: 'Crystal',    pts: 8,   speed: 1.9, weight: 6,  physics: 'bounce',   glow: 'rgba(100,180,255,.9)',  isRare: true },
-  { emoji: '⭐', label: 'Stella Oro', pts: 15,  speed: 1.5, weight: 3,  physics: 'zigzag',   glow: 'rgba(255,215,0,.95)',   isRare: true },
-  { emoji: '💨', label: 'Fumata',     pts: 0,   speed: 1.6, weight: 8,  physics: 'drift',    glow: 'rgba(180,150,255,.7)',  isSlow: true },
-  { emoji: '❤️', label: 'Vita',       pts: 0,   speed: 1.2, weight: 4,  physics: 'drift',    glow: 'rgba(255,80,80,.8)',    isLife: true },
-  { emoji: '💣', label: 'Bomba',      pts: -5,  speed: 3.6, weight: 6,  physics: 'straight', glow: 'rgba(232,59,59,.9)',    isDanger: true },
-  { emoji: '🚔', label: 'Polizia',    pts: -10, speed: 2.1, weight: 3,  physics: 'chase',    glow: 'rgba(255,100,0,.9)',    isSuperDanger: true },
-]
-function pickItemDef(): GameItemDef {
-  let r = Math.random() * 100
-  for (const def of GAME_ITEMS) { r -= def.weight; if (r <= 0) return def }
-  return GAME_ITEMS[0]
-}
-function comboMultiplier(combo: number) {
-  if (combo >= 8) return 3
-  if (combo >= 5) return 2
-  if (combo >= 3) return 1.5
-  return 1
-}
-const BG_STARS = Array.from({ length: 18 }, (_, i) => ({
-  id: i, left: (i * 37 + 11) % 100, top: (i * 53 + 7) % 100,
-  size: 1.5 + (i % 3) * 0.8, dur: 2.5 + (i % 4) * 0.7, delay: (i * 0.3) % 3,
-}))
-interface FItem { id: number; def: GameItemDef; x: number; y: number; vx: number; phase: number }
-interface FbItem { id: number; x: number; y: number; text: string; color: string }
+interface StuckItem { id: number; relAngle: number; emoji: string; isObstacle: boolean; isBonus: boolean; pts: number }
 interface LeaderEntry { id: string; handle: string; name: string; score: number; month: string }
 interface OrderItem { id: string; total: number; date: string }
+
+// ─── Bud Strike constants ───
+const WHEEL_R = 100
+const STICK_R = WHEEL_R + 18        // radius where items sit (center of emoji)
+const COL_DEG = 13                  // angular collision threshold (degrees)
+const BONUS_DEG = 20                // angular bonus-collect threshold
+const PROJ_SPEED = 9                // pixels per frame
+const MAX_LIVES_G = 3
+
+const BG_STARS_G = Array.from({ length: 22 }, (_, i) => ({
+  id: i, left: (i * 37 + 11) % 100, top: (i * 53 + 7) % 100,
+  size: 1.2 + (i % 3) * 0.6, dur: 2.5 + (i % 4) * 0.8, delay: (i * 0.31) % 3.5,
+}))
+
+function gSpinSpeed(level: number) {
+  // Alternates CW/CCW; speeds up each level
+  return (level % 2 === 1 ? 1 : -1) * (62 + level * 16)
+}
+function gKnifeTarget(level: number) { return Math.min(4 + level, 13) }
+function gObstacleAngles(level: number): number[] {
+  if (level <= 1) return []
+  const n = Math.min(level - 1, 6)
+  return Array.from({ length: n }, (_, i) => Math.round((360 / n) * i))
+}
+function gBonusDef(level: number): { relAngle: number; emoji: string; pts: number } {
+  const cycle = level % 3
+  if (cycle === 0) return { relAngle: 60,  emoji: '💎', pts: 15 }
+  if (cycle === 1) return { relAngle: 270, emoji: '⭐', pts: 20 }
+  return              { relAngle: 150, emoji: '🍯', pts: 10 }
+}
+function gToRad(deg: number) { return deg * Math.PI / 180 }
+function gPolarXY(cx: number, cy: number, angleDeg: number, r: number) {
+  // 0°=top, 90°=right, 180°=bottom, 270°=left
+  return { x: cx + r * Math.sin(gToRad(angleDeg)), y: cy - r * Math.cos(gToRad(angleDeg)) }
+}
+function gAngDist(a: number, b: number) {
+  let d = Math.abs(((a - b) % 360 + 360) % 360)
+  return d > 180 ? 360 - d : d
+}
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -790,57 +797,59 @@ function GameLeaderboard({ entries }: { entries: LeaderEntry[] }) {
 
 function GameView() {
   const { sessionToken, isLoggedIn } = useUIStore()
-  const [phase, setPhase] = React.useState<'idle' | 'counting' | 'playing' | 'ended'>('idle')
+  const MAX_PLAYS = 3
+
+  type Phase = 'idle' | 'counting' | 'playing' | 'levelclear' | 'ended'
+  const [phase, setPhase] = React.useState<Phase>('idle')
   const [countdown, setCountdown] = React.useState(3)
   const [displayScore, setDisplayScore] = React.useState(0)
-  const [displayTime, setDisplayTime] = React.useState(60)
-  const [displayLives, setDisplayLives] = React.useState(3)
-  const [displayCombo, setDisplayCombo] = React.useState(0)
-  const [displayCatcherX, setDisplayCatcherX] = React.useState(160)
-  const [displayItems, setDisplayItems] = React.useState<FItem[]>([])
-  const [displayFb, setDisplayFb] = React.useState<FbItem[]>([])
-  const [displaySlowed, setDisplaySlowed] = React.useState(false)
-  const [catchPulse, setCatchPulse] = React.useState(0)
-  const [shakeKey, setShakeKey] = React.useState(0)
+  const [displayLives, setDisplayLives] = React.useState(MAX_LIVES_G)
+  const [displayLevel, setDisplayLevel] = React.useState(1)
+  const [displayDone, setDisplayDone] = React.useState(0)
+  const [displayTarget, setDisplayTarget] = React.useState(gKnifeTarget(1))
+  const [displayWheelAngle, setDisplayWheelAngle] = React.useState(0)
+  const [displayProjY, setDisplayProjY] = React.useState(400)
+  const [displayProjFlying, setDisplayProjFlying] = React.useState(false)
+  const [displayStuck, setDisplayStuck] = React.useState<StuckItem[]>([])
+  const [displayCX, setDisplayCX] = React.useState(180)
+  const [displayCY, setDisplayCY] = React.useState(220)
+  const [displaySpinDir, setDisplaySpinDir] = React.useState<'↻' | '↺'>('↻')
+  const [levelClearMsg, setLevelClearMsg] = React.useState('')
+  const [hitFlash, setHitFlash] = React.useState(false)
+  const [bonusFlash, setBonusFlash] = React.useState<{ text: string; x: number; y: number } | null>(null)
   const [result, setResult] = React.useState<{ score: number; rank: number | null; bestScore: number } | null>(null)
   const [leaderboard, setLeaderboard] = React.useState<LeaderEntry[]>([])
   const [playsToday, setPlaysToday] = React.useState(0)
-  const MAX_PLAYS = 3
-  const CATCHER_HALF = 48
 
+  const wheelAngleRef = React.useRef(0)
+  const projYRef = React.useRef(400)
+  const projFlyingRef = React.useRef(false)
+  const canThrowRef = React.useRef(true)
+  const stuckRef = React.useRef<StuckItem[]>([])
+  const livesRef = React.useRef(MAX_LIVES_G)
   const scoreRef = React.useRef(0)
-  const livesRef = React.useRef(3)
-  const comboRef = React.useRef(0)
-  const catcherXRef = React.useRef(160)
-  const touchXRef = React.useRef(160)
-  const itemsRef = React.useRef<FItem[]>([])
-  const fbRef = React.useRef<FbItem[]>([])
-  const lastSpawnRef = React.useRef(0)
-  const startTimeRef = React.useRef(0)
-  const slowEndRef = React.useRef(0)
+  const levelRef = React.useRef(1)
+  const doneRef = React.useRef(0)
+  const targetRef = React.useRef(gKnifeTarget(1))
+  const phaseRef = React.useRef<Phase>('idle')
   const rafRef = React.useRef<number>(0)
+  const lastTimeRef = React.useRef(0)
   const nextIdRef = React.useRef(0)
-  const nextFbIdRef = React.useRef(0)
   const gameAreaRef = React.useRef<HTMLDivElement>(null)
-  const phaseRef = React.useRef<'idle' | 'counting' | 'playing' | 'ended'>('idle')
+  const cxRef = React.useRef(180)
+  const cyRef = React.useRef(220)
+
   const todayKey = () => `game_plays_${new Date().toISOString().slice(0, 10)}`
 
   React.useEffect(() => {
     setPlaysToday(parseInt(localStorage.getItem(todayKey()) ?? '0'))
     fetch('/api/game').then(r => r.json()).then((d: LeaderEntry[]) => { if (Array.isArray(d)) setLeaderboard(d) }).catch(() => {})
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function fetchLeaderboard() {
     fetch('/api/game').then(r => r.json()).then((d: LeaderEntry[]) => { if (Array.isArray(d)) setLeaderboard(d) }).catch(() => {})
-  }
-
-  function spawnMs(elapsed: number) {
-    if (elapsed < 15) return 1300
-    if (elapsed < 30) return 1050
-    if (elapsed < 45) return 820
-    return 640
   }
 
   function startCountdown() {
@@ -849,115 +858,144 @@ function GameView() {
     const iv = setInterval(() => { c--; if (c <= 0) { clearInterval(iv); startGame() } else setCountdown(c) }, 1000)
   }
 
+  function initLevel(level: number): boolean {
+    const ga = gameAreaRef.current
+    if (!ga) return false
+    const gH = ga.clientHeight, gW = ga.clientWidth
+    const cx = gW / 2, cy = gH * 0.40
+    cxRef.current = cx; cyRef.current = cy
+    setDisplayCX(cx); setDisplayCY(cy)
+
+    const startY = gH - 52
+    projYRef.current = startY; projFlyingRef.current = false; canThrowRef.current = true
+    setDisplayProjY(startY); setDisplayProjFlying(false)
+
+    const items: StuckItem[] = []
+    gObstacleAngles(level).forEach(a => {
+      items.push({ id: nextIdRef.current++, relAngle: a, emoji: '🌿', isObstacle: true, isBonus: false, pts: 0 })
+    })
+    const bd = gBonusDef(level)
+    items.push({ id: nextIdRef.current++, relAngle: bd.relAngle, emoji: bd.emoji, isObstacle: false, isBonus: true, pts: bd.pts })
+    stuckRef.current = items; setDisplayStuck([...items])
+
+    doneRef.current = 0; targetRef.current = gKnifeTarget(level)
+    setDisplayDone(0); setDisplayTarget(gKnifeTarget(level))
+    setDisplayLevel(level); levelRef.current = level
+    setDisplaySpinDir(gSpinSpeed(level) > 0 ? '↻' : '↺')
+    return true
+  }
+
   function startGame() {
-    const gW = gameAreaRef.current?.clientWidth ?? 360
-    const startX = gW / 2
-    scoreRef.current = 0; livesRef.current = 3; comboRef.current = 0
-    catcherXRef.current = startX; touchXRef.current = startX
-    itemsRef.current = []; fbRef.current = []; slowEndRef.current = 0
-    setDisplayScore(0); setDisplayTime(60); setDisplayLives(3); setDisplayCombo(0)
-    setDisplayCatcherX(startX); setCatchPulse(0)
-    setDisplayItems([]); setDisplayFb([]); setDisplaySlowed(false); setResult(null)
-    startTimeRef.current = performance.now(); lastSpawnRef.current = 0
-    setPhase('playing'); phaseRef.current = 'playing'
+    scoreRef.current = 0; livesRef.current = MAX_LIVES_G; levelRef.current = 1
+    wheelAngleRef.current = 0; nextIdRef.current = 0
+    setDisplayScore(0); setDisplayLives(MAX_LIVES_G); setDisplayLevel(1); setResult(null)
     const n = parseInt(localStorage.getItem(todayKey()) ?? '0') + 1
     localStorage.setItem(todayKey(), String(n)); setPlaysToday(n)
-    rafRef.current = requestAnimationFrame(loop)
+    setPhase('playing'); phaseRef.current = 'playing'
+    const tryStart = () => {
+      if (!initLevel(1)) { requestAnimationFrame(tryStart); return }
+      lastTimeRef.current = performance.now()
+      rafRef.current = requestAnimationFrame(loop)
+    }
+    requestAnimationFrame(tryStart)
   }
 
   function loop(now: number) {
     if (phaseRef.current !== 'playing') return
-    const elapsed = (now - startTimeRef.current) / 1000
-    const remaining = Math.max(0, 60 - elapsed)
-    if (remaining <= 0 || livesRef.current <= 0) { endGame(); return }
+    const dt = Math.min((now - lastTimeRef.current) / 1000, 0.05)
+    lastTimeRef.current = now
     const ga = gameAreaRef.current
     if (!ga) { rafRef.current = requestAnimationFrame(loop); return }
     const gH = ga.clientHeight, gW = ga.clientWidth
-    const slowed = now < slowEndRef.current
-    const sf = slowed ? 0.35 : 1
+    const cx = gW / 2, cy = gH * 0.40
+    cxRef.current = cx; cyRef.current = cy
 
-    // Smooth catcher movement toward touch position
-    const clampedTarget = Math.max(CATCHER_HALF, Math.min(gW - CATCHER_HALF, touchXRef.current))
-    catcherXRef.current += (clampedTarget - catcherXRef.current) * 0.2
-    const cX = catcherXRef.current
-    const catcherTop = gH - 60
-    const catcherBot = gH - 20
+    // Rotate wheel
+    wheelAngleRef.current += gSpinSpeed(levelRef.current) * dt
+    const wAngle = wheelAngleRef.current
 
-    // Spawn
-    if (now - lastSpawnRef.current > spawnMs(elapsed)) {
-      const def = pickItemDef()
-      const vx = def.physics === 'bounce' ? (Math.random() > 0.5 ? 2.2 : -2.2) : 0
-      itemsRef.current.push({ id: nextIdRef.current++, def, x: 8 + Math.random() * Math.max(0, gW - 72), y: -70, vx, phase: Math.random() * Math.PI * 2 })
-      lastSpawnRef.current = now
+    // Move projectile upward
+    if (projFlyingRef.current) {
+      projYRef.current -= PROJ_SPEED
+
+      // Arrival check: projectile center at cy + STICK_R from above
+      if (projYRef.current <= cy + STICK_R) {
+        const arrivalAngle = 180  // always from bottom (6 o'clock)
+        let collision = false
+        let bonusHit: StuckItem | null = null
+
+        for (const item of stuckRef.current) {
+          const wa = ((item.relAngle + wAngle) % 360 + 360) % 360
+          const d = gAngDist(wa, arrivalAngle)
+          if (!item.isBonus && d < COL_DEG) { collision = true; break }
+          if (item.isBonus && d < BONUS_DEG && !bonusHit) bonusHit = item
+        }
+
+        if (collision) {
+          livesRef.current = Math.max(0, livesRef.current - 1)
+          setDisplayLives(livesRef.current)
+          setHitFlash(true); setTimeout(() => setHitFlash(false), 400)
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([80, 30, 80])
+          projFlyingRef.current = false; projYRef.current = gH - 52; canThrowRef.current = true
+          setDisplayProjFlying(false); setDisplayProjY(gH - 52)
+          if (livesRef.current <= 0) { endGame(); return }
+        } else {
+          // Stick!
+          const newRelAngle = arrivalAngle - wAngle
+          const stuck: StuckItem = { id: nextIdRef.current++, relAngle: newRelAngle, emoji: '🌿', isObstacle: false, isBonus: false, pts: 0 }
+          let pts = 5 + (levelRef.current - 1)
+
+          if (bonusHit) {
+            pts += bonusHit.pts
+            stuckRef.current = stuckRef.current.filter(i => i.id !== bonusHit!.id)
+            const bp = gPolarXY(cx, cy, arrivalAngle, STICK_R)
+            setBonusFlash({ text: `+${bonusHit.pts} ${bonusHit.emoji}`, x: bp.x, y: bp.y })
+            setTimeout(() => setBonusFlash(null), 1000)
+          }
+          scoreRef.current += pts
+          stuckRef.current = [...stuckRef.current, stuck]
+          doneRef.current += 1
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(14)
+
+          projFlyingRef.current = false; projYRef.current = gH - 52; canThrowRef.current = true
+
+          if (doneRef.current >= targetRef.current) {
+            const bonus = 15 * levelRef.current
+            scoreRef.current += bonus
+            setDisplayScore(scoreRef.current)
+            setDisplayStuck([...stuckRef.current])
+            const nextLv = levelRef.current + 1
+            phaseRef.current = 'levelclear'; setPhase('levelclear')
+            setLevelClearMsg(`Livello ${levelRef.current} superato! +${bonus} bonus`)
+            setTimeout(() => {
+              if (phaseRef.current !== 'levelclear') return
+              levelRef.current = nextLv; phaseRef.current = 'playing'; setPhase('playing')
+              if (!initLevel(nextLv)) return
+              lastTimeRef.current = performance.now()
+              rafRef.current = requestAnimationFrame(loop)
+            }, 1800)
+            return
+          }
+        }
+      }
     }
 
-    // Move items + collision detect via catcher
-    const nextItems: FItem[] = []
-    for (const item of itemsRef.current) {
-      let { x, y, vx, phase } = item
-      y += item.def.speed * sf
-      switch (item.def.physics) {
-        case 'drift': x += Math.sin(elapsed * 2.5 + phase) * 1.5 * sf; break
-        case 'bounce':
-          x += vx * sf
-          if (x < 8) { vx = Math.abs(vx); x = 8 }
-          if (x > gW - 72) { vx = -Math.abs(vx); x = gW - 72 }
-          break
-        case 'zigzag': x += Math.sin(elapsed * 5 + phase) * 3 * sf; break
-        case 'chase': x += ((cX - 28) - x) * 0.018 * sf; break
-      }
-      const iCX = x + 28, iCY = y + 28
-      if (iCX > cX - CATCHER_HALF - 6 && iCX < cX + CATCHER_HALF + 6 && iCY > catcherTop && iCY < catcherBot + 24) {
-        onCatch(item, now)
-      } else if (y < gH + 70) {
-        nextItems.push({ ...item, x, y, vx, phase })
-      }
-    }
-    itemsRef.current = nextItems
-
-    setDisplayScore(scoreRef.current); setDisplayTime(Math.ceil(remaining))
-    setDisplayLives(livesRef.current); setDisplayCombo(comboRef.current)
-    setDisplayCatcherX(cX)
-    setDisplayItems([...itemsRef.current]); setDisplayFb([...fbRef.current])
-    setDisplaySlowed(slowed)
+    setDisplayWheelAngle(wAngle)
+    setDisplayProjY(projYRef.current)
+    setDisplayProjFlying(projFlyingRef.current)
+    setDisplayStuck([...stuckRef.current])
+    setDisplayScore(scoreRef.current)
+    setDisplayLives(livesRef.current)
+    setDisplayDone(doneRef.current)
+    setDisplayCX(cx); setDisplayCY(cy)
     rafRef.current = requestAnimationFrame(loop)
   }
 
-  function onCatch(item: FItem, now: number) {
-    const def = item.def
-    const fbId = nextFbIdRef.current++
-    if (def.isSlow) {
-      slowEndRef.current = now + 3000; comboRef.current++
-      fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: '⏱ SLOW!', color: 'rgba(200,160,255,1)' }]
-    } else if (def.isLife) {
-      livesRef.current = Math.min(5, livesRef.current + 1); comboRef.current++
-      fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: '+1 ❤️', color: 'rgba(255,100,100,1)' }]
-    } else if (def.isDanger || def.isSuperDanger) {
-      const lost = def.isSuperDanger ? 2 : 1
-      livesRef.current = Math.max(0, livesRef.current - lost); comboRef.current = 0
-      setShakeKey(k => k + 1)
-      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([70, 25, 70])
-      fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: def.isSuperDanger ? '🚔 -2❤️' : '💥 -1❤️', color: 'rgba(232,59,59,1)' }]
-    } else {
-      const newCombo = comboRef.current + 1
-      const multi = comboMultiplier(newCombo)
-      const earned = Math.round(def.pts * multi)
-      scoreRef.current += earned; comboRef.current = newCombo
-      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
-      fbRef.current = [...fbRef.current, { id: fbId, x: item.x, y: item.y, text: multi > 1 ? `+${earned} ×${multi}` : `+${earned}`, color: def.isRare ? 'rgba(255,215,0,1)' : 'rgba(61,255,110,1)' }]
-    }
-    setCatchPulse(p => p + 1)
-    setTimeout(() => { fbRef.current = fbRef.current.filter(f => f.id !== fbId) }, 900)
-  }
-
-  function handlePointerMove(e: React.TouchEvent | React.MouseEvent) {
-    const rect = gameAreaRef.current?.getBoundingClientRect()
-    if (!rect) return
-    if ('touches' in e) {
-      touchXRef.current = (e as React.TouchEvent).touches[0].clientX - rect.left
-    } else {
-      touchXRef.current = (e as React.MouseEvent).clientX - rect.left
-    }
+  function throwProjectile() {
+    if (phaseRef.current !== 'playing') return
+    if (projFlyingRef.current || !canThrowRef.current) return
+    canThrowRef.current = false; projFlyingRef.current = true
+    setDisplayProjFlying(true)
   }
 
   function endGame() {
@@ -973,112 +1011,105 @@ function GameView() {
   }
 
   const canPlay = playsToday < MAX_PLAYS
-  const multi = comboMultiplier(displayCombo)
-  const catcherColor = displayCombo >= 8 ? '#ff6b35' : displayCombo >= 5 ? '#f5c842' : '#3dff6e'
-  const catchAnim = catchPulse > 0 ? (catchPulse % 2 === 0 ? 'bud-catcha .18s ease' : 'bud-catchb .18s ease') : 'none'
+  const showGame = phase === 'playing' || phase === 'levelclear'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 62px)', paddingBottom: 80 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 62px)' }}>
       <style>{`
-        @keyframes bud-fb{from{opacity:1;transform:translateY(0) scale(1.3)}to{opacity:0;transform:translateY(-72px) scale(.8)}}
-        @keyframes bud-shake{0%,100%{transform:translate(0,0)}15%{transform:translate(-6px,3px)}30%{transform:translate(6px,-3px)}50%{transform:translate(-4px,2px)}70%{transform:translate(4px,-2px)}85%{transform:translate(-2px,1px)}}
-        @keyframes bud-star{0%,100%{opacity:.2;transform:scale(1)}50%{opacity:.65;transform:scale(1.4)}}
-        @keyframes bud-slow{0%,100%{opacity:.55}50%{opacity:1}}
-        @keyframes bud-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
-        @keyframes bud-count{0%{transform:scale(1.6);opacity:0}35%{transform:scale(1);opacity:1}80%{transform:scale(.97);opacity:1}100%{transform:scale(.8);opacity:0}}
-        @keyframes bud-catcha{0%{transform:scaleX(1.35) scaleY(.55)}100%{transform:scaleX(1) scaleY(1)}}
-        @keyframes bud-catchb{0%{transform:scaleX(1.35) scaleY(.55)}100%{transform:scaleX(1) scaleY(1)}}
+        @keyframes kh-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+        @keyframes kh-count{0%{transform:scale(1.6);opacity:0}40%{transform:scale(1);opacity:1}80%{opacity:1}100%{transform:scale(.85);opacity:0}}
+        @keyframes kh-levelup{0%{opacity:0;transform:scale(.85)}15%{opacity:1;transform:scale(1.06)}70%{opacity:1;transform:scale(1)}100%{opacity:0;transform:translateY(-28px)}}
+        @keyframes kh-flash{0%,100%{background:transparent}50%{background:rgba(232,59,59,.28)}}
+        @keyframes kh-bonus{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-56px) scale(.8)}}
+        @keyframes kh-fadein{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+        @keyframes kh-star{0%,100%{opacity:.12}50%{opacity:.45}}
+        @keyframes kh-proj{0%,100%{transform:scaleY(1) scaleX(1)}50%{transform:scaleY(.9) scaleX(1.1)}}
+        @keyframes kh-stick{0%{opacity:0;transform:scale(.5)}100%{opacity:1;transform:scale(1)}}
       `}</style>
 
       {/* ── Header ── */}
-      <div style={{ padding: '12px 16px 8px', background: 'var(--bg2)', borderBottom: '1px solid rgba(61,255,110,.15)', flexShrink: 0 }}>
+      <div style={{ padding: '10px 16px 8px', background: 'var(--bg2)', borderBottom: '1px solid rgba(61,255,110,.15)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>🎮 Bud Rush</div>
-          <div style={{ fontSize: '.6rem', color: 'rgba(61,255,110,.7)', background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 20, padding: '2px 8px', letterSpacing: 1 }}>v2</div>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>🎯 Bud Strike</div>
+          <div style={{ fontSize: '.58rem', color: 'rgba(61,255,110,.7)', background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 20, padding: '2px 8px', letterSpacing: 1 }}>v3</div>
         </div>
-        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>Muovi il cestino · cattura i buds · top scorer mensile vince 🏆</div>
+        <div style={{ fontSize: '.67rem', color: 'var(--muted)', marginTop: 2 }}>Tocca per lanciare · colpisci il bersaglio · schiva i nodi</div>
       </div>
 
       {/* ── IDLE ── */}
       {phase === 'idle' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Controls */}
           <div style={{ background: 'var(--card)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 'var(--radius)', padding: '16px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', marginBottom: 12, color: 'var(--green)' }}>🕹️ Come si controlla</div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-              <div style={{ flex: 1, padding: '11px 8px', background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.12)', borderRadius: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: '1.5rem', marginBottom: 5 }}>👆</div>
-                <div style={{ fontSize: '.72rem', color: 'var(--text)', fontWeight: 600 }}>Trascina il dito</div>
-                <div style={{ fontSize: '.63rem', color: 'var(--muted)', marginTop: 2 }}>sinistra / destra</div>
-              </div>
-              <div style={{ flex: 1, padding: '11px 8px', background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.12)', borderRadius: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: '1.5rem', marginBottom: 5 }}>🧺</div>
-                <div style={{ fontSize: '.72rem', color: 'var(--text)', fontWeight: 600 }}>Cestino insegue</div>
-                <div style={{ fontSize: '.63rem', color: 'var(--muted)', marginTop: 2 }}>il tuo tocco</div>
-              </div>
-            </div>
-            <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
-              Hai <strong style={{ color: 'var(--text)' }}>3 ❤️ vite</strong> e <strong style={{ color: 'var(--text)' }}>60 secondi</strong>.
-              Ogni cattura consecutiva aumenta la <strong style={{ color: 'var(--gold)' }}>combo</strong>!
-            </div>
-          </div>
-
-          {/* Items with physics descriptions */}
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', marginBottom: 10, color: 'var(--text)' }}>📦 Oggetti</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {GAME_ITEMS.map(def => {
-                const isDmg = def.isDanger || def.isSuperDanger
-                const isPow = def.isSlow || def.isLife
-                const physicsNote: Record<string, string> = {
-                  straight: 'cade dritto', drift: 'dondola nel vento',
-                  bounce: 'rimbalza sui muri', zigzag: 'zigzag imprevedibile', chase: '🚨 segue il cestino',
-                }
-                return (
-                  <div key={def.emoji} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: isDmg ? 'rgba(232,59,59,.05)' : isPow ? 'rgba(180,150,255,.05)' : 'rgba(61,255,110,.04)', border: `1px solid ${isDmg ? 'rgba(232,59,59,.14)' : isPow ? 'rgba(180,150,255,.14)' : 'rgba(61,255,110,.1)'}` }}>
-                    <span style={{ fontSize: '1.45rem', lineHeight: 1, filter: `drop-shadow(0 0 5px ${def.glow})` }}>{def.emoji}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '.72rem', color: 'var(--text)', fontWeight: 600 }}>{def.label}</div>
-                      <div style={{ fontSize: '.6rem', color: isDmg ? '#e83b3b' : isPow ? 'rgba(200,160,255,1)' : 'var(--green)', marginBottom: 1 }}>
-                        {def.isSlow ? '⏱ Rallenta tutto 3s' : def.isLife ? '+1 ❤️ vita' : def.pts > 0 ? `+${def.pts} pt base` : `${def.pts} pt · -${def.isSuperDanger ? 2 : 1}❤️`}
-                      </div>
-                      <div style={{ fontSize: '.57rem', color: 'rgba(106,138,106,.55)' }}>{physicsNote[def.physics]}</div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Combo */}
-          <div style={{ background: 'rgba(245,200,66,.04)', border: '1px solid rgba(245,200,66,.14)', borderRadius: 'var(--radius)', padding: '14px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', color: 'var(--gold)', marginBottom: 10 }}>⚡ Combo Multiplier</div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              {([['3+', '×1.5', '#3dff6e'], ['5+', '×2', '#f5c842'], ['8+', '×3 🔥', '#ff6b35']] as const).map(([hits, m, color]) => (
-                <div key={hits} style={{ flex: 1, textAlign: 'center', padding: '9px 4px', background: 'rgba(0,0,0,.2)', border: `1px solid ${color}22`, borderRadius: 10 }}>
-                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color, lineHeight: 1 }}>{m}</div>
-                  <div style={{ fontSize: '.62rem', color: 'var(--muted)', marginTop: 3 }}>{hits} fila</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', marginBottom: 12, color: 'var(--green)' }}>🎯 Come si gioca</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+              {[
+                { icon: '👆', title: 'Tocca', desc: 'per lanciare il bud verso il bersaglio rotante' },
+                { icon: '🌿', title: 'Atterra', desc: 'il bud si conficca dove atterrano' },
+                { icon: '💥', title: 'Schiva', desc: 'non colpire i nodi già piantati!' },
+              ].map(s => (
+                <div key={s.icon} style={{ padding: '10px 6px', background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.1)', borderRadius: 12, textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.5rem', marginBottom: 5 }}>{s.icon}</div>
+                  <div style={{ fontSize: '.68rem', color: 'var(--text)', fontWeight: 700 }}>{s.title}</div>
+                  <div style={{ fontSize: '.58rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>{s.desc}</div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.6)', textAlign: 'center' }}>Il cestino cambia colore con la combo · si azzera su trappola</div>
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+              Il bersaglio ruota sempre più veloce · cambia direzione ogni livello.<br />
+              Lancia <strong style={{ color: 'var(--text)' }}>tutti i bud</strong> senza collisioni per avanzare al prossimo livello!
+            </div>
           </div>
 
-          {/* Tips */}
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px' }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', marginBottom: 10, color: 'var(--text)' }}>💎 Oggetti speciali sul bersaglio</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {[
+                { emoji: '💎', name: 'Crystal', pts: '+15 pt', glow: 'rgba(100,180,255,.9)', desc: 'Colpisci con il bud per punti extra' },
+                { emoji: '⭐', name: 'Stella Oro', pts: '+20 pt', glow: 'rgba(255,215,0,.95)', desc: 'Rarissima — punta bene!' },
+                { emoji: '🍯', name: 'Hash', pts: '+10 pt', glow: 'rgba(245,200,66,.7)', desc: 'Bonus solido ogni livello' },
+              ].map(item => (
+                <div key={item.emoji} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'rgba(61,255,110,.03)', border: '1px solid rgba(61,255,110,.08)', borderRadius: 10 }}>
+                  <span style={{ fontSize: '1.4rem', filter: `drop-shadow(0 0 6px ${item.glow})` }}>{item.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--text)' }}>{item.name}</div>
+                    <div style={{ fontSize: '.63rem', color: 'var(--muted)' }}>{item.desc}</div>
+                  </div>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--gold)' }}>{item.pts}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(245,200,66,.04)', border: '1px solid rgba(245,200,66,.14)', borderRadius: 'var(--radius)', padding: '14px' }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', color: 'var(--gold)', marginBottom: 10 }}>⚡ Progressione livelli</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[1,2,3,4,5].map(lv => (
+                <div key={lv} style={{ flex: 1, textAlign: 'center', padding: '8px 4px', background: 'rgba(0,0,0,.2)', border: '1px solid rgba(245,200,66,.12)', borderRadius: 10 }}>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', color: lv === 1 ? '#3dff6e' : lv <= 3 ? '#f5c842' : '#ff6b35', lineHeight: 1 }}>Lv{lv}</div>
+                  <div style={{ fontSize: '.57rem', color: 'var(--muted)', marginTop: 3 }}>{gKnifeTarget(lv)} bud</div>
+                  <div style={{ fontSize: '.53rem', color: 'rgba(106,138,106,.55)', marginTop: 2 }}>{Math.abs(gSpinSpeed(lv))}°/s</div>
+                  <div style={{ fontSize: '.52rem', color: 'rgba(106,138,106,.4)', marginTop: 1 }}>{gSpinSpeed(lv) > 0 ? '↻' : '↺'}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.6)', textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>
+              Bonus livello: +15 × livello · ostacoli pre-piantati aumentano ogni livello
+            </div>
+          </div>
+
           <div style={{ background: 'rgba(61,255,110,.03)', border: '1px solid rgba(61,255,110,.08)', borderRadius: 'var(--radius)', padding: '12px 14px' }}>
             <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem', color: 'var(--text)', marginBottom: 8 }}>💡 Strategia</div>
             {[
-              '💎 Crystal rimbalza: anticipalo ai bordi dello schermo',
-              '🚔 Polizia SEGUE il cestino — schivala deviando di lato',
-              '⭐ Stella Oro fa zigzag lento: rarissima ma vale ×combo',
-              '💨 Fumata rallenta tutto: catturala per fare combo su Crystal e Stella',
+              '🎯 Aspetta il momento giusto — il timing batte la velocità',
+              '🌿 Osserva gli spazi liberi tra i nodi già piantati',
+              '💎 I bonus ruotano col bersaglio — prevedine la posizione',
+              '⚡ Dal livello 2 la rotazione si inverte: adattati!',
             ].map((tip, i) => (
               <div key={i} style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.55, padding: '4px 0', borderBottom: i < 3 ? '1px solid rgba(61,255,110,.05)' : 'none' }}>{tip}</div>
             ))}
           </div>
 
-          {/* Start */}
           <div style={{ textAlign: 'center', padding: '4px 0' }}>
             <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 12 }}>
               Partite oggi: <strong style={{ color: canPlay ? 'var(--green)' : '#e83b3b' }}>{playsToday}/{MAX_PLAYS}</strong>
@@ -1086,9 +1117,9 @@ function GameView() {
             <button
               onClick={() => canPlay && startCountdown()}
               disabled={!canPlay}
-              style={{ background: canPlay ? 'linear-gradient(135deg,rgba(61,255,110,.24),rgba(61,255,110,.1))' : 'rgba(106,138,106,.06)', border: `1.5px solid ${canPlay ? 'rgba(61,255,110,.55)' : 'rgba(106,138,106,.15)'}`, borderRadius: 18, padding: '15px 50px', fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: canPlay ? 'var(--green)' : 'var(--muted)', cursor: canPlay ? 'pointer' : 'default', boxShadow: canPlay ? '0 0 36px rgba(61,255,110,.22)' : 'none', animation: canPlay ? 'bud-pulse 2.5s ease infinite' : 'none', transition: 'all .2s' }}
+              style={{ background: canPlay ? 'linear-gradient(135deg,rgba(61,255,110,.24),rgba(61,255,110,.1))' : 'rgba(106,138,106,.06)', border: `1.5px solid ${canPlay ? 'rgba(61,255,110,.55)' : 'rgba(106,138,106,.15)'}`, borderRadius: 18, padding: '15px 50px', fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: canPlay ? 'var(--green)' : 'var(--muted)', cursor: canPlay ? 'pointer' : 'default', boxShadow: canPlay ? '0 0 36px rgba(61,255,110,.22)' : 'none', animation: canPlay ? 'kh-pulse 2.5s ease infinite' : 'none', transition: 'all .2s' }}
             >
-              {canPlay ? '🎮 Inizia Partita' : '⏰ Torna Domani'}
+              {canPlay ? '🎯 Inizia Partita' : '⏰ Torna Domani'}
             </button>
           </div>
 
@@ -1099,83 +1130,147 @@ function GameView() {
       {/* ── COUNTING ── */}
       {phase === 'counting' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'radial-gradient(ellipse at 50% 40%,rgba(61,255,110,.1) 0%,transparent 70%)' }}>
-          <div key={countdown} style={{ fontFamily: "'Fredoka One', cursive", fontSize: '9rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1, animation: 'bud-count .9s ease forwards' }}>{countdown}</div>
+          <div key={countdown} style={{ fontFamily: "'Fredoka One', cursive", fontSize: '9rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1, animation: 'kh-count .9s ease forwards' }}>{countdown}</div>
           <div style={{ color: 'var(--muted)', fontSize: '.9rem', letterSpacing: 2 }}>PREPARATI...</div>
-          <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.5)', marginTop: 4 }}>trascina il dito per muovere il cestino</div>
+          <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.5)', marginTop: 4 }}>tocca lo schermo per lanciare i bud</div>
         </div>
       )}
 
-      {/* ── PLAYING ── */}
-      {phase === 'playing' && (
+      {/* ── PLAYING / LEVEL CLEAR ── */}
+      {showGame && (
         <div
-          key={shakeKey}
           ref={gameAreaRef}
-          onTouchStart={e => { e.preventDefault(); handlePointerMove(e) }}
-          onTouchMove={e => { e.preventDefault(); handlePointerMove(e) }}
-          onMouseMove={handlePointerMove}
-          style={{ flex: 1, position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: 'none', minHeight: 400, background: 'radial-gradient(ellipse at 50% 5%,rgba(61,255,110,.09) 0%,transparent 55%),radial-gradient(ellipse at 85% 90%,rgba(61,40,180,.06) 0%,transparent 45%)', animation: shakeKey > 0 ? 'bud-shake .4s ease' : 'none' }}
+          onClick={throwProjectile}
+          style={{
+            flex: 1, position: 'relative', overflow: 'hidden',
+            userSelect: 'none', touchAction: 'none', cursor: 'pointer', minHeight: 380,
+            animation: hitFlash ? 'kh-flash .4s ease' : 'none',
+            background: 'radial-gradient(ellipse at 50% 38%,rgba(61,255,110,.08) 0%,transparent 60%),radial-gradient(ellipse at 20% 80%,rgba(61,40,180,.05) 0%,transparent 40%)',
+          }}
         >
-          {/* Animated bg stars */}
-          {BG_STARS.map(s => (
-            <div key={s.id} style={{ position: 'absolute', left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, borderRadius: '50%', background: 'rgba(61,255,110,.28)', pointerEvents: 'none', animation: `bud-star ${s.dur}s ${s.delay}s infinite ease-in-out` }} />
+          {/* Background stars */}
+          {BG_STARS_G.map(s => (
+            <div key={s.id} style={{ position: 'absolute', left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, borderRadius: '50%', background: 'rgba(61,255,110,.32)', pointerEvents: 'none', animation: `kh-star ${s.dur}s ${s.delay}s infinite ease-in-out` }} />
           ))}
 
           {/* HUD */}
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '7px 14px 6px', background: 'rgba(8,12,8,.92)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(61,255,110,.12)' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '7px 14px 6px', background: 'rgba(8,12,8,.92)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(61,255,110,.1)', pointerEvents: 'none' }}>
             <div>
-              <div style={{ fontSize: '.5rem', color: 'var(--muted)', letterSpacing: '.8px', textTransform: 'uppercase' }}>Punti</div>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.85rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{displayScore}</div>
+              <div style={{ fontSize: '.48rem', color: 'var(--muted)', letterSpacing: '.8px', textTransform: 'uppercase' }}>Punti</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.8rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{displayScore}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-              <div style={{ fontSize: '1rem', letterSpacing: 3 }}>
-                {Array.from({ length: 5 }, (_, i) => (
-                  <span key={i} style={{ opacity: i < displayLives ? 1 : .18, filter: i < displayLives ? 'drop-shadow(0 0 3px rgba(255,80,80,.7))' : 'none' }}>❤️</span>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.72rem', color: 'var(--gold)', letterSpacing: 1 }}>LIVELLO {displayLevel} {displaySpinDir}</div>
+              <div style={{ fontSize: '.9rem', letterSpacing: 3 }}>
+                {Array.from({ length: MAX_LIVES_G }, (_, i) => (
+                  <span key={i} style={{ opacity: i < displayLives ? 1 : .14, filter: i < displayLives ? 'drop-shadow(0 0 3px rgba(255,80,80,.7))' : 'none' }}>❤️</span>
                 ))}
               </div>
-              {displaySlowed && <div style={{ fontSize: '.52rem', color: 'rgba(200,160,255,1)', letterSpacing: 1, animation: 'bud-slow .7s infinite' }}>⏱ SLOW</div>}
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '.5rem', color: 'var(--muted)', letterSpacing: '.8px', textTransform: 'uppercase' }}>Tempo</div>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.85rem', lineHeight: 1, color: displayTime <= 10 ? '#e83b3b' : 'var(--text)', transition: 'color .3s' }}>{displayTime}</div>
+              <div style={{ fontSize: '.48rem', color: 'var(--muted)', letterSpacing: '.8px', textTransform: 'uppercase' }}>Bud</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.8rem', lineHeight: 1, color: 'var(--text)' }}>
+                {displayDone}<span style={{ fontSize: '1rem', color: 'var(--muted)' }}>/{displayTarget}</span>
+              </div>
             </div>
           </div>
 
-          {/* Combo indicator */}
-          {displayCombo >= 3 && (
-            <div style={{ position: 'absolute', top: 58, left: '50%', transform: 'translateX(-50%)', zIndex: 15, pointerEvents: 'none', textAlign: 'center', whiteSpace: 'nowrap' }}>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: displayCombo >= 8 ? '1.35rem' : '1.05rem', lineHeight: 1, color: catcherColor, textShadow: displayCombo >= 8 ? '0 0 24px rgba(255,107,53,.8)' : displayCombo >= 5 ? '0 0 18px rgba(245,200,66,.7)' : 'var(--led-green)' }}>
-                {displayCombo >= 8 ? `🔥 ×${multi} FIRE!` : `⚡ ×${multi} COMBO`}
-              </div>
-              <div style={{ fontSize: '.54rem', color: 'var(--muted)', marginTop: 1 }}>{displayCombo} di fila</div>
+          {/* Ammo dots below HUD */}
+          <div style={{ position: 'absolute', top: 52, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 5, pointerEvents: 'none', zIndex: 9 }}>
+            {Array.from({ length: displayTarget }, (_, i) => (
+              <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: i < displayDone ? 'rgba(61,255,110,.9)' : 'rgba(61,255,110,.18)', border: '1px solid rgba(61,255,110,.4)', transition: 'background .2s' }} />
+            ))}
+          </div>
+
+          {/* Wheel visual */}
+          <div style={{
+            position: 'absolute',
+            left: displayCX - WHEEL_R,
+            top: displayCY - WHEEL_R,
+            width: WHEEL_R * 2,
+            height: WHEEL_R * 2,
+            borderRadius: '50%',
+            background: `conic-gradient(from ${displayWheelAngle}deg, #0d150d 0deg, #111911 45deg, #0a120a 90deg, #111911 135deg, #0d150d 180deg, #111911 225deg, #0a120a 270deg, #111911 315deg, #0d150d 360deg)`,
+            border: '3px solid rgba(61,255,110,.42)',
+            boxShadow: '0 0 48px rgba(61,255,110,.16), inset 0 0 32px rgba(0,0,0,.7)',
+            pointerEvents: 'none',
+          }}>
+            <div style={{ position: 'absolute', inset: 16, borderRadius: '50%', border: '1px solid rgba(61,255,110,.1)' }} />
+            <div style={{ position: 'absolute', inset: 32, borderRadius: '50%', border: '1px solid rgba(61,255,110,.06)' }} />
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 14, height: 14, borderRadius: '50%', background: 'rgba(61,255,110,.65)', boxShadow: '0 0 12px rgba(61,255,110,.6)' }} />
+          </div>
+
+          {/* Stuck items & their stick lines */}
+          {displayStuck.map(item => {
+            const wa = ((item.relAngle + displayWheelAngle) % 360 + 360) % 360
+            const pos = gPolarXY(displayCX, displayCY, wa, STICK_R)
+            const inner = gPolarXY(displayCX, displayCY, wa, WHEEL_R - 1)
+            const dx = pos.x - inner.x, dy = pos.y - inner.y
+            const lineLen = Math.sqrt(dx * dx + dy * dy)
+            const lineAngle = Math.atan2(dy, dx) * 180 / Math.PI
+            const isBonus = item.isBonus
+            const isObs = item.isObstacle
+            const glowColor = isBonus ? 'rgba(255,215,0,.85)' : isObs ? 'rgba(232,59,59,.6)' : 'rgba(61,255,110,.7)'
+            return (
+              <React.Fragment key={item.id}>
+                {!isBonus && (
+                  <div style={{ position: 'absolute', left: inner.x, top: inner.y - 1.5, width: lineLen, height: 3, borderRadius: 2, background: isObs ? 'rgba(232,59,59,.4)' : 'rgba(61,255,110,.35)', transformOrigin: '0 50%', transform: `rotate(${lineAngle}deg)`, pointerEvents: 'none', zIndex: 2 }} />
+                )}
+                <div style={{ position: 'absolute', left: pos.x - 14, top: pos.y - 14, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isBonus ? '1.3rem' : '1.05rem', pointerEvents: 'none', filter: `drop-shadow(0 0 ${isBonus ? 9 : 5}px ${glowColor})`, zIndex: 3, animation: 'kh-stick .15s ease' }}>{item.emoji}</div>
+              </React.Fragment>
+            )
+          })}
+
+          {/* Flight trajectory guide (subtle dashed line) */}
+          {!displayProjFlying && phase === 'playing' && (
+            <div style={{ position: 'absolute', left: displayCX - 1, top: displayCY + WHEEL_R + 6, width: 2, bottom: 52, background: 'repeating-linear-gradient(to bottom,rgba(61,255,110,.2) 0px,rgba(61,255,110,.2) 4px,transparent 4px,transparent 10px)', pointerEvents: 'none', zIndex: 1 }} />
+          )}
+
+          {/* Projectile — flying */}
+          {displayProjFlying && (
+            <div style={{ position: 'absolute', left: displayCX - 7, top: displayProjY - 22, width: 14, height: 44, borderRadius: 7, background: 'linear-gradient(180deg,rgba(61,255,110,.98) 0%,rgba(40,200,80,.7) 60%,rgba(20,140,50,.4) 100%)', boxShadow: '0 0 14px rgba(61,255,110,.9), 0 -6px 18px rgba(61,255,110,.5)', pointerEvents: 'none', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 4 }}>
+              <span style={{ fontSize: '.75rem', lineHeight: 1 }}>🌿</span>
             </div>
           )}
 
-          {/* Falling items */}
-          {displayItems.map(item => (
-            <div key={item.id} style={{ position: 'absolute', left: item.x, top: item.y + 56, width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: item.def.isRare ? '2.5rem' : '2.1rem', pointerEvents: 'none', filter: `drop-shadow(0 0 ${item.def.isRare ? 12 : item.def.isDanger || item.def.isSuperDanger ? 9 : 5}px ${item.def.glow})` }}>{item.def.emoji}</div>
-          ))}
+          {/* Projectile — ready at bottom */}
+          {!displayProjFlying && phase === 'playing' && (
+            <div style={{ position: 'absolute', left: displayCX - 7, top: displayProjY - 22, width: 14, height: 44, borderRadius: 7, background: 'linear-gradient(180deg,rgba(61,255,110,.75) 0%,rgba(40,200,80,.45) 60%,rgba(20,140,50,.25) 100%)', border: '1px solid rgba(61,255,110,.5)', boxShadow: '0 0 10px rgba(61,255,110,.45)', pointerEvents: 'none', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 4, animation: 'kh-proj 1.4s ease infinite' }}>
+              <span style={{ fontSize: '.75rem', lineHeight: 1 }}>🌿</span>
+            </div>
+          )}
 
-          {/* Score feedback */}
-          {displayFb.map(fb => (
-            <div key={fb.id} style={{ position: 'absolute', left: fb.x, top: fb.y + 44, fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', fontWeight: 900, color: fb.color, pointerEvents: 'none', animation: 'bud-fb .9s ease forwards', zIndex: 20, whiteSpace: 'nowrap', textShadow: `0 0 10px ${fb.color}` }}>{fb.text}</div>
-          ))}
+          {/* Bonus collect flash */}
+          {bonusFlash && (
+            <div style={{ position: 'absolute', left: bonusFlash.x - 44, top: bonusFlash.y - 28, fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: '#f5c842', pointerEvents: 'none', animation: 'kh-bonus .9s ease forwards', zIndex: 20, whiteSpace: 'nowrap', textShadow: '0 0 14px rgba(245,200,66,.85)' }}>{bonusFlash.text}</div>
+          )}
 
-          {/* Catcher */}
-          <div style={{ position: 'absolute', bottom: 18, left: displayCatcherX - CATCHER_HALF, width: CATCHER_HALF * 2, height: 40, borderRadius: 20, zIndex: 5, pointerEvents: 'none', background: `linear-gradient(135deg,${catcherColor}28,${catcherColor}10)`, border: `2.5px solid ${catcherColor}bb`, boxShadow: `0 0 ${displayCombo >= 5 ? 28 : 16}px ${catcherColor}55`, animation: catchAnim, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>🌿</div>
+          {/* Tap hint */}
+          {!displayProjFlying && phase === 'playing' && (
+            <div style={{ position: 'absolute', bottom: 14, left: 0, right: 0, textAlign: 'center', fontSize: '.63rem', color: 'rgba(106,138,106,.45)', pointerEvents: 'none' }}>tocca per lanciare</div>
+          )}
 
-          {/* Catcher ground glow */}
-          <div style={{ position: 'absolute', bottom: 0, left: displayCatcherX - CATCHER_HALF - 12, width: CATCHER_HALF * 2 + 24, height: 18, borderRadius: 10, background: `radial-gradient(ellipse at 50% 0%,${catcherColor}28 0%,transparent 70%)`, pointerEvents: 'none', zIndex: 4 }} />
+          {/* Level clear overlay */}
+          {phase === 'levelclear' && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 30, background: 'rgba(8,12,8,.6)', backdropFilter: 'blur(5px)' }}>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '2.2rem', color: 'var(--green)', textShadow: 'var(--led-green)', animation: 'kh-levelup 1.8s ease forwards', textAlign: 'center', lineHeight: 1.3 }}>
+                ✅ {levelClearMsg.split('!')[0]}!
+                <div style={{ fontSize: '1.1rem', color: 'var(--gold)', marginTop: 6 }}>{levelClearMsg.split('!')[1]?.trim()}</div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* ── ENDED ── */}
       {phase === 'ended' && result && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '22px 14px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', animation: 'kh-fadein .4s ease' }}>
             <div style={{ fontSize: '3.2rem', marginBottom: 10, lineHeight: 1 }}>
-              {result.rank === 1 ? '👑' : result.rank && result.rank <= 3 ? '🏆' : result.score >= 50 ? '🌿' : '🎮'}
+              {result.rank === 1 ? '👑' : result.rank && result.rank <= 3 ? '🏆' : displayLevel > 3 ? '🎯' : '🌿'}
             </div>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', marginBottom: 6, color: 'var(--text)' }}>Partita finita!</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', marginBottom: 4 }}>Partita Finita!</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 8 }}>Sei arrivato al <strong style={{ color: 'var(--gold)' }}>livello {displayLevel}</strong></div>
             <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '4rem', color: 'var(--green)', textShadow: 'var(--led-green)', lineHeight: 1 }}>{result.score}</div>
             <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 }}>
               {result.rank != null
@@ -1191,7 +1286,7 @@ function GameView() {
           <div style={{ display: 'flex', gap: 10, width: '100%' }}>
             {canPlay && (
               <button onClick={startCountdown} style={{ flex: 1, padding: '12px', background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.35)', borderRadius: 13, color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.85rem', cursor: 'pointer' }}>
-                🎮 Rigioca ({MAX_PLAYS - playsToday})
+                🎯 Rigioca ({MAX_PLAYS - playsToday})
               </button>
             )}
             <button onClick={() => { setPhase('idle'); phaseRef.current = 'idle'; setResult(null) }} style={{ flex: 1, padding: '12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 13, color: 'var(--muted)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.85rem', cursor: 'pointer' }}>
