@@ -17,7 +17,7 @@ const BADGE_LABELS: Record<string, string> = {
   frozen:  '🧊 Frozen',
   new:     '✨ Novità',
   hash:    '🪨 Hash',
-  cbd:     '🌿 CBD',
+  cbd:     '🌿 THC',
 }
 
 function getMinPrice(p: Product): number {

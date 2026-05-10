@@ -7,7 +7,7 @@ const CATEGORIES = [
   { id: 'frozen',  label: '🧊 Frozen' },
   { id: 'new',     label: '✨ Novità' },
   { id: 'hash',    label: '🪨 Hash' },
-  { id: 'cbd',     label: '🌿 CBD' },
+  { id: 'cbd',     label: '🌿 THC' },
 ]
 
 export default function CategoryFilter() {
