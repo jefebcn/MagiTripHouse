@@ -20,6 +20,7 @@ interface UIState {
   setFilter: (f: string) => void
   search: string
   setSearch: (s: string) => void
+  // Auth
   userName: string
   userHandle: string
   userRole: string
@@ -29,8 +30,10 @@ interface UIState {
   login: (name: string, handle: string, role: string, token: string) => void
   logout: () => void
   setUserAvatar: (url: string) => void
+  // Channel
   channelJoined: boolean
   setChannelJoined: (v: boolean) => void
+  // News badge
   lastReadNewsAt: string
   setLastReadNewsAt: (t: string) => void
   latestNewsAt: string
@@ -56,6 +59,7 @@ export const useUIStore = create<UIState>()(
       setFilter: (filter) => set({ filter }),
       search: '',
       setSearch: (search) => set({ search }),
+      // Auth
       userName: '',
       userHandle: '',
       userRole: '',
@@ -67,8 +71,10 @@ export const useUIStore = create<UIState>()(
       logout: () =>
         set({ userName: '', userHandle: '', userRole: '', userAvatar: '', sessionToken: '', isLoggedIn: false, view: 'catalog' }),
       setUserAvatar: (userAvatar) => set({ userAvatar }),
+      // Channel
       channelJoined: false,
       setChannelJoined: (channelJoined) => set({ channelJoined }),
+      // News badge
       lastReadNewsAt: '',
       setLastReadNewsAt: (lastReadNewsAt) => set({ lastReadNewsAt }),
       latestNewsAt: '',

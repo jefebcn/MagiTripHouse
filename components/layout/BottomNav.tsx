@@ -3,12 +3,12 @@ import { useUIStore } from '@/store/uiStore'
 import { useCartStore } from '@/store/cartStore'
 
 const TABS = [
-  { id: 'game',       label: 'Gioca',    icon: '🎮', cart: false },
-  { id: 'catalog',    label: 'Catalogo', icon: '☰',  cart: false },
-  { id: 'news',       label: 'Canale',   icon: '📡', cart: false },
-  { id: 'cart',       label: 'Carrello', icon: '🛒', cart: true  },
-  { id: 'affiliates', label: 'Affiliati',icon: '👥', cart: false },
-  { id: 'account',    label: 'Account',  icon: '👤', cart: false },
+  { id: 'game',      label: 'Gioca',    icon: '🎮', cart: false },
+  { id: 'catalog',   label: 'Catalogo', icon: '☰',  cart: false },
+  { id: 'news',      label: 'Canale',   icon: '📡', cart: false },
+  { id: 'cart',      label: 'Carrello', icon: '🛒', cart: true  },
+  { id: 'affiliates',label: 'Affiliati',icon: '👥', cart: false },
+  { id: 'account',   label: 'Account',  icon: '👤', cart: false },
 ] as const
 
 export default function BottomNav() {
