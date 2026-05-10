@@ -1068,24 +1068,36 @@ function GameView() {
               <div style={{ position: 'relative', width: 210, height: 272 }}>
                 {/* Rotating group: wheel disc + stuck buds */}
                 <div style={{ position: 'absolute', left: 5, top: 0, width: 200, height: 200, animation: 'kh-preview-spin 5s linear infinite', transformOrigin: '50% 50%' }}>
-                  <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'conic-gradient(#0d150d 0deg,#111911 45deg,#0a120a 90deg,#111911 135deg,#0d150d 180deg,#111911 225deg,#0a120a 270deg,#111911 315deg,#0d150d 360deg)', border: '3px solid rgba(61,255,110,.48)', boxShadow: '0 0 52px rgba(61,255,110,.22)', position: 'relative' }}>
-                    <div style={{ position: 'absolute', inset: 17, borderRadius: '50%', border: '1px solid rgba(61,255,110,.11)' }} />
-                    <div style={{ position: 'absolute', inset: 35, borderRadius: '50%', border: '1px solid rgba(61,255,110,.07)' }} />
-                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 13, height: 13, borderRadius: '50%', background: 'rgba(61,255,110,.7)', boxShadow: '0 0 12px rgba(61,255,110,.6)' }} />
+                  <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'conic-gradient(#5c2e06 0deg,#8b4513 36deg,#a05a1a 72deg,#7a3c0e 108deg,#5c2e06 144deg,#7a3c0e 180deg,#8b4513 216deg,#a05a1a 252deg,#7a3c0e 288deg,#5c2e06 324deg,#8b4513 360deg)', border: '3px solid rgba(195,130,50,.6)', boxShadow: '0 0 48px rgba(160,90,20,.3)', position: 'relative' }}>
+                    <div style={{ position: 'absolute', inset: 14, borderRadius: '50%', border: '2px solid rgba(195,130,50,.22)' }} />
+                    <div style={{ position: 'absolute', inset: 30, borderRadius: '50%', border: '1px solid rgba(195,130,50,.15)' }} />
+                    <div style={{ position: 'absolute', inset: 48, borderRadius: '50%', border: '1px solid rgba(195,130,50,.1)' }} />
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 14, height: 14, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%,#f5d878,#c49020)', boxShadow: '0 0 10px rgba(200,160,30,.6)' }} />
                   </div>
-                  {/* Stuck buds rotating with wheel */}
+                  {/* Stuck joints rotating with wheel */}
                   {([45, 138, 222, 312] as number[]).map(angle => {
-                    const r = 76
+                    const sinA = Math.sin(angle * Math.PI / 180), cosA = Math.cos(angle * Math.PI / 180)
+                    const ir = 78, or = 110
+                    const ix = 100 + ir * sinA, iy = 100 - ir * cosA
+                    const ox = 100 + or * sinA, oy = 100 - or * cosA
+                    const la = Math.atan2(oy - iy, ox - ix) * 180 / Math.PI
+                    const ll = Math.sqrt((ox - ix) ** 2 + (oy - iy) ** 2)
                     return (
-                      <div key={angle} style={{ position: 'absolute', left: 100 + r * Math.sin(angle * Math.PI / 180) - 11, top: 100 - r * Math.cos(angle * Math.PI / 180) - 11, fontSize: '1.15rem', lineHeight: 1, filter: 'drop-shadow(0 0 5px rgba(61,255,110,.75))' }}>🌿</div>
+                      <React.Fragment key={angle}>
+                        <div style={{ position: 'absolute', left: ix, top: iy - 4, width: ll, height: 8, borderRadius: 3, background: 'linear-gradient(90deg,rgba(90,55,12,.8) 0%,#e8d888 18%,#f4ecc8 48%,#dece78 80%,#9a6020 100%)', transformOrigin: '0 50%', transform: `rotate(${la}deg)` }} />
+                        <div style={{ position: 'absolute', left: ox - 5, top: oy - 5, width: 10, height: 10, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%,#d4a448,#7a4820)', boxShadow: '0 0 5px rgba(180,120,40,.45)' }} />
+                      </React.Fragment>
                     )
                   })}
                 </div>
                 {/* Dashed trajectory line */}
-                <div style={{ position: 'absolute', left: 104, top: 205, width: 2, height: 40, background: 'repeating-linear-gradient(to bottom,rgba(61,255,110,.28) 0px,rgba(61,255,110,.28) 4px,transparent 4px,transparent 9px)' }} />
+                <div style={{ position: 'absolute', left: 104, top: 200, width: 2, height: 16, background: 'repeating-linear-gradient(to bottom,rgba(180,130,50,.3) 0px,rgba(180,130,50,.3) 4px,transparent 4px,transparent 9px)' }} />
                 {/* Projectile ready */}
-                <div style={{ position: 'absolute', left: 98, top: 222, width: 14, height: 44, borderRadius: 7, background: 'linear-gradient(180deg,rgba(61,255,110,.98) 0%,rgba(40,200,80,.65) 65%,rgba(20,130,45,.3) 100%)', boxShadow: '0 0 18px rgba(61,255,110,.75), 0 -4px 12px rgba(61,255,110,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 4, animation: 'kh-proj 1.5s ease infinite' }}>
-                  <span style={{ fontSize: '.75rem', lineHeight: 1 }}>🌿</span>
+                <div style={{ position: 'absolute', left: 100, top: 214, width: 10, height: 56, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'kh-proj 1.5s ease infinite' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%,rgba(255,250,180,.75),rgba(200,120,20,.5))', boxShadow: '0 0 6px rgba(200,130,0,.5)', flexShrink: 0 }} />
+                  <div style={{ width: 7, height: 5, background: 'linear-gradient(180deg,#999,#666)', borderRadius: '0 0 2px 2px', flexShrink: 0, opacity: .7 }} />
+                  <div style={{ width: 10, height: 30, background: 'linear-gradient(180deg,rgba(244,236,204,.85),rgba(232,216,144,.72))', borderRadius: 2, border: '1px solid rgba(180,150,60,.28)', flexShrink: 0 }} />
+                  <div style={{ width: 10, height: 13, background: 'linear-gradient(180deg,rgba(184,144,72,.8),rgba(122,72,32,.7))', borderRadius: '0 0 4px 4px', flexShrink: 0 }} />
                 </div>
               </div>
 
@@ -1274,14 +1286,15 @@ function GameView() {
             width: WHEEL_R * 2,
             height: WHEEL_R * 2,
             borderRadius: '50%',
-            background: `conic-gradient(from ${displayWheelAngle}deg, #0d150d 0deg, #111911 45deg, #0a120a 90deg, #111911 135deg, #0d150d 180deg, #111911 225deg, #0a120a 270deg, #111911 315deg, #0d150d 360deg)`,
-            border: '3px solid rgba(61,255,110,.42)',
-            boxShadow: '0 0 48px rgba(61,255,110,.16), inset 0 0 32px rgba(0,0,0,.7)',
+            background: `conic-gradient(from ${displayWheelAngle}deg, #5c2e06 0deg, #8b4513 36deg, #a05a1a 72deg, #7a3c0e 108deg, #5c2e06 144deg, #7a3c0e 180deg, #8b4513 216deg, #a05a1a 252deg, #7a3c0e 288deg, #5c2e06 324deg, #8b4513 360deg)`,
+            border: '3px solid rgba(195,130,50,.6)',
+            boxShadow: '0 0 40px rgba(160,90,20,.28), inset 0 0 36px rgba(0,0,0,.65)',
             pointerEvents: 'none',
           }}>
-            <div style={{ position: 'absolute', inset: 16, borderRadius: '50%', border: '1px solid rgba(61,255,110,.1)' }} />
-            <div style={{ position: 'absolute', inset: 32, borderRadius: '50%', border: '1px solid rgba(61,255,110,.06)' }} />
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 14, height: 14, borderRadius: '50%', background: 'rgba(61,255,110,.65)', boxShadow: '0 0 12px rgba(61,255,110,.6)' }} />
+            <div style={{ position: 'absolute', inset: 14, borderRadius: '50%', border: '2px solid rgba(195,130,50,.22)' }} />
+            <div style={{ position: 'absolute', inset: 30, borderRadius: '50%', border: '1px solid rgba(195,130,50,.15)' }} />
+            <div style={{ position: 'absolute', inset: 48, borderRadius: '50%', border: '1px solid rgba(195,130,50,.1)' }} />
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 16, height: 16, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%,#f5d878,#c49020)', boxShadow: '0 0 10px rgba(200,160,30,.65), inset 0 0 4px rgba(0,0,0,.3)' }} />
           </div>
 
           {/* Stuck items & their stick lines */}
@@ -1294,13 +1307,22 @@ function GameView() {
             const lineAngle = Math.atan2(dy, dx) * 180 / Math.PI
             const isBonus = item.isBonus
             const isObs = item.isObstacle
-            const glowColor = isBonus ? 'rgba(255,215,0,.85)' : isObs ? 'rgba(232,59,59,.6)' : 'rgba(61,255,110,.7)'
+            if (isBonus) {
+              return (
+                <div key={item.id} style={{ position: 'absolute', left: pos.x - 14, top: pos.y - 14, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', pointerEvents: 'none', filter: 'drop-shadow(0 0 9px rgba(255,215,0,.85))', zIndex: 3, animation: 'kh-stick .15s ease' }}>{item.emoji}</div>
+              )
+            }
+            const bodyBg = isObs
+              ? 'linear-gradient(90deg,rgba(80,20,10,.8) 0%,rgba(200,60,40,.7) 30%,rgba(220,80,60,.55) 65%,rgba(150,30,20,.7) 100%)'
+              : 'linear-gradient(90deg,rgba(90,55,12,.8) 0%,#e8d888 18%,#f4ecc8 48%,#dece78 80%,#9a6020 100%)'
+            const capBg = isObs
+              ? 'radial-gradient(circle at 35% 35%,#ff7060,#8b2020)'
+              : 'radial-gradient(circle at 35% 35%,#d4a448,#7a4820)'
+            const capShadow = isObs ? '0 0 6px rgba(220,60,40,.55)' : '0 0 5px rgba(180,120,40,.4)'
             return (
               <React.Fragment key={item.id}>
-                {!isBonus && (
-                  <div style={{ position: 'absolute', left: inner.x, top: inner.y - 1.5, width: lineLen, height: 3, borderRadius: 2, background: isObs ? 'rgba(232,59,59,.4)' : 'rgba(61,255,110,.35)', transformOrigin: '0 50%', transform: `rotate(${lineAngle}deg)`, pointerEvents: 'none', zIndex: 2 }} />
-                )}
-                <div style={{ position: 'absolute', left: pos.x - 14, top: pos.y - 14, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isBonus ? '1.3rem' : '1.05rem', pointerEvents: 'none', filter: `drop-shadow(0 0 ${isBonus ? 9 : 5}px ${glowColor})`, zIndex: 3, animation: 'kh-stick .15s ease' }}>{item.emoji}</div>
+                <div style={{ position: 'absolute', left: inner.x, top: inner.y - 4, width: lineLen, height: 8, borderRadius: 3, background: bodyBg, transformOrigin: '0 50%', transform: `rotate(${lineAngle}deg)`, pointerEvents: 'none', zIndex: 2, animation: isObs ? 'none' : 'kh-stick .15s ease' }} />
+                <div style={{ position: 'absolute', left: pos.x - 5, top: pos.y - 5, width: 10, height: 10, borderRadius: '50%', background: capBg, boxShadow: capShadow, pointerEvents: 'none', zIndex: 3, animation: isObs ? 'none' : 'kh-stick .15s ease' }} />
               </React.Fragment>
             )
           })}
@@ -1312,15 +1334,21 @@ function GameView() {
 
           {/* Projectile — flying */}
           {displayProjFlying && (
-            <div style={{ position: 'absolute', left: displayCX - 7, top: displayProjY - 22, width: 14, height: 44, borderRadius: 7, background: 'linear-gradient(180deg,rgba(61,255,110,.98) 0%,rgba(40,200,80,.7) 60%,rgba(20,140,50,.4) 100%)', boxShadow: '0 0 14px rgba(61,255,110,.9), 0 -6px 18px rgba(61,255,110,.5)', pointerEvents: 'none', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 4 }}>
-              <span style={{ fontSize: '.75rem', lineHeight: 1 }}>🌿</span>
+            <div style={{ position: 'absolute', left: displayCX - 5, top: displayProjY - 42, width: 10, height: 56, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%,#fffde0,#ff9800 55%,#ff5500)', boxShadow: '0 0 8px #ff9800, 0 0 16px rgba(255,152,0,.55)', flexShrink: 0 }} />
+              <div style={{ width: 7, height: 5, background: 'linear-gradient(180deg,#aaa,#777)', borderRadius: '0 0 2px 2px', flexShrink: 0 }} />
+              <div style={{ width: 10, height: 30, background: 'linear-gradient(180deg,#f4eccc 0%,#e8d890 55%,#d8c870 100%)', borderRadius: 2, border: '1px solid rgba(180,150,60,.32)', flexShrink: 0 }} />
+              <div style={{ width: 10, height: 13, background: 'linear-gradient(180deg,#b89048,#7a4820)', borderRadius: '0 0 4px 4px', border: '1px solid rgba(80,40,10,.35)', flexShrink: 0 }} />
             </div>
           )}
 
           {/* Projectile — ready at bottom */}
           {!displayProjFlying && phase === 'playing' && (
-            <div style={{ position: 'absolute', left: displayCX - 7, top: displayProjY - 22, width: 14, height: 44, borderRadius: 7, background: 'linear-gradient(180deg,rgba(61,255,110,.75) 0%,rgba(40,200,80,.45) 60%,rgba(20,140,50,.25) 100%)', border: '1px solid rgba(61,255,110,.5)', boxShadow: '0 0 10px rgba(61,255,110,.45)', pointerEvents: 'none', zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 4, animation: 'kh-proj 1.4s ease infinite' }}>
-              <span style={{ fontSize: '.75rem', lineHeight: 1 }}>🌿</span>
+            <div style={{ position: 'absolute', left: displayCX - 5, top: displayProjY - 42, width: 10, height: 56, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'kh-proj 1.4s ease infinite' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%,rgba(255,250,180,.7),rgba(200,120,20,.5))', boxShadow: '0 0 5px rgba(200,130,0,.42)', flexShrink: 0 }} />
+              <div style={{ width: 7, height: 5, background: 'linear-gradient(180deg,#999,#666)', borderRadius: '0 0 2px 2px', flexShrink: 0, opacity: .72 }} />
+              <div style={{ width: 10, height: 30, background: 'linear-gradient(180deg,rgba(244,236,204,.84),rgba(232,216,144,.7),rgba(216,200,112,.55))', borderRadius: 2, border: '1px solid rgba(180,150,60,.25)', flexShrink: 0 }} />
+              <div style={{ width: 10, height: 13, background: 'linear-gradient(180deg,rgba(184,144,72,.78),rgba(122,72,32,.68))', borderRadius: '0 0 4px 4px', border: '1px solid rgba(80,40,10,.25)', flexShrink: 0 }} />
             </div>
           )}
 
