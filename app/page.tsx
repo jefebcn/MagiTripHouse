@@ -820,6 +820,7 @@ function GameView() {
   const [result, setResult] = React.useState<{ score: number; rank: number | null; bestScore: number } | null>(null)
   const [leaderboard, setLeaderboard] = React.useState<LeaderEntry[]>([])
   const [playsToday, setPlaysToday] = React.useState(0)
+  const [showInfo, setShowInfo] = React.useState(false)
 
   const wheelAngleRef = React.useRef(0)
   const projYRef = React.useRef(400)
@@ -1025,105 +1026,188 @@ function GameView() {
         @keyframes kh-star{0%,100%{opacity:.12}50%{opacity:.45}}
         @keyframes kh-proj{0%,100%{transform:scaleY(1) scaleX(1)}50%{transform:scaleY(.9) scaleX(1.1)}}
         @keyframes kh-stick{0%{opacity:0;transform:scale(.5)}100%{opacity:1;transform:scale(1)}}
+        @keyframes kh-preview-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
       `}</style>
 
-      {/* ── Header ── */}
-      <div style={{ padding: '10px 16px 8px', background: 'var(--bg2)', borderBottom: '1px solid rgba(61,255,110,.15)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>🎯 Bud Strike</div>
-          <div style={{ fontSize: '.58rem', color: 'rgba(61,255,110,.7)', background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 20, padding: '2px 8px', letterSpacing: 1 }}>v3</div>
+      {/* ── Header (hidden on idle — title is part of the start screen) ── */}
+      {phase !== 'idle' && (
+        <div style={{ padding: '10px 16px 8px', background: 'var(--bg2)', borderBottom: '1px solid rgba(61,255,110,.15)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>🎯 Bud Strike</div>
+            <div style={{ fontSize: '.58rem', color: 'rgba(61,255,110,.7)', background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 20, padding: '2px 8px', letterSpacing: 1 }}>v3</div>
+          </div>
+          <div style={{ fontSize: '.67rem', color: 'var(--muted)', marginTop: 2 }}>Tocca per lanciare · colpisci il bersaglio · schiva i nodi</div>
         </div>
-        <div style={{ fontSize: '.67rem', color: 'var(--muted)', marginTop: 2 }}>Tocca per lanciare · colpisci il bersaglio · schiva i nodi</div>
-      </div>
+      )}
 
       {/* ── IDLE ── */}
       {phase === 'idle' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+          {/* BG glow + stars */}
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 28%,rgba(61,255,110,.12) 0%,transparent 62%)', pointerEvents: 'none' }} />
+          {BG_STARS_G.slice(0, 14).map(s => (
+            <div key={s.id} style={{ position: 'absolute', left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, borderRadius: '50%', background: 'rgba(61,255,110,.3)', pointerEvents: 'none', animation: `kh-star ${s.dur}s ${s.delay}s infinite ease-in-out` }} />
+          ))}
 
-          <div style={{ background: 'var(--card)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 'var(--radius)', padding: '16px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', marginBottom: 12, color: 'var(--green)' }}>🎯 Come si gioca</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-              {[
-                { icon: '👆', title: 'Tocca', desc: 'per lanciare il bud verso il bersaglio rotante' },
-                { icon: '🌿', title: 'Atterra', desc: 'il bud si conficca dove atterrano' },
-                { icon: '💥', title: 'Schiva', desc: 'non colpire i nodi già piantati!' },
-              ].map(s => (
-                <div key={s.icon} style={{ padding: '10px 6px', background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.1)', borderRadius: 12, textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', marginBottom: 5 }}>{s.icon}</div>
-                  <div style={{ fontSize: '.68rem', color: 'var(--text)', fontWeight: 700 }}>{s.title}</div>
-                  <div style={{ fontSize: '.58rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>{s.desc}</div>
+          {!showInfo ? (
+            /* ── MAIN START SCREEN ── */
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', padding: '20px 20px 18px', position: 'relative', zIndex: 1 }}>
+
+              {/* Title */}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '3.2rem', lineHeight: 1, color: 'var(--green)', textShadow: '0 0 40px rgba(61,255,110,.65), 0 3px 0 rgba(0,50,0,.9)' }}>BUD</div>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '3.2rem', lineHeight: 1, color: 'var(--gold)', textShadow: '0 0 40px rgba(245,200,66,.65), 0 3px 0 rgba(50,30,0,.9)', marginTop: -6 }}>STRIKE</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10 }}>
+                  <div style={{ height: 1, width: 28, background: 'rgba(61,255,110,.3)' }} />
+                  <div style={{ fontSize: '.58rem', color: 'rgba(61,255,110,.55)', letterSpacing: 2.5, textTransform: 'uppercase' }}>Precision Game</div>
+                  <div style={{ height: 1, width: 28, background: 'rgba(61,255,110,.3)' }} />
                 </div>
-              ))}
-            </div>
-            <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
-              Il bersaglio ruota sempre più veloce · cambia direzione ogni livello.<br />
-              Lancia <strong style={{ color: 'var(--text)' }}>tutti i bud</strong> senza collisioni per avanzare al prossimo livello!
-            </div>
-          </div>
+              </div>
 
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', marginBottom: 10, color: 'var(--text)' }}>💎 Oggetti speciali sul bersaglio</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {[
-                { emoji: '💎', name: 'Crystal', pts: '+15 pt', glow: 'rgba(100,180,255,.9)', desc: 'Colpisci con il bud per punti extra' },
-                { emoji: '⭐', name: 'Stella Oro', pts: '+20 pt', glow: 'rgba(255,215,0,.95)', desc: 'Rarissima — punta bene!' },
-                { emoji: '🍯', name: 'Hash', pts: '+10 pt', glow: 'rgba(245,200,66,.7)', desc: 'Bonus solido ogni livello' },
-              ].map(item => (
-                <div key={item.emoji} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'rgba(61,255,110,.03)', border: '1px solid rgba(61,255,110,.08)', borderRadius: 10 }}>
-                  <span style={{ fontSize: '1.4rem', filter: `drop-shadow(0 0 6px ${item.glow})` }}>{item.emoji}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--text)' }}>{item.name}</div>
-                    <div style={{ fontSize: '.63rem', color: 'var(--muted)' }}>{item.desc}</div>
+              {/* Wheel preview */}
+              <div style={{ position: 'relative', width: 210, height: 272 }}>
+                {/* Rotating group: wheel disc + stuck buds */}
+                <div style={{ position: 'absolute', left: 5, top: 0, width: 200, height: 200, animation: 'kh-preview-spin 5s linear infinite', transformOrigin: '50% 50%' }}>
+                  <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'conic-gradient(#0d150d 0deg,#111911 45deg,#0a120a 90deg,#111911 135deg,#0d150d 180deg,#111911 225deg,#0a120a 270deg,#111911 315deg,#0d150d 360deg)', border: '3px solid rgba(61,255,110,.48)', boxShadow: '0 0 52px rgba(61,255,110,.22)', position: 'relative' }}>
+                    <div style={{ position: 'absolute', inset: 17, borderRadius: '50%', border: '1px solid rgba(61,255,110,.11)' }} />
+                    <div style={{ position: 'absolute', inset: 35, borderRadius: '50%', border: '1px solid rgba(61,255,110,.07)' }} />
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 13, height: 13, borderRadius: '50%', background: 'rgba(61,255,110,.7)', boxShadow: '0 0 12px rgba(61,255,110,.6)' }} />
                   </div>
-                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--gold)' }}>{item.pts}</div>
+                  {/* Stuck buds rotating with wheel */}
+                  {([45, 138, 222, 312] as number[]).map(angle => {
+                    const r = 76
+                    return (
+                      <div key={angle} style={{ position: 'absolute', left: 100 + r * Math.sin(angle * Math.PI / 180) - 11, top: 100 - r * Math.cos(angle * Math.PI / 180) - 11, fontSize: '1.15rem', lineHeight: 1, filter: 'drop-shadow(0 0 5px rgba(61,255,110,.75))' }}>🌿</div>
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ background: 'rgba(245,200,66,.04)', border: '1px solid rgba(245,200,66,.14)', borderRadius: 'var(--radius)', padding: '14px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', color: 'var(--gold)', marginBottom: 10 }}>⚡ Progressione livelli</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {[1,2,3,4,5].map(lv => (
-                <div key={lv} style={{ flex: 1, textAlign: 'center', padding: '8px 4px', background: 'rgba(0,0,0,.2)', border: '1px solid rgba(245,200,66,.12)', borderRadius: 10 }}>
-                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', color: lv === 1 ? '#3dff6e' : lv <= 3 ? '#f5c842' : '#ff6b35', lineHeight: 1 }}>Lv{lv}</div>
-                  <div style={{ fontSize: '.57rem', color: 'var(--muted)', marginTop: 3 }}>{gKnifeTarget(lv)} bud</div>
-                  <div style={{ fontSize: '.53rem', color: 'rgba(106,138,106,.55)', marginTop: 2 }}>{Math.abs(gSpinSpeed(lv))}°/s</div>
-                  <div style={{ fontSize: '.52rem', color: 'rgba(106,138,106,.4)', marginTop: 1 }}>{gSpinSpeed(lv) > 0 ? '↻' : '↺'}</div>
+                {/* Dashed trajectory line */}
+                <div style={{ position: 'absolute', left: 104, top: 205, width: 2, height: 40, background: 'repeating-linear-gradient(to bottom,rgba(61,255,110,.28) 0px,rgba(61,255,110,.28) 4px,transparent 4px,transparent 9px)' }} />
+                {/* Projectile ready */}
+                <div style={{ position: 'absolute', left: 98, top: 222, width: 14, height: 44, borderRadius: 7, background: 'linear-gradient(180deg,rgba(61,255,110,.98) 0%,rgba(40,200,80,.65) 65%,rgba(20,130,45,.3) 100%)', boxShadow: '0 0 18px rgba(61,255,110,.75), 0 -4px 12px rgba(61,255,110,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 4, animation: 'kh-proj 1.5s ease infinite' }}>
+                  <span style={{ fontSize: '.75rem', lineHeight: 1 }}>🌿</span>
                 </div>
-              ))}
-            </div>
-            <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.6)', textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>
-              Bonus livello: +15 × livello · ostacoli pre-piantati aumentano ogni livello
-            </div>
-          </div>
+              </div>
 
-          <div style={{ background: 'rgba(61,255,110,.03)', border: '1px solid rgba(61,255,110,.08)', borderRadius: 'var(--radius)', padding: '12px 14px' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem', color: 'var(--text)', marginBottom: 8 }}>💡 Strategia</div>
-            {[
-              '🎯 Aspetta il momento giusto — il timing batte la velocità',
-              '🌿 Osserva gli spazi liberi tra i nodi già piantati',
-              '💎 I bonus ruotano col bersaglio — prevedine la posizione',
-              '⚡ Dal livello 2 la rotazione si inverte: adattati!',
-            ].map((tip, i) => (
-              <div key={i} style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.55, padding: '4px 0', borderBottom: i < 3 ? '1px solid rgba(61,255,110,.05)' : 'none' }}>{tip}</div>
-            ))}
-          </div>
+              {/* Stats row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginBottom: 2 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '.56rem', color: 'var(--muted)', letterSpacing: 1.8, textTransform: 'uppercase', marginBottom: 3 }}>Record</div>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', color: 'var(--gold)', textShadow: '0 0 14px rgba(245,200,66,.4)', lineHeight: 1 }}>
+                    {leaderboard.length > 0 ? leaderboard[0].score : '—'}
+                  </div>
+                  {leaderboard.length > 0 && <div style={{ fontSize: '.55rem', color: 'var(--muted)', marginTop: 2 }}>@{leaderboard[0].handle}</div>}
+                </div>
+                <div style={{ width: 1, height: 40, background: 'rgba(61,255,110,.2)' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '.56rem', color: 'var(--muted)', letterSpacing: 1.8, textTransform: 'uppercase', marginBottom: 3 }}>Partite</div>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', lineHeight: 1, color: canPlay ? 'var(--green)' : '#e83b3b' }}>
+                    {playsToday}<span style={{ fontSize: '.95rem', color: 'var(--muted)' }}>/{MAX_PLAYS}</span>
+                  </div>
+                  <div style={{ fontSize: '.55rem', color: 'var(--muted)', marginTop: 2 }}>oggi</div>
+                </div>
+                <div style={{ width: 1, height: 40, background: 'rgba(61,255,110,.2)' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '.56rem', color: 'var(--muted)', letterSpacing: 1.8, textTransform: 'uppercase', marginBottom: 3 }}>Stage</div>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', color: 'var(--text)', lineHeight: 1 }}>1</div>
+                  <div style={{ fontSize: '.55rem', color: 'var(--muted)', marginTop: 2 }}>↻ 62°/s</div>
+                </div>
+              </div>
 
-          <div style={{ textAlign: 'center', padding: '4px 0' }}>
-            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 12 }}>
-              Partite oggi: <strong style={{ color: canPlay ? 'var(--green)' : '#e83b3b' }}>{playsToday}/{MAX_PLAYS}</strong>
+              {/* Play button + secondary buttons */}
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button
+                  onClick={() => canPlay && startCountdown()}
+                  disabled={!canPlay}
+                  style={{ width: '100%', padding: '18px', background: canPlay ? 'linear-gradient(180deg,rgba(61,255,110,.35) 0%,rgba(30,150,55,.25) 100%)' : 'rgba(106,138,106,.07)', border: `2px solid ${canPlay ? 'rgba(61,255,110,.7)' : 'rgba(106,138,106,.2)'}`, borderRadius: 16, fontFamily: "'Fredoka One', cursive", fontSize: '1.55rem', color: canPlay ? 'var(--green)' : 'var(--muted)', cursor: canPlay ? 'pointer' : 'default', boxShadow: canPlay ? '0 4px 0 rgba(0,70,20,.6), 0 0 48px rgba(61,255,110,.28)' : 'none', animation: canPlay ? 'kh-pulse 2.5s ease infinite' : 'none', letterSpacing: 2, textShadow: canPlay ? '0 0 20px rgba(61,255,110,.6)' : 'none' }}
+                >
+                  {canPlay ? 'GIOCA  ›' : '⏰  TORNA DOMANI'}
+                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setShowInfo(true)} style={{ flex: 1, padding: '10px', background: 'rgba(61,255,110,.06)', border: '1px solid rgba(61,255,110,.18)', borderRadius: 12, color: 'var(--muted)', fontFamily: 'inherit', fontSize: '.78rem', cursor: 'pointer' }}>
+                    ℹ Istruzioni
+                  </button>
+                  <button onClick={() => setShowInfo(true)} style={{ flex: 1, padding: '10px', background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.18)', borderRadius: 12, color: 'var(--muted)', fontFamily: 'inherit', fontSize: '.78rem', cursor: 'pointer' }}>
+                    🏆 Classifica
+                  </button>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={() => canPlay && startCountdown()}
-              disabled={!canPlay}
-              style={{ background: canPlay ? 'linear-gradient(135deg,rgba(61,255,110,.24),rgba(61,255,110,.1))' : 'rgba(106,138,106,.06)', border: `1.5px solid ${canPlay ? 'rgba(61,255,110,.55)' : 'rgba(106,138,106,.15)'}`, borderRadius: 18, padding: '15px 50px', fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: canPlay ? 'var(--green)' : 'var(--muted)', cursor: canPlay ? 'pointer' : 'default', boxShadow: canPlay ? '0 0 36px rgba(61,255,110,.22)' : 'none', animation: canPlay ? 'kh-pulse 2.5s ease infinite' : 'none', transition: 'all .2s' }}
-            >
-              {canPlay ? '🎯 Inizia Partita' : '⏰ Torna Domani'}
-            </button>
-          </div>
+          ) : (
+            /* ── INFO + LEADERBOARD PANEL ── */
+            <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1 }}>
+              <div style={{ padding: '12px 14px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button onClick={() => setShowInfo(false)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--muted)', fontSize: '.85rem', cursor: 'pointer', padding: '2px 0', fontFamily: 'inherit', alignSelf: 'flex-start' }}>
+                  ‹ Indietro
+                </button>
 
-          <GameLeaderboard entries={leaderboard} />
+                <div style={{ background: 'var(--card)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 'var(--radius)', padding: '14px' }}>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: 'var(--green)', marginBottom: 10 }}>🎯 Come si gioca</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+                    {[
+                      { icon: '👆', t: 'Tocca', d: 'per lanciare il bud verso il bersaglio' },
+                      { icon: '🌿', t: 'Atterra', d: 'il bud si conficca nel bersaglio' },
+                      { icon: '💥', t: 'Schiva', d: 'non colpire i nodi già piantati!' },
+                    ].map(s => (
+                      <div key={s.icon} style={{ padding: '8px 4px', background: 'rgba(61,255,110,.04)', border: '1px solid rgba(61,255,110,.09)', borderRadius: 10, textAlign: 'center' }}>
+                        <div style={{ fontSize: '1.4rem', marginBottom: 4 }}>{s.icon}</div>
+                        <div style={{ fontSize: '.66rem', fontWeight: 700, color: 'var(--text)' }}>{s.t}</div>
+                        <div style={{ fontSize: '.57rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>{s.d}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+                    Il bersaglio ruota più veloce ogni livello · cambia direzione alternando.<br />
+                    Lancia <strong style={{ color: 'var(--text)' }}>tutti i bud</strong> senza collisioni per avanzare!
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px' }}>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', color: 'var(--text)', marginBottom: 10 }}>💎 Bonus sul bersaglio</div>
+                  {[
+                    { emoji: '💎', name: 'Crystal', pts: '+15 pt', desc: 'Colpisci col bud per punti extra' },
+                    { emoji: '⭐', name: 'Stella Oro', pts: '+20 pt', desc: 'Rarissima — punta bene!' },
+                    { emoji: '🍯', name: 'Hash', pts: '+10 pt', desc: 'Bonus solido ogni livello' },
+                  ].map((item, i) => (
+                    <div key={item.emoji} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < 2 ? '1px solid rgba(61,255,110,.06)' : 'none' }}>
+                      <span style={{ fontSize: '1.3rem' }}>{item.emoji}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '.73rem', fontWeight: 700, color: 'var(--text)' }}>{item.name}</div>
+                        <div style={{ fontSize: '.62rem', color: 'var(--muted)' }}>{item.desc}</div>
+                      </div>
+                      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.82rem', color: 'var(--gold)' }}>{item.pts}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ background: 'rgba(245,200,66,.04)', border: '1px solid rgba(245,200,66,.14)', borderRadius: 'var(--radius)', padding: '12px 14px' }}>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem', color: 'var(--gold)', marginBottom: 8 }}>⚡ Livelli</div>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {[1,2,3,4,5].map(lv => (
+                      <div key={lv} style={{ flex: 1, textAlign: 'center', padding: '7px 3px', background: 'rgba(0,0,0,.2)', borderRadius: 9 }}>
+                        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: lv <= 1 ? '#3dff6e' : lv <= 3 ? '#f5c842' : '#ff6b35' }}>Lv{lv}</div>
+                        <div style={{ fontSize: '.55rem', color: 'var(--muted)', marginTop: 2 }}>{gKnifeTarget(lv)} bud</div>
+                        <div style={{ fontSize: '.52rem', color: 'rgba(106,138,106,.5)', marginTop: 1 }}>{gSpinSpeed(lv) > 0 ? '↻' : '↺'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ background: 'rgba(61,255,110,.03)', border: '1px solid rgba(61,255,110,.08)', borderRadius: 'var(--radius)', padding: '10px 12px' }}>
+                  {[
+                    '🎯 Aspetta il momento giusto — il timing batte la velocità',
+                    '🌿 Osserva gli spazi liberi prima di lanciare',
+                    '💎 I bonus ruotano col bersaglio — prevedine la posizione',
+                    '⚡ Dal livello 2 la rotazione si inverte!',
+                  ].map((tip, i) => (
+                    <div key={i} style={{ fontSize: '.69rem', color: 'var(--muted)', lineHeight: 1.55, padding: '4px 0', borderBottom: i < 3 ? '1px solid rgba(61,255,110,.05)' : 'none' }}>{tip}</div>
+                  ))}
+                </div>
+
+                <GameLeaderboard entries={leaderboard} />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
