@@ -356,6 +356,20 @@ function gBonusDef(level: number): { relAngle: number; emoji: string; pts: numbe
   if (cycle === 1) return { relAngle: 270, emoji: '⭐', pts: 20 }
   return              { relAngle: 150, emoji: '🍯', pts: 10 }
 }
+// ─── Wheel themes ───
+interface WheelTheme { stops: string; border: string; glow: string; rings: string; peg: string; isBoss?: boolean }
+const WHEEL_THEMES: WheelTheme[] = [
+  { stops: '#6b3510 0deg,#a05a1a 30deg,#c47828 60deg,#8b4513 90deg,#5c2e06 120deg,#8b4513 150deg,#c47828 180deg,#a05a1a 210deg,#6b3510 240deg,#8b4513 270deg,#c47828 300deg,#8b4513 330deg,#6b3510 360deg', border: 'rgba(210,145,60,.7)', glow: '0 0 48px rgba(180,100,20,.38)', rings: 'rgba(220,155,65,.3)', peg: 'radial-gradient(circle at 35% 35%,#f8e060,#d4a020)' },
+  { stops: '#4a0a08 0deg,#8b1a14 36deg,#c02820 72deg,#8b1a14 108deg,#4a0a08 144deg,#8b1a14 180deg,#c02820 216deg,#8b1a14 252deg,#4a0a08 288deg,#8b1a14 324deg,#4a0a08 360deg', border: 'rgba(200,60,40,.65)', glow: '0 0 48px rgba(180,40,20,.38)', rings: 'rgba(200,80,60,.3)', peg: 'radial-gradient(circle at 35% 35%,#ff9070,#c03020)' },
+  { stops: '#1a2535 0deg,#2e4060 36deg,#3a5278 72deg,#2e4060 108deg,#1a2535 144deg,#2e4060 180deg,#3a5278 216deg,#2e4060 252deg,#1a2535 288deg,#2e4060 324deg,#1a2535 360deg', border: 'rgba(80,140,200,.6)', glow: '0 0 48px rgba(40,100,180,.35)', rings: 'rgba(100,160,220,.28)', peg: 'radial-gradient(circle at 35% 35%,#90c8f8,#2060c0)' },
+  { stops: '#5a4200 0deg,#8b6800 36deg,#c09010 72deg,#8b6800 108deg,#5a4200 144deg,#8b6800 180deg,#c09010 216deg,#8b6800 252deg,#5a4200 288deg,#8b6800 324deg,#5a4200 360deg', border: 'rgba(220,180,40,.65)', glow: '0 0 48px rgba(200,160,20,.38)', rings: 'rgba(230,190,60,.3)', peg: 'radial-gradient(circle at 35% 35%,#fff080,#e0b000)' },
+]
+const BOSS_THEME: WheelTheme = { stops: '#0a0a0a 0deg,#1a1a2a 30deg,#0d0d1a 60deg,#1a1a2a 90deg,#0a0a0a 120deg,#200020 150deg,#1a1a2a 180deg,#0a0a0a 210deg,#1a1a2a 240deg,#200020 270deg,#0a0a0a 300deg,#1a1a2a 330deg,#0a0a0a 360deg', border: 'rgba(180,0,255,.7)', glow: '0 0 64px rgba(160,0,240,.48), 0 0 24px rgba(255,100,0,.2)', rings: 'rgba(180,0,255,.32)', peg: 'radial-gradient(circle at 35% 35%,#ff80ff,#8000c0)', isBoss: true }
+function gWheelTheme(level: number): WheelTheme { return level % 5 === 0 ? BOSS_THEME : WHEEL_THEMES[(level - 1) % 4] }
+function isBossLevel(level: number) { return level % 5 === 0 }
+function gBossTarget(level: number) { return Math.min(gKnifeTarget(level) + 6, 18) }
+function gBossObstacles(): number[] { return [0, 45, 90, 135, 180, 225, 270, 315] }
+
 function gToRad(deg: number) { return deg * Math.PI / 180 }
 function gPolarXY(cx: number, cy: number, angleDeg: number, r: number) {
   // 0°=top, 90°=right, 180°=bottom, 270°=left
@@ -872,15 +886,18 @@ function GameView() {
     setDisplayProjY(startY); setDisplayProjFlying(false)
 
     const items: StuckItem[] = []
-    gObstacleAngles(level).forEach(a => {
+    const obstAngles = isBossLevel(level) ? gBossObstacles() : gObstacleAngles(level)
+    obstAngles.forEach(a => {
       items.push({ id: nextIdRef.current++, relAngle: a, emoji: '🌿', isObstacle: true, isBonus: false, pts: 0 })
     })
     const bd = gBonusDef(level)
-    items.push({ id: nextIdRef.current++, relAngle: bd.relAngle, emoji: bd.emoji, isObstacle: false, isBonus: true, pts: bd.pts })
+    const bonusPts = isBossLevel(level) ? bd.pts * 2 : bd.pts
+    items.push({ id: nextIdRef.current++, relAngle: bd.relAngle, emoji: bd.emoji, isObstacle: false, isBonus: true, pts: bonusPts })
     stuckRef.current = items; setDisplayStuck([...items])
 
-    doneRef.current = 0; targetRef.current = gKnifeTarget(level)
-    setDisplayDone(0); setDisplayTarget(gKnifeTarget(level))
+    const lvTarget = isBossLevel(level) ? gBossTarget(level) : gKnifeTarget(level)
+    doneRef.current = 0; targetRef.current = lvTarget
+    setDisplayDone(0); setDisplayTarget(lvTarget)
     setDisplayLevel(level); levelRef.current = level
     setDisplaySpinDir(gSpinSpeed(level) > 0 ? '↻' : '↺')
     return true
@@ -967,7 +984,7 @@ function GameView() {
             setDisplayStuck([...stuckRef.current])
             const nextLv = levelRef.current + 1
             phaseRef.current = 'levelclear'; setPhase('levelclear')
-            setLevelClearMsg(`Livello ${levelRef.current} superato! +${bonus} bonus`)
+            setLevelClearMsg(isBossLevel(levelRef.current) ? `BOSS SCONFITTO! 💀! +${bonus} bonus` : `Livello ${levelRef.current} superato! +${bonus} bonus`)
             setTimeout(() => {
               if (phaseRef.current !== 'levelclear') return
               levelRef.current = nextLv; phaseRef.current = 'playing'; setPhase('playing')
@@ -1241,7 +1258,9 @@ function GameView() {
             flex: 1, position: 'relative', overflow: 'hidden',
             userSelect: 'none', touchAction: 'none', cursor: 'pointer', minHeight: 380,
             animation: hitFlash ? 'kh-flash .4s ease' : 'none',
-            background: 'radial-gradient(ellipse at 50% 38%,rgba(61,255,110,.08) 0%,transparent 60%),radial-gradient(ellipse at 20% 80%,rgba(61,40,180,.05) 0%,transparent 40%)',
+            background: isBossLevel(displayLevel)
+              ? 'radial-gradient(ellipse at 50% 38%,rgba(160,0,240,.13) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(255,50,0,.07) 0%,transparent 40%)'
+              : 'radial-gradient(ellipse at 50% 38%,rgba(61,255,110,.08) 0%,transparent 60%),radial-gradient(ellipse at 20% 80%,rgba(61,40,180,.05) 0%,transparent 40%)',
           }}
         >
           {/* Background stars */}
@@ -1271,31 +1290,44 @@ function GameView() {
             </div>
           </div>
 
+          {/* Boss banner */}
+          {isBossLevel(displayLevel) && (
+            <div style={{ position: 'absolute', top: 52, left: 0, right: 0, textAlign: 'center', fontFamily: "'Fredoka One',cursive", fontSize: '.72rem', color: '#cc44ff', textShadow: '0 0 10px rgba(180,0,255,.65)', letterSpacing: 2, pointerEvents: 'none', zIndex: 10, paddingBottom: 2 }}>⚡ BOSS LEVEL ⚡</div>
+          )}
+
           {/* Ammo dots below HUD */}
-          <div style={{ position: 'absolute', top: 52, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 5, pointerEvents: 'none', zIndex: 9 }}>
+          <div style={{ position: 'absolute', top: isBossLevel(displayLevel) ? 68 : 52, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 5, pointerEvents: 'none', zIndex: 9 }}>
             {Array.from({ length: displayTarget }, (_, i) => (
               <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: i < displayDone ? 'rgba(61,255,110,.9)' : 'rgba(61,255,110,.18)', border: '1px solid rgba(61,255,110,.4)', transition: 'background .2s' }} />
             ))}
           </div>
 
-          {/* Wheel visual */}
-          <div style={{
-            position: 'absolute',
-            left: displayCX - WHEEL_R,
-            top: displayCY - WHEEL_R,
-            width: WHEEL_R * 2,
-            height: WHEEL_R * 2,
-            borderRadius: '50%',
-            background: `conic-gradient(from ${displayWheelAngle}deg, #5c2e06 0deg, #8b4513 36deg, #a05a1a 72deg, #7a3c0e 108deg, #5c2e06 144deg, #7a3c0e 180deg, #8b4513 216deg, #a05a1a 252deg, #7a3c0e 288deg, #5c2e06 324deg, #8b4513 360deg)`,
-            border: '3px solid rgba(195,130,50,.6)',
-            boxShadow: '0 0 40px rgba(160,90,20,.28), inset 0 0 36px rgba(0,0,0,.65)',
-            pointerEvents: 'none',
-          }}>
-            <div style={{ position: 'absolute', inset: 14, borderRadius: '50%', border: '2px solid rgba(195,130,50,.22)' }} />
-            <div style={{ position: 'absolute', inset: 30, borderRadius: '50%', border: '1px solid rgba(195,130,50,.15)' }} />
-            <div style={{ position: 'absolute', inset: 48, borderRadius: '50%', border: '1px solid rgba(195,130,50,.1)' }} />
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 16, height: 16, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%,#f5d878,#c49020)', boxShadow: '0 0 10px rgba(200,160,30,.65), inset 0 0 4px rgba(0,0,0,.3)' }} />
-          </div>
+          {/* Wheel visual — theme per level */}
+          {(() => {
+            const wt = gWheelTheme(displayLevel)
+            return (
+              <div style={{
+                position: 'absolute',
+                left: displayCX - WHEEL_R,
+                top: displayCY - WHEEL_R,
+                width: WHEEL_R * 2,
+                height: WHEEL_R * 2,
+                borderRadius: '50%',
+                background: `conic-gradient(from ${displayWheelAngle}deg, ${wt.stops})`,
+                border: `3px solid ${wt.border}`,
+                boxShadow: `${wt.glow}, inset 0 0 40px rgba(0,0,0,.6)`,
+                pointerEvents: 'none',
+              }}>
+                {/* Metallic sheen overlay */}
+                <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'radial-gradient(circle at 38% 32%, rgba(255,255,255,.13) 0%, transparent 54%)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', inset: 12, borderRadius: '50%', border: `2px solid ${wt.rings}` }} />
+                <div style={{ position: 'absolute', inset: 28, borderRadius: '50%', border: `1px solid ${wt.rings.replace('.3)', '.18)')}` }} />
+                <div style={{ position: 'absolute', inset: 46, borderRadius: '50%', border: `1px solid ${wt.rings.replace('.3)', '.1)')}` }} />
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 18, height: 18, borderRadius: '50%', background: wt.peg, boxShadow: `0 0 12px ${wt.border}, inset 0 0 5px rgba(0,0,0,.4)` }} />
+                {wt.isBoss && <div style={{ position: 'absolute', inset: -7, borderRadius: '50%', border: '2px solid rgba(180,0,255,.38)', animation: 'kh-pulse 1.2s ease infinite', pointerEvents: 'none' }} />}
+              </div>
+            )
+          })()}
 
           {/* Stuck items & their stick lines */}
           {displayStuck.map(item => {
@@ -1321,8 +1353,8 @@ function GameView() {
             const capShadow = isObs ? '0 0 6px rgba(220,60,40,.55)' : '0 0 5px rgba(180,120,40,.4)'
             return (
               <React.Fragment key={item.id}>
-                <div style={{ position: 'absolute', left: inner.x, top: inner.y - 4, width: lineLen, height: 8, borderRadius: 3, background: bodyBg, transformOrigin: '0 50%', transform: `rotate(${lineAngle}deg)`, pointerEvents: 'none', zIndex: 2, animation: isObs ? 'none' : 'kh-stick .15s ease' }} />
-                <div style={{ position: 'absolute', left: pos.x - 5, top: pos.y - 5, width: 10, height: 10, borderRadius: '50%', background: capBg, boxShadow: capShadow, pointerEvents: 'none', zIndex: 3, animation: isObs ? 'none' : 'kh-stick .15s ease' }} />
+                <div style={{ position: 'absolute', left: inner.x, top: inner.y - 5.5, width: lineLen, height: 11, borderRadius: 4, background: bodyBg, transformOrigin: '0 50%', transform: `rotate(${lineAngle}deg)`, pointerEvents: 'none', zIndex: 2, boxShadow: '0 2px 5px rgba(0,0,0,.45)', animation: isObs ? 'none' : 'kh-stick .15s ease' }} />
+                <div style={{ position: 'absolute', left: pos.x - 6.5, top: pos.y - 6.5, width: 13, height: 13, borderRadius: '50%', background: capBg, boxShadow: isObs ? '0 0 8px rgba(220,60,40,.6)' : '0 0 7px rgba(180,120,40,.55)', pointerEvents: 'none', zIndex: 3, animation: isObs ? 'none' : 'kh-stick .15s ease' }} />
               </React.Fragment>
             )
           })}
@@ -1334,21 +1366,21 @@ function GameView() {
 
           {/* Projectile — flying */}
           {displayProjFlying && (
-            <div style={{ position: 'absolute', left: displayCX - 5, top: displayProjY - 42, width: 10, height: 56, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%,#fffde0,#ff9800 55%,#ff5500)', boxShadow: '0 0 8px #ff9800, 0 0 16px rgba(255,152,0,.55)', flexShrink: 0 }} />
-              <div style={{ width: 7, height: 5, background: 'linear-gradient(180deg,#aaa,#777)', borderRadius: '0 0 2px 2px', flexShrink: 0 }} />
-              <div style={{ width: 10, height: 30, background: 'linear-gradient(180deg,#f4eccc 0%,#e8d890 55%,#d8c870 100%)', borderRadius: 2, border: '1px solid rgba(180,150,60,.32)', flexShrink: 0 }} />
-              <div style={{ width: 10, height: 13, background: 'linear-gradient(180deg,#b89048,#7a4820)', borderRadius: '0 0 4px 4px', border: '1px solid rgba(80,40,10,.35)', flexShrink: 0 }} />
+            <div style={{ position: 'absolute', left: displayCX - 6.5, top: displayProjY - 44, width: 13, height: 60, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%,#fffde0,#ff9800 55%,#ff5500)', boxShadow: '0 0 9px #ff9800, 0 0 18px rgba(255,152,0,.6)', flexShrink: 0 }} />
+              <div style={{ width: 8, height: 5, background: 'linear-gradient(180deg,#bbb,#777)', borderRadius: '0 0 2px 2px', flexShrink: 0 }} />
+              <div style={{ width: 13, height: 32, background: 'linear-gradient(180deg,#f8f0d0 0%,#ede0a0 50%,#d8c878 100%)', backgroundImage: 'linear-gradient(180deg,#f8f0d0 0%,#ede0a0 50%,#d8c878 100%), repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(160,130,50,.14) 3px,rgba(160,130,50,.14) 4px)', borderRadius: 3, border: '1px solid rgba(180,150,60,.35)', boxShadow: 'inset 2px 0 4px rgba(255,240,180,.4)', flexShrink: 0 }} />
+              <div style={{ width: 13, height: 14, background: 'linear-gradient(180deg,#c89848,#7a4820)', backgroundImage: 'linear-gradient(90deg,rgba(255,200,100,.2) 0%,transparent 45%,rgba(0,0,0,.12) 100%)', borderRadius: '0 0 5px 5px', border: '1px solid rgba(80,40,10,.4)', flexShrink: 0 }} />
             </div>
           )}
 
           {/* Projectile — ready at bottom */}
           {!displayProjFlying && phase === 'playing' && (
-            <div style={{ position: 'absolute', left: displayCX - 5, top: displayProjY - 42, width: 10, height: 56, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'kh-proj 1.4s ease infinite' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%,rgba(255,250,180,.7),rgba(200,120,20,.5))', boxShadow: '0 0 5px rgba(200,130,0,.42)', flexShrink: 0 }} />
-              <div style={{ width: 7, height: 5, background: 'linear-gradient(180deg,#999,#666)', borderRadius: '0 0 2px 2px', flexShrink: 0, opacity: .72 }} />
-              <div style={{ width: 10, height: 30, background: 'linear-gradient(180deg,rgba(244,236,204,.84),rgba(232,216,144,.7),rgba(216,200,112,.55))', borderRadius: 2, border: '1px solid rgba(180,150,60,.25)', flexShrink: 0 }} />
-              <div style={{ width: 10, height: 13, background: 'linear-gradient(180deg,rgba(184,144,72,.78),rgba(122,72,32,.68))', borderRadius: '0 0 4px 4px', border: '1px solid rgba(80,40,10,.25)', flexShrink: 0 }} />
+            <div style={{ position: 'absolute', left: displayCX - 6.5, top: displayProjY - 44, width: 13, height: 60, pointerEvents: 'none', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'kh-proj 1.4s ease infinite' }}>
+              <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%,rgba(255,250,180,.72),rgba(200,120,20,.52))', boxShadow: '0 0 6px rgba(200,130,0,.44)', flexShrink: 0 }} />
+              <div style={{ width: 8, height: 5, background: 'linear-gradient(180deg,#999,#666)', borderRadius: '0 0 2px 2px', flexShrink: 0, opacity: .72 }} />
+              <div style={{ width: 13, height: 32, background: 'linear-gradient(180deg,rgba(248,240,208,.85),rgba(237,224,160,.7),rgba(216,200,120,.55))', backgroundImage: 'linear-gradient(180deg,rgba(248,240,208,.85),rgba(237,224,160,.7),rgba(216,200,120,.55)), repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(160,130,50,.1) 3px,rgba(160,130,50,.1) 4px)', borderRadius: 3, border: '1px solid rgba(180,150,60,.22)', flexShrink: 0 }} />
+              <div style={{ width: 13, height: 14, background: 'linear-gradient(180deg,rgba(200,152,72,.8),rgba(122,72,32,.7))', borderRadius: '0 0 5px 5px', border: '1px solid rgba(80,40,10,.22)', flexShrink: 0 }} />
             </div>
           )}
 
