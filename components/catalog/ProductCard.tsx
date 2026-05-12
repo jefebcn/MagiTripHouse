@@ -46,8 +46,8 @@ export default function ProductCard({ product: p, index }: Props) {
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       style={{
-        background: p.category === 'combo' ? 'linear-gradient(160deg,rgba(255,100,0,.06) 0%,var(--card) 60%)' : 'var(--card)',
-        border: p.category === 'combo' ? '1px solid rgba(255,120,0,.35)' : '1px solid var(--border)',
+        background: p.category === 'combo' ? 'linear-gradient(160deg,rgba(255,100,0,.08) 0%,var(--card) 70%)' : 'var(--card)',
+        border: p.category === 'combo' ? '1px solid rgba(255,120,0,.4)' : '1px solid var(--border)',
         borderRadius: 'var(--radius)',
         overflow: 'hidden',
         cursor: unavailable ? 'default' : 'pointer',
@@ -63,6 +63,79 @@ export default function ProductCard({ product: p, index }: Props) {
             : '0 2px 12px rgba(0,0,0,.35)',
       }}
     >
+      {/* ── COMBO LAYOUT (no media) ── */}
+      {p.category === 'combo' ? (
+        <div style={{ padding: '14px 13px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Badge + title row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              background: 'rgba(255,120,0,.18)', border: '1px solid rgba(255,120,0,.5)',
+              borderRadius: 20, padding: '3px 10px',
+              fontSize: '.6rem', fontWeight: 700, color: '#ff8c00', letterSpacing: '.3px', flexShrink: 0,
+            }}>🔥 Combo</div>
+            {isOnSale && (
+              <div style={{
+                background: 'rgba(232,59,59,.88)', border: '1px solid rgba(232,59,59,.5)',
+                borderRadius: 20, padding: '3px 9px',
+                fontSize: '.6rem', fontWeight: 800, color: '#fff', letterSpacing: '1px',
+              }}>SCONTO</div>
+            )}
+          </div>
+
+          {/* Name */}
+          <div style={{
+            fontFamily: "'Fredoka One', cursive", fontSize: '1rem',
+            letterSpacing: '.2px', lineHeight: 1.2,
+            color: unavailable ? 'var(--muted)' : 'var(--text)',
+          }}>{p.name}</div>
+
+          {/* Bundle items */}
+          {p.bundleItems && p.bundleItems.length > 0 && (
+            <div style={{
+              background: 'rgba(255,120,0,.06)', border: '1px solid rgba(255,120,0,.22)',
+              borderRadius: 10, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 5,
+            }}>
+              {p.bundleItems.map((b, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ fontSize: '1rem' }}>{b.emoji}</span>
+                  <span style={{ fontSize: '.78rem', color: '#ffaa44', fontWeight: 600 }}>
+                    {b.qty}× {b.productName}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Price + button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 2 }}>
+            {isComingSoon ? (
+              <div style={{ fontSize: '.75rem', color: '#7ec8f8', fontWeight: 700 }}>Prossimamente</div>
+            ) : isExhausted ? (
+              <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>Non disponibile</div>
+            ) : minPrice > 0 ? (
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.18rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>
+                da €{minPrice}
+              </div>
+            ) : (
+              <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>Vedi tagli</div>
+            )}
+            {!unavailable && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setDetailProduct(p) }}
+                style={{
+                  background: 'linear-gradient(135deg,var(--green),var(--green2))',
+                  border: 'none', borderRadius: 8, padding: '6px 14px',
+                  fontSize: '.78rem', fontWeight: 700, cursor: 'pointer', color: '#000',
+                  fontFamily: "'Fredoka One', cursive", letterSpacing: '.3px',
+                  boxShadow: '0 2px 8px rgba(61,255,110,.25)', flexShrink: 0,
+                }}
+              >Scegli</button>
+            )}
+          </div>
+        </div>
+      ) : (
+      /* ── NORMAL LAYOUT (with media) ── */
+      <>
       {/* Media */}
       <div style={{ position: 'relative', paddingBottom: '96%', background: 'var(--bg3)' }}>
         {p.imageUrl ? (
@@ -127,25 +200,18 @@ export default function ProductCard({ product: p, index }: Props) {
 
         {/* ESAURITO overlay */}
         {isExhausted && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{
               background: 'rgba(30,30,30,.75)', backdropFilter: 'blur(2px)',
               borderRadius: 8, padding: '5px 14px',
-              fontSize: '.7rem', fontWeight: 800, color: 'rgba(255,255,255,.7)',
-              letterSpacing: '1.5px',
+              fontSize: '.7rem', fontWeight: 800, color: 'rgba(255,255,255,.7)', letterSpacing: '1.5px',
             }}>ESAURITO</div>
           </div>
         )}
 
         {/* IN ARRIVO overlay */}
         {isComingSoon && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{
               background: 'rgba(59,130,246,.85)', backdropFilter: 'blur(2px)',
               borderRadius: 8, padding: '5px 14px',
@@ -175,19 +241,7 @@ export default function ProductCard({ product: p, index }: Props) {
         }}>
           {p.name}
         </div>
-        {p.category === 'combo' && p.bundleItems && p.bundleItems.length > 0 && (
-          <div style={{
-            background: 'rgba(255,120,0,.07)', border: '1px solid rgba(255,120,0,.2)',
-            borderRadius: 8, padding: '6px 10px', marginBottom: 7,
-          }}>
-            {p.bundleItems.map((b, i) => (
-              <div key={i} style={{ fontSize: '.7rem', color: '#ffaa44', lineHeight: 1.6 }}>
-                {b.emoji} {b.qty}× {b.productName}
-              </div>
-            ))}
-          </div>
-        )}
-        {p.category !== 'combo' && p.origin && (
+        {p.origin && (
           <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 6 }}>
             🌍 {p.origin}
           </div>
@@ -222,6 +276,8 @@ export default function ProductCard({ product: p, index }: Props) {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }
