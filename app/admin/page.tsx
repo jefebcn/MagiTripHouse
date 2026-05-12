@@ -18,11 +18,12 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
 }
 
 const SECTIONS = [
-  { href: '/admin/products',   icon: '📦', label: 'Prodotti'  },
-  { href: '/admin/orders',     icon: '📋', label: 'Ordini'    },
-  { href: '/admin/news',       icon: '📢', label: 'Novità'    },
-  { href: '/admin/members',    icon: '👥', label: 'Membri'    },
-  { href: '/admin/affiliates', icon: '🤝', label: 'Affiliati' },
+  { href: '/admin/products',              icon: '📦', label: 'Prodotti'  },
+  { href: '/admin/orders',                icon: '📋', label: 'Ordini'    },
+  { href: '/admin/products?category=combo', icon: '🔥', label: 'Combo'  },
+  { href: '/admin/news',                  icon: '📢', label: 'Novità'    },
+  { href: '/admin/members',               icon: '👥', label: 'Membri'    },
+  { href: '/admin/affiliates',            icon: '🤝', label: 'Affiliati' },
 ]
 
 function fmt(n: number) {

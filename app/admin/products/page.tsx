@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { upload } from '@vercel/blob/client'
 
 interface Variant { label: string; price: number }
@@ -20,9 +21,12 @@ const EMPTY: Omit<Product, 'id' | 'sortOrder'> = {
 }
 
 export default function AdminProducts() {
+  const searchParams = useSearchParams()
+  const comboMode = searchParams.get('category') === 'combo'
+
   const [products, setProducts] = useState<Product[]>([])
   const [editing, setEditing] = useState<Product | null>(null)
-  const [form, setForm] = useState<typeof EMPTY>({ ...EMPTY })
+  const [form, setForm] = useState<typeof EMPTY>({ ...EMPTY, ...(comboMode ? { category: 'combo', badge: 'combo' } : {}) })
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -39,7 +43,7 @@ export default function AdminProducts() {
 
   function startCreate() {
     setEditing(null)
-    setForm({ ...EMPTY })
+    setForm({ ...EMPTY, ...(comboMode ? { category: 'combo', badge: 'combo' } : {}) })
   }
 
   function startEdit(p: Product) {
@@ -142,13 +146,19 @@ export default function AdminProducts() {
     </div>
   )
 
+  const displayedProducts = comboMode
+    ? products.filter(p => p.category === 'combo')
+    : products
+
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>📦 Prodotti</span>
-        <button onClick={startCreate} style={{ marginLeft: 'auto', background: 'rgba(61,255,110,.1)', border: '1px solid rgba(61,255,110,.3)', color: 'var(--green)', borderRadius: 8, padding: '7px 14px', fontFamily: 'inherit', fontSize: '.82rem', fontWeight: 700, cursor: 'pointer' }}>
-          + Nuovo
+        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>
+          {comboMode ? '🔥 Combo' : '📦 Prodotti'}
+        </span>
+        <button onClick={startCreate} style={{ marginLeft: 'auto', background: comboMode ? 'rgba(255,120,0,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${comboMode ? 'rgba(255,120,0,.4)' : 'rgba(61,255,110,.3)'}`, color: comboMode ? '#ff8c00' : 'var(--green)', borderRadius: 8, padding: '7px 14px', fontFamily: 'inherit', fontSize: '.82rem', fontWeight: 700, cursor: 'pointer' }}>
+          + Nuova {comboMode ? 'Combo' : ''}
         </button>
       </div>
 
@@ -394,8 +404,8 @@ export default function AdminProducts() {
 
       {/* Product list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {products.map((p, idx) => (
-          <div key={p.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        {displayedProducts.map((p, idx) => (
+          <div key={p.id} style={{ background: 'var(--card)', border: `1px solid ${p.category === 'combo' ? 'rgba(255,120,0,.3)' : 'var(--border)'}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', background: 'var(--bg3)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {p.imageUrl
                 ? p.mediaType === 'video'
@@ -408,13 +418,15 @@ export default function AdminProducts() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: '.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
               <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>
-                {p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
+                {p.category === 'combo' && p.bundleItems?.length
+                  ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
+                  : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
                 {p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               <button onClick={() => moveProduct(p.id, -1)} disabled={idx === 0} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--muted)', fontSize: '.85rem' }}>↑</button>
-              <button onClick={() => moveProduct(p.id, 1)} disabled={idx === products.length - 1} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--muted)', fontSize: '.85rem' }}>↓</button>
+              <button onClick={() => moveProduct(p.id, 1)} disabled={idx === displayedProducts.length - 1} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--muted)', fontSize: '.85rem' }}>↓</button>
               <button onClick={() => startEdit(p)} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
               <button onClick={() => handleDelete(p.id)} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
             </div>
