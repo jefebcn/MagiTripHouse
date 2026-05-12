@@ -11,7 +11,7 @@ function haptic(pattern: number | number[] = 50) {
 }
 
 export default function CartDrawer() {
-  const { cartOpen, setCartOpen, userHandle, userName } = useUIStore()
+  const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView } = useUIStore()
   const { items, changeQty, clear, total } = useCartStore()
   const { user: tgUser } = useTelegram()
   const panelRef = useRef<HTMLDivElement>(null)
@@ -22,10 +22,10 @@ export default function CartDrawer() {
 
   function placeOrder() {
     if (!items.length) return
+    if (!isLoggedIn) return
 
-    // Use registered handle if logged in, fall back to Telegram username
-    const displayName = userName || tgUser || 'Anonimo'
-    const userId = userHandle || tgUser || 'anonymous'
+    const displayName = userName || tgUser || 'Sconosciuto'
+    const userId = userHandle || tgUser || 'unknown'
 
     const orderId = `MTH-${Date.now()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`
     const date = new Date().toLocaleDateString('it-IT')
@@ -158,9 +158,31 @@ export default function CartDrawer() {
               </span>
             </div>
 
-            <button className="checkout-btn" onClick={placeOrder}>
-              📲 Conferma & Invia su Telegram →
-            </button>
+            {isLoggedIn ? (
+              <button className="checkout-btn" onClick={placeOrder}>
+                📲 Conferma & Invia su Telegram →
+              </button>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '.8rem', color: 'var(--muted)', marginBottom: 10 }}>
+                  🔒 Devi accedere per effettuare un ordine
+                </div>
+                <button
+                  onClick={() => { close(); setView('account') }}
+                  style={{
+                    width: '100%', padding: '14px', borderRadius: 14,
+                    fontFamily: 'inherit', fontWeight: 700, fontSize: '.95rem',
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg,rgba(61,255,110,.22),rgba(61,255,110,.1))',
+                    border: '1.5px solid rgba(61,255,110,.6)',
+                    color: 'var(--green)',
+                    boxShadow: '0 0 20px rgba(61,255,110,.18)',
+                  }}
+                >
+                  👤 Accedi o Registrati
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
