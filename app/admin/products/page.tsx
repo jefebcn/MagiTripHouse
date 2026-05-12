@@ -1,7 +1,5 @@
 'use client'
-export const dynamic = 'force-dynamic'
-
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { upload } from '@vercel/blob/client'
@@ -23,6 +21,14 @@ const EMPTY: Omit<Product, 'id' | 'sortOrder'> = {
 }
 
 export default function AdminProducts() {
+  return (
+    <Suspense>
+      <AdminProductsInner />
+    </Suspense>
+  )
+}
+
+function AdminProductsInner() {
   const searchParams = useSearchParams()
   const comboMode = searchParams.get('category') === 'combo'
 
