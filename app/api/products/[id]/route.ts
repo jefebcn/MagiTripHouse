@@ -26,6 +26,7 @@ export async function PUT(req: Request, { params }: Ctx) {
       sortOrder:    body.sortOrder ?? 99,
       isOnSale:     body.isOnSale ?? false,
       isComingSoon: body.isComingSoon ?? false,
+      bundleItems:  body.bundleItems ?? null,
     },
   })
   return NextResponse.json(product)

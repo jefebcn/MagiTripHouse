@@ -175,13 +175,15 @@ export default function ProductCard({ product: p, index }: Props) {
         }}>
           {p.name}
         </div>
-        {p.category === 'combo' && p.description && (
+        {p.category === 'combo' && p.bundleItems && p.bundleItems.length > 0 && (
           <div style={{
             background: 'rgba(255,120,0,.07)', border: '1px solid rgba(255,120,0,.2)',
             borderRadius: 8, padding: '6px 10px', marginBottom: 7,
           }}>
-            {p.description.split('\n').filter(Boolean).map((line, i) => (
-              <div key={i} style={{ fontSize: '.7rem', color: '#ffaa44', lineHeight: 1.5 }}>• {line}</div>
+            {p.bundleItems.map((b, i) => (
+              <div key={i} style={{ fontSize: '.7rem', color: '#ffaa44', lineHeight: 1.6 }}>
+                {b.emoji} {b.qty}× {b.productName}
+              </div>
             ))}
           </div>
         )}
