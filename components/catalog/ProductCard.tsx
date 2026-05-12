@@ -10,6 +10,7 @@ const BADGE_COLORS: Record<string, { bg: string; color: string; border: string }
   new:     { bg: 'rgba(61,255,110,.15)', color: '#3dff6e', border: 'rgba(61,255,110,.45)' },
   hash:    { bg: 'rgba(200,140,60,.15)', color: '#e0a060', border: 'rgba(200,140,60,.45)' },
   cbd:     { bg: 'rgba(61,255,110,.12)', color: '#a0e8b0', border: 'rgba(61,255,110,.35)' },
+  combo:   { bg: 'rgba(255,120,0,.18)', color: '#ff8c00', border: 'rgba(255,120,0,.5)' },
 }
 
 const BADGE_LABELS: Record<string, string> = {
@@ -18,6 +19,7 @@ const BADGE_LABELS: Record<string, string> = {
   new:     '✨ Novità',
   hash:    '🪨 Hash',
   cbd:     '🌿 THC',
+  combo:   '🔥 Combo',
 }
 
 function getMinPrice(p: Product): number {
@@ -44,8 +46,8 @@ export default function ProductCard({ product: p, index }: Props) {
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       style={{
-        background: 'var(--card)',
-        border: '1px solid var(--border)',
+        background: p.category === 'combo' ? 'linear-gradient(160deg,rgba(255,100,0,.06) 0%,var(--card) 60%)' : 'var(--card)',
+        border: p.category === 'combo' ? '1px solid rgba(255,120,0,.35)' : '1px solid var(--border)',
         borderRadius: 'var(--radius)',
         overflow: 'hidden',
         cursor: unavailable ? 'default' : 'pointer',
@@ -54,7 +56,11 @@ export default function ProductCard({ product: p, index }: Props) {
         animation: `fadeInUp .35s ease both`,
         animationDelay: `${index * 0.05}s`,
         transform: pressed ? 'scale(.97)' : 'scale(1)',
-        boxShadow: pressed ? '0 1px 6px rgba(0,0,0,.3)' : '0 2px 12px rgba(0,0,0,.35)',
+        boxShadow: pressed
+          ? '0 1px 6px rgba(0,0,0,.3)'
+          : p.category === 'combo'
+            ? '0 2px 12px rgba(0,0,0,.35), 0 0 18px rgba(255,100,0,.1)'
+            : '0 2px 12px rgba(0,0,0,.35)',
       }}
     >
       {/* Media */}
@@ -169,7 +175,17 @@ export default function ProductCard({ product: p, index }: Props) {
         }}>
           {p.name}
         </div>
-        {p.origin && (
+        {p.category === 'combo' && p.description && (
+          <div style={{
+            background: 'rgba(255,120,0,.07)', border: '1px solid rgba(255,120,0,.2)',
+            borderRadius: 8, padding: '6px 10px', marginBottom: 7,
+          }}>
+            {p.description.split('\n').filter(Boolean).map((line, i) => (
+              <div key={i} style={{ fontSize: '.7rem', color: '#ffaa44', lineHeight: 1.5 }}>• {line}</div>
+            ))}
+          </div>
+        )}
+        {p.category !== 'combo' && p.origin && (
           <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 6 }}>
             🌍 {p.origin}
           </div>

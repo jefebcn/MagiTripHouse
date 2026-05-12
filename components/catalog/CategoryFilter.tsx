@@ -8,6 +8,7 @@ const CATEGORIES = [
   { id: 'new',     label: '✨ Novità' },
   { id: 'hash',    label: '🪨 Hash' },
   { id: 'cbd',     label: '🌿 THC' },
+  { id: 'combo',   label: '🔥 Combo' },
 ]
 
 export default function CategoryFilter() {
