@@ -4,18 +4,19 @@ import Link from 'next/link'
 import { upload } from '@vercel/blob/client'
 
 interface Variant { label: string; price: number }
+interface BundleItem { productId: string; productName: string; emoji: string; qty: number }
 interface Product {
   id: string; name: string; description?: string; category: string; tags: string[];
   variants: Variant[]; stock?: number | null; imageUrl?: string; mediaType?: string;
   emoji: string; badge?: string; origin?: string; sortOrder: number;
-  isOnSale?: boolean; isComingSoon?: boolean;
+  isOnSale?: boolean; isComingSoon?: boolean; bundleItems?: BundleItem[] | null;
 }
 
 const EMPTY: Omit<Product, 'id' | 'sortOrder'> = {
   name: '', description: '', category: 'premium', tags: [],
   variants: [{ label: '', price: 0 }], stock: null,
   imageUrl: '', mediaType: 'image', emoji: '🌿', badge: '', origin: '',
-  isOnSale: false, isComingSoon: false,
+  isOnSale: false, isComingSoon: false, bundleItems: null,
 }
 
 export default function AdminProducts() {
@@ -51,6 +52,7 @@ export default function AdminProducts() {
       mediaType: p.mediaType ?? 'image', emoji: p.emoji,
       badge: p.badge ?? '', origin: p.origin ?? '',
       isOnSale: p.isOnSale ?? false, isComingSoon: p.isComingSoon ?? false,
+      bundleItems: p.bundleItems ?? null,
     })
   }
 
@@ -274,6 +276,55 @@ export default function AdminProducts() {
               >🕐 In arrivo</button>
             </div>
           </div>
+
+          {/* Bundle picker — solo per combo */}
+          {form.category === 'combo' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label style={{ fontSize: '.75rem', color: '#ff8c00', textTransform: 'uppercase', letterSpacing: '.4px' }}>🔥 Prodotti inclusi nella combo</label>
+              <div style={{ background: 'rgba(255,120,0,.06)', border: '1px solid rgba(255,120,0,.25)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {products.filter(p => p.category !== 'combo').map((p) => {
+                  const item = (form.bundleItems ?? []).find(b => b.productId === p.id)
+                  const selected = !!item
+                  return (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(e) => {
+                          const cur = form.bundleItems ?? []
+                          if (e.target.checked) {
+                            setForm(f => ({ ...f, bundleItems: [...cur, { productId: p.id, productName: p.name, emoji: p.emoji, qty: 1 }] }))
+                          } else {
+                            setForm(f => ({ ...f, bundleItems: cur.filter(b => b.productId !== p.id) }))
+                          }
+                        }}
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#ff8c00' }}
+                      />
+                      <span style={{ flex: 1, fontSize: '.85rem', color: selected ? 'var(--text)' : 'var(--muted)' }}>{p.emoji} {p.name}</span>
+                      {selected && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => setForm(f => ({ ...f, bundleItems: (f.bundleItems ?? []).map(b => b.productId === p.id ? { ...b, qty: Math.max(1, b.qty - 1) } : b) }))}
+                            style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid rgba(255,120,0,.4)', background: 'rgba(255,120,0,.1)', color: '#ff8c00', cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >−</button>
+                          <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700, color: '#ff8c00', fontSize: '.9rem' }}>{item!.qty}</span>
+                          <button
+                            type="button"
+                            onClick={() => setForm(f => ({ ...f, bundleItems: (f.bundleItems ?? []).map(b => b.productId === p.id ? { ...b, qty: b.qty + 1 } : b) }))}
+                            style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid rgba(255,120,0,.4)', background: 'rgba(255,120,0,.1)', color: '#ff8c00', cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >+</button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                {products.filter(p => p.category !== 'combo').length === 0 && (
+                  <div style={{ fontSize: '.8rem', color: 'var(--muted)', textAlign: 'center', padding: '8px 0' }}>Nessun prodotto disponibile</div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Variants */}
           <div>

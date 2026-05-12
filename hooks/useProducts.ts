@@ -2,6 +2,7 @@
 import useSWR from 'swr'
 
 export interface Variant { label: string; price: number }
+export interface BundleItem { productId: string; productName: string; emoji: string; qty: number }
 
 export interface Product {
   id: string
@@ -19,6 +20,7 @@ export interface Product {
   sortOrder: number
   isOnSale: boolean
   isComingSoon: boolean
+  bundleItems?: BundleItem[] | null
   createdAt: string
 }
 

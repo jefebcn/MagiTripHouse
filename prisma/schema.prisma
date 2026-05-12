@@ -23,6 +23,7 @@ model Product {
   sortOrder    Int      @default(99)
   isOnSale     Boolean  @default(false)
   isComingSoon Boolean  @default(false)
+  bundleItems  Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

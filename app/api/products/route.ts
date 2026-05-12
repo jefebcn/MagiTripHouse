@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       sortOrder:    body.sortOrder ?? 99,
       isOnSale:     body.isOnSale ?? false,
       isComingSoon: body.isComingSoon ?? false,
+      bundleItems:  body.bundleItems ?? null,
     },
   })
   return NextResponse.json(product, { status: 201 })
