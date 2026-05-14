@@ -48,7 +48,7 @@ const r2 = new S3Client({
   },
 })
 
-const prisma = new PrismaClient({ datasources: { db: { url: DATABASE_URL } } })
+const prisma = new PrismaClient()
 
 async function uploadToR2(url, key, contentType) {
   const res = await fetch(url, {
