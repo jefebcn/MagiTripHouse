@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { S3Client, PutObjectCommand, PutBucketCorsCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { auth } from '@/lib/auth'
 
 const r2 = new S3Client({
@@ -12,54 +11,29 @@ const r2 = new S3Client({
   },
 })
 
-// Configure CORS on the R2 bucket so browsers can PUT directly via presigned URLs.
-// Idempotent — safe to call on every cold start.
-let corsConfigured = false
-async function ensureCors() {
-  if (corsConfigured) return
-  try {
-    await r2.send(new PutBucketCorsCommand({
-      Bucket: process.env.R2_BUCKET_NAME!,
-      CORSConfiguration: {
-        CORSRules: [{
-          AllowedOrigins: ['*'],
-          AllowedMethods: ['GET', 'PUT', 'HEAD'],
-          AllowedHeaders: ['*'],
-          ExposeHeaders: ['ETag'],
-          MaxAgeSeconds: 86400,
-        }],
-      },
-    }))
-    corsConfigured = true
-  } catch (e: any) {
-    // Token may lack bucket-level permissions — log and continue.
-    // In that case the user must configure CORS manually in the Cloudflare R2 dashboard.
-    console.warn('R2 CORS auto-setup skipped:', e.message)
-  }
-}
+export const maxDuration = 60
 
 export async function POST(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { filename, contentType } = await req.json()
-  if (!filename || !contentType) {
-    return NextResponse.json({ error: 'Missing filename or contentType' }, { status: 400 })
-  }
+  const formData = await req.formData()
+  const file = formData.get('file') as File | null
+  if (!file) return NextResponse.json({ error: 'Nessun file ricevuto' }, { status: 400 })
 
-  await ensureCors()
-
-  const ext = (filename as string).split('.').pop() ?? 'bin'
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
   const key = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+  const contentType = file.type || (ext.match(/mp4|mov|webm/) ? 'video/mp4' : 'image/jpeg')
 
-  const command = new PutObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME!,
-    Key: key,
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  await r2.send(new PutObjectCommand({
+    Bucket:      process.env.R2_BUCKET_NAME!,
+    Key:         key,
+    Body:        buffer,
     ContentType: contentType,
-  })
+  }))
 
-  const signedUrl = await getSignedUrl(r2, command, { expiresIn: 300 })
   const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`
-
-  return NextResponse.json({ signedUrl, publicUrl })
+  return NextResponse.json({ publicUrl })
 }

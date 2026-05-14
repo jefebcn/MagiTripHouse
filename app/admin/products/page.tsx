@@ -71,28 +71,19 @@ function AdminProductsInner() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    setUploadProgress(10)
+    setUploadProgress(20)
     setSaveError('')
     try {
-      // Get presigned URL from server (also triggers R2 CORS auto-setup)
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
-      })
+      // Upload via server (avoids CORS issues with direct browser→R2)
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      setUploadProgress(80)
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? `Errore server ${res.status}`)
       }
-      const { signedUrl, publicUrl } = await res.json()
-      setUploadProgress(40)
-      // Upload directly to R2 via presigned URL
-      const r2res = await fetch(signedUrl, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
-      })
-      if (!r2res.ok) throw new Error(`Errore caricamento su R2: ${r2res.status}`)
+      const { publicUrl } = await res.json()
       const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
       setForm((f) => ({ ...f, imageUrl: publicUrl, mediaType }))
       setUploadProgress(100)
