@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { upload } from '@vercel/blob/client'
 
 interface Variant { label: string; price: number }
 interface BundleItem { productId: string; productName: string; emoji: string; qty: number }
@@ -72,22 +71,29 @@ function AdminProductsInner() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    setUploadProgress(0)
-    const timer = setInterval(() => setUploadProgress(p => p < 90 ? p + 5 : p), 400)
+    setUploadProgress(10)
     try {
-      const ext = file.name.split('.').pop() ?? 'bin'
-      const filename = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      const blob = await upload(filename, file, {
-        access: 'public',
-        handleUploadUrl: '/api/upload',
+      // Get presigned URL from server
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      })
+      if (!res.ok) throw new Error('Failed to get upload URL')
+      const { signedUrl, publicUrl } = await res.json()
+      setUploadProgress(30)
+      // Upload directly to R2
+      await fetch(signedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
       })
       const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
-      setForm((f) => ({ ...f, imageUrl: blob.url, mediaType }))
+      setForm((f) => ({ ...f, imageUrl: publicUrl, mediaType }))
       setUploadProgress(100)
     } catch (err) {
       console.error('Upload failed', err)
     }
-    clearInterval(timer)
     setUploading(false)
   }
 
