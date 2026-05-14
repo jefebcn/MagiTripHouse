@@ -30,6 +30,16 @@ if (missing.length) {
 
 console.log('DATABASE_URL prefix:', DATABASE_URL.slice(0, 20) + '...')
 
+// Diagnose: list tables in public schema
+async function diagnoseTables(sql) {
+  try {
+    const rows = await sql`SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
+    console.log('Tables in public schema:', rows.map(r => r.tablename).join(', ') || '(none)')
+  } catch (e) {
+    console.log('Could not list tables:', e.message)
+  }
+}
+
 const r2 = new S3Client({
   region: 'auto',
   endpoint: R2_ENDPOINT,
@@ -73,8 +83,11 @@ async function main() {
     return
   }
 
-  // Load all products from DB using raw SQL
-  const products = await sql`SELECT id, "imageUrl" FROM "Product" WHERE "imageUrl" IS NOT NULL`
+  // Diagnose available tables first
+  await diagnoseTables(sql)
+
+  // Load all products from DB using raw SQL (explicit public schema)
+  const products = await sql`SELECT id, "imageUrl" FROM public."Product" WHERE "imageUrl" IS NOT NULL`
   console.log(`Found ${products.length} products in DB\n`)
 
   // Build map: blobUrl → product ids
@@ -101,7 +114,7 @@ async function main() {
 
       const productIds = urlToProducts[blob.url] || []
       for (const id of productIds) {
-        await sql`UPDATE "Product" SET "imageUrl" = ${newUrl} WHERE id = ${id}`
+        await sql`UPDATE public."Product" SET "imageUrl" = ${newUrl} WHERE id = ${id}`
         console.log(`✓ → ${newUrl} (updated product ${id})`)
       }
       if (productIds.length === 0) {
