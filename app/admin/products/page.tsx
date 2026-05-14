@@ -71,24 +71,45 @@ function AdminProductsInner() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    setUploadProgress(20)
+    setUploadProgress(10)
     setSaveError('')
     try {
-      // Upload via server (avoids CORS issues with direct browser→R2)
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/upload', { method: 'POST', body: formData })
-      setUploadProgress(80)
+      // Step 1: get presigned URL from server
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? `Errore server ${res.status}`)
       }
-      const { publicUrl } = await res.json()
+      const { signedUrl, publicUrl } = await res.json()
+      setUploadProgress(30)
+
+      // Step 2: PUT the file directly to R2 via presigned URL
+      // R2 CORS is configured to allow PUT from any origin.
+      // ContentType is NOT a signed header so any value is accepted.
+      const controller = new AbortController()
+      const tid = setTimeout(() => controller.abort(), 120_000)
+      try {
+        const r2res = await fetch(signedUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          signal: controller.signal,
+        })
+        if (!r2res.ok) throw new Error(`R2 ha rifiutato il file: ${r2res.status}`)
+      } finally {
+        clearTimeout(tid)
+      }
+
       const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
       setForm((f) => ({ ...f, imageUrl: publicUrl, mediaType }))
       setUploadProgress(100)
     } catch (err: any) {
-      setSaveError(`⚠ Upload fallito: ${err.message}`)
+      const msg = err.name === 'AbortError' ? 'Timeout: file troppo grande o connessione lenta' : err.message
+      setSaveError(`⚠ Upload fallito: ${msg}`)
       console.error('Upload failed', err)
     }
     setUploading(false)
