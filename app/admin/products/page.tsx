@@ -71,7 +71,7 @@ function AdminProductsInner() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    setUploadProgress(10)
+    setUploadProgress(5)
     setSaveError('')
     try {
       // Step 1: get presigned URL from server
@@ -85,31 +85,33 @@ function AdminProductsInner() {
         throw new Error(data.error ?? `Errore server ${res.status}`)
       }
       const { signedUrl, publicUrl } = await res.json()
-      setUploadProgress(30)
+      setUploadProgress(15)
 
-      // Step 2: PUT the file directly to R2 via presigned URL
-      // R2 CORS is configured to allow PUT from any origin.
-      // ContentType is NOT a signed header so any value is accepted.
-      const controller = new AbortController()
-      const tid = setTimeout(() => controller.abort(), 120_000)
-      try {
-        const r2res = await fetch(signedUrl, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': file.type || 'application/octet-stream' },
-          signal: controller.signal,
-        })
-        if (!r2res.ok) throw new Error(`R2 ha rifiutato il file: ${r2res.status}`)
-      } finally {
-        clearTimeout(tid)
-      }
+      // Step 2: PUT file directly to R2 via XHR (more reliable than fetch on iOS Safari)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', signedUrl)
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+        xhr.timeout = 180_000
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) {
+            setUploadProgress(15 + Math.round((ev.loaded / ev.total) * 83))
+          }
+        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve()
+          else reject(new Error(`R2 ha rifiutato il file: ${xhr.status} ${xhr.statusText}`))
+        }
+        xhr.onerror = () => reject(new Error('Errore di rete durante il caricamento'))
+        xhr.ontimeout = () => reject(new Error('Timeout: connessione troppo lenta'))
+        xhr.send(file)
+      })
 
       const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
       setForm((f) => ({ ...f, imageUrl: publicUrl, mediaType }))
       setUploadProgress(100)
     } catch (err: any) {
-      const msg = err.name === 'AbortError' ? 'Timeout: file troppo grande o connessione lenta' : err.message
-      setSaveError(`⚠ Upload fallito: ${msg}`)
+      setSaveError(`⚠ Upload fallito: ${err.message}`)
       console.error('Upload failed', err)
     }
     setUploading(false)
