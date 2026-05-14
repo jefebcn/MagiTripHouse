@@ -1,0 +1,29 @@
+name: Migrate Vercel Blob → Cloudflare R2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migration
+        env:
+          BLOB_READ_WRITE_TOKEN:    ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          R2_ACCESS_KEY_ID:         ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY_ID:  ${{ secrets.R2_SECRET_ACCESS_KEY_ID }}
+          R2_ENDPOINT:              ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME:           ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL:            ${{ secrets.R2_PUBLIC_URL }}
+          DATABASE_URL:             ${{ secrets.DATABASE_URL }}
+        run: node migrate-to-r2.mjs
