@@ -1,22 +1,11 @@
 /**
  * Migration script: Vercel Blob → Cloudflare R2
- *
- * Usage:
- *   BLOB_READ_WRITE_TOKEN=... \
- *   R2_ACCESS_KEY_ID=... \
- *   R2_SECRET_ACCESS_KEY_ID=... \
- *   R2_ENDPOINT=https://xxxx.r2.cloudflarestorage.com \
- *   R2_BUCKET_NAME=magic-trip-house-media \
- *   R2_PUBLIC_URL=https://pub-xxxx.r2.dev \
- *   DATABASE_URL=postgresql://... \
- *   node migrate-to-r2.mjs
+ * Run via GitHub Actions (workflow_dispatch) — see .github/workflows/migrate-to-r2.yml
  */
 
 import { list } from '@vercel/blob'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
-const { PrismaClient } = require('@prisma/client')
+import { neon } from '@neondatabase/serverless'
 
 const {
   BLOB_READ_WRITE_TOKEN,
@@ -39,6 +28,8 @@ if (missing.length) {
   process.exit(1)
 }
 
+console.log('DATABASE_URL prefix:', DATABASE_URL.slice(0, 20) + '...')
+
 const r2 = new S3Client({
   region: 'auto',
   endpoint: R2_ENDPOINT,
@@ -48,7 +39,7 @@ const r2 = new S3Client({
   },
 })
 
-const prisma = new PrismaClient()
+const sql = neon(DATABASE_URL)
 
 async function uploadToR2(url, key, contentType) {
   const res = await fetch(url, {
@@ -68,7 +59,6 @@ async function uploadToR2(url, key, contentType) {
 async function main() {
   console.log('📦 Fetching all blobs from Vercel Blob...')
 
-  // List all blobs (paginated)
   let cursor
   const allBlobs = []
   do {
@@ -83,11 +73,11 @@ async function main() {
     return
   }
 
-  // Load all products from DB
-  const products = await prisma.product.findMany()
+  // Load all products from DB using raw SQL
+  const products = await sql`SELECT id, "imageUrl" FROM "Product" WHERE "imageUrl" IS NOT NULL`
   console.log(`Found ${products.length} products in DB\n`)
 
-  // Build a map: blobUrl → product id(s)
+  // Build map: blobUrl → product ids
   const urlToProducts = {}
   for (const p of products) {
     if (p.imageUrl) {
@@ -97,31 +87,25 @@ async function main() {
   }
 
   let migrated = 0
-  let skipped = 0
   let errors = 0
 
   for (const blob of allBlobs) {
     const key = `products/${blob.pathname.split('/').pop()}`
-    const contentType = blob.contentType || (
-      blob.pathname.match(/\.(mp4|mov|webm)$/i) ? 'video/mp4' : 'image/jpeg'
-    )
+    const contentType = blob.contentType ||
+      (blob.pathname.match(/\.(mp4|mov|webm)$/i) ? 'video/mp4' : 'image/jpeg')
 
     process.stdout.write(`  ↑ ${blob.pathname} ... `)
 
     try {
       const newUrl = await uploadToR2(blob.downloadUrl, key, contentType)
 
-      // Update products that reference this blob URL
       const productIds = urlToProducts[blob.url] || []
       for (const id of productIds) {
-        await prisma.product.update({
-          where: { id },
-          data: { imageUrl: newUrl },
-        })
+        await sql`UPDATE "Product" SET "imageUrl" = ${newUrl} WHERE id = ${id}`
         console.log(`✓ → ${newUrl} (updated product ${id})`)
       }
       if (productIds.length === 0) {
-        console.log(`✓ → ${newUrl} (no product references)`)
+        console.log(`✓ uploaded (no product references)`)
       }
       migrated++
     } catch (err) {
@@ -130,14 +114,10 @@ async function main() {
     }
   }
 
-  await prisma.$disconnect()
-
   console.log('\n─────────────────────────────────')
   console.log(`✅ Migrated : ${migrated}`)
-  console.log(`⏭  Skipped  : ${skipped}`)
   console.log(`❌ Errors   : ${errors}`)
   console.log('─────────────────────────────────')
-  console.log('\nDone! Remember to update R2_PUBLIC_URL in Vercel if needed.')
 }
 
 main().catch(err => {
