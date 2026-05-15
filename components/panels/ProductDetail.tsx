@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import { useUIStore } from '@/store/uiStore'
 import { useCartStore } from '@/store/cartStore'
@@ -10,27 +10,80 @@ function haptic(ms = 50) {
   try { if (navigator.vibrate) navigator.vibrate(ms) } catch { /* noop */ }
 }
 
+function parseGrams(label: string): number {
+  return parseFloat(label.replace(/[^0-9.]/g, '')) || 0
+}
+
+// Returns the highest tier whose gram threshold is ≤ requested grams
+function getActiveTier(grams: number, variants: Variant[]): Variant | null {
+  const sorted = [...variants]
+    .filter(v => parseGrams(v.label) > 0)
+    .sort((a, b) => parseGrams(a.label) - parseGrams(b.label))
+  if (!sorted.length) return null
+  let active = sorted[0]
+  for (const v of sorted) {
+    if (parseGrams(v.label) <= grams) active = v
+    else break
+  }
+  return active
+}
+
 export default function ProductDetail() {
   const { detailProduct: p, setDetailProduct, openLightbox } = useUIStore()
   const addItem = useCartStore((s) => s.addItem)
   const panelRef = useRef<HTMLDivElement>(null)
   const [qty, setQty] = useState(1)
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null)
+  const [customGrams, setCustomGrams] = useState<number>(0)
 
   const close = useCallback(() => setDetailProduct(null), [setDetailProduct])
   useSwipeToClose(panelRef, close, !!p)
 
-  if (!p) return null
+  // Reset state when product changes
+  useEffect(() => {
+    if (!p) return
+    setSelectedVariant(null)
+    setQty(1)
+    const first = p.variants?.[0]
+    setCustomGrams(first ? parseGrams(first.label) || 1 : 0)
+  }, [p?.id])
 
-  const product = p!
+  if (!p) return null
+  const product = p
+
   const variant = selectedVariant ?? (product.variants?.[0] ?? null)
-  const price = variant?.price ?? 0
-  const grams = variant ? parseFloat(variant.label) : 0
-  const pricePerG = grams > 0 ? (price / grams).toFixed(2) : null
+
+  // Detect gram-based pricing (numeric labels like "10", "20g", "1g")
+  const isGramBased = (product.variants?.length ?? 0) > 0 &&
+    product.variants.some(v => parseGrams(v.label) > 0)
+
+  // Active tier = highest tier whose threshold ≤ customGrams
+  const activeTier = isGramBased && customGrams > 0
+    ? getActiveTier(customGrams, product.variants)
+    : variant
+
+  const tierGrams = activeTier ? parseGrams(activeTier.label) : 0
+  const tierPricePerG = tierGrams > 0 ? activeTier!.price / tierGrams : 0
+
+  const displayPrice = isGramBased && customGrams > 0 && tierPricePerG > 0
+    ? Math.round(customGrams * tierPricePerG * 100) / 100
+    : (variant?.price ?? 0)
+
+  const displayPricePerG = isGramBased && tierPricePerG > 0
+    ? tierPricePerG.toFixed(2)
+    : (variant && parseGrams(variant.label) > 0
+        ? (variant.price / parseGrams(variant.label)).toFixed(2)
+        : null)
+
+  const displayLabel = isGramBased && customGrams > 0
+    ? `${customGrams}g`
+    : (variant?.label ?? '')
 
   function handleAdd() {
-    if (!variant) return
-    addItem(product.id, product.name, variant, qty, product.imageUrl, product.mediaType, product.emoji)
+    const effectiveVariant: Variant = isGramBased && customGrams > 0
+      ? { label: `${customGrams}g`, price: displayPrice }
+      : (variant ?? { label: '?', price: 0 })
+    addItem(product.id, product.name, effectiveVariant, qty, product.imageUrl, product.mediaType, product.emoji)
     close()
     haptic(60)
   }
@@ -44,14 +97,17 @@ export default function ProductDetail() {
     }
   }
 
+  const inputStyle: React.CSSProperties = {
+    width: 64, textAlign: 'center', background: 'var(--bg)',
+    border: 'none', outline: 'none', color: 'var(--text)',
+    fontSize: '1rem', fontWeight: 700, padding: '6px 0',
+    MozAppearance: 'textfield',
+  }
+
   return (
     <div className="panel open">
       <div className="panel-overlay" onClick={close} />
-      <div
-        ref={panelRef}
-        className="panel-content"
-        style={{ gap: 14 }}
-      >
+      <div ref={panelRef} className="panel-content" style={{ gap: 14 }}>
         <div className="panel-handle" />
 
         {/* Image */}
@@ -78,7 +134,6 @@ export default function ProductDetail() {
             <span style={{ fontSize: '5rem' }}>{product.emoji}</span>
           )}
 
-          {/* Share overlay */}
           <button
             onClick={(e) => { e.stopPropagation(); shareProduct() }}
             style={{
@@ -92,7 +147,6 @@ export default function ProductDetail() {
             📤 Condividi
           </button>
 
-          {/* Zoom hint */}
           {product.imageUrl && (
             <div style={{
               position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
@@ -128,13 +182,10 @@ export default function ProductDetail() {
         {product.tags.length > 0 && (
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
             {product.tags.map((t) => (
-              <span
-                key={t}
-                style={{
-                  background: 'var(--bg3)', border: '1px solid rgba(61,255,110,.15)',
-                  borderRadius: 20, padding: '4px 11px', fontSize: '.72rem', color: 'var(--muted)',
-                }}
-              >
+              <span key={t} style={{
+                background: 'var(--bg3)', border: '1px solid rgba(61,255,110,.15)',
+                borderRadius: 20, padding: '4px 11px', fontSize: '.72rem', color: 'var(--muted)',
+              }}>
                 {t}
               </span>
             ))}
@@ -143,21 +194,71 @@ export default function ProductDetail() {
 
         {/* Variants */}
         {product.variants?.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.8px', fontWeight: 700 }}>
               📦 Seleziona Formato
             </div>
+
+            {/* Quick-select buttons */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {product.variants.map((v, i) => (
-                <button
-                  key={i}
-                  className={`variant-btn${variant?.label === v.label ? ' selected' : ''}`}
-                  onClick={() => setSelectedVariant(v)}
-                >
-                  {v.label}
-                </button>
-              ))}
+              {product.variants.map((v, i) => {
+                const vg = parseGrams(v.label)
+                const isActive = isGramBased
+                  ? activeTier?.label === v.label
+                  : variant?.label === v.label
+                return (
+                  <button
+                    key={i}
+                    className={`variant-btn${isActive ? ' selected' : ''}`}
+                    onClick={() => {
+                      setSelectedVariant(v)
+                      if (isGramBased && vg > 0) setCustomGrams(vg)
+                    }}
+                  >
+                    {v.label}
+                  </button>
+                )
+              })}
             </div>
+
+            {/* Custom gram input */}
+            {isGramBased && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: '.78rem', color: 'var(--muted)', flexShrink: 0 }}>
+                  Quantità:
+                </span>
+                <div style={{
+                  display: 'flex', alignItems: 'center',
+                  background: 'var(--bg)', border: '1px solid var(--border)',
+                  borderRadius: 10, overflow: 'hidden',
+                }}>
+                  <button
+                    onClick={() => setCustomGrams(g => Math.max(1, g - 1))}
+                    style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '1.1rem', cursor: 'pointer', padding: '6px 12px' }}
+                  >−</button>
+                  <input
+                    type="number"
+                    min="1"
+                    value={customGrams || ''}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value)
+                      if (!isNaN(v) && v > 0) setCustomGrams(v)
+                    }}
+                    style={inputStyle}
+                  />
+                  <button
+                    onClick={() => setCustomGrams(g => g + 1)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '1.1rem', cursor: 'pointer', padding: '6px 12px' }}
+                  >+</button>
+                </div>
+                <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>g</span>
+                {activeTier && (
+                  <span style={{ fontSize: '.72rem', color: 'var(--green)', marginLeft: 'auto', flexShrink: 0 }}>
+                    Fascia {activeTier.label}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -169,16 +270,16 @@ export default function ProductDetail() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div>
               <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '2.1rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>
-                €{price}
-                {pricePerG && (
+                €{displayPrice}
+                {displayPricePerG && (
                   <span style={{ color: 'var(--muted)', fontSize: '.75rem' }}>
-                    {' '}· €{pricePerG}/g
+                    {' '}· €{displayPricePerG}/g
                   </span>
                 )}
               </div>
-              {variant && (
+              {displayLabel && (
                 <div style={{ color: 'var(--muted)', fontSize: '.75rem', marginTop: 2 }}>
-                  {variant.label}
+                  {displayLabel}
                 </div>
               )}
             </div>
