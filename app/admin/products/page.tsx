@@ -75,75 +75,60 @@ function AdminProductsInner() {
     setUploadProgress(5)
     setSaveError('')
 
+    const workerUrl = process.env.NEXT_PUBLIC_UPLOAD_WORKER_URL
+
     try {
-      // Step 1: ottieni URL firmato — Vercel genera solo l'URL, non tocca i byte del file
-      const presignRes = await fetch('/api/upload/presign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
-      })
-      if (!presignRes.ok) {
-        const d = await presignRes.json().catch(() => ({}))
-        throw new Error(d.error ?? `Errore server ${presignRes.status}`)
-      }
-      const { signedUrl, publicUrl } = await presignRes.json()
-      setUploadProgress(10)
+      if (workerUrl) {
+        // Percorso principale: Cloudflare Worker → R2 diretto
+        // Nessun limite di dimensione, nessun CORS, progresso reale
+        const { publicUrl } = await new Promise<{ publicUrl: string }>((resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+          xhr.open('POST', workerUrl)
+          xhr.setRequestHeader('X-Filename', file.name)
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+          xhr.timeout = 600_000
+          xhr.upload.onprogress = ev => {
+            if (ev.lengthComputable)
+              setUploadProgress(5 + Math.round((ev.loaded / ev.total) * 90))
+          }
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try { resolve(JSON.parse(xhr.responseText)) }
+              catch { reject(new Error('Risposta Worker non valida')) }
+            } else {
+              reject(new Error(`Worker errore ${xhr.status}: ${xhr.statusText}`))
+            }
+          }
+          xhr.onerror   = () => reject(new Error('Errore di rete verso il Worker'))
+          xhr.ontimeout = () => reject(new Error('Timeout: connessione troppo lenta'))
+          xhr.send(file)
+        })
 
-      // Step 2: carica direttamente su R2 via XHR (nessun limite Vercel, progresso reale)
-      let directOk = false
-      let directErr = ''
-      await new Promise<void>((resolve) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open('PUT', signedUrl)
-        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
-        xhr.timeout = 600_000
-        xhr.upload.onprogress = ev => {
-          if (ev.lengthComputable)
-            setUploadProgress(10 + Math.round((ev.loaded / ev.total) * 85))
-        }
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) directOk = true
-          else directErr = `R2 ${xhr.status}: ${xhr.statusText || 'errore sconosciuto'}`
-          resolve()
-        }
-        xhr.onerror   = () => resolve() // CORS/network → proviamo fallback
-        xhr.ontimeout = () => { directErr = 'Timeout: connessione troppo lenta'; resolve() }
-        xhr.send(file)
-      })
-
-      if (directErr) throw new Error(directErr)
-
-      if (directOk) {
-        // Caricamento diretto su R2 riuscito — nessun limite di dimensione
         const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
         setForm(f => ({ ...f, imageUrl: publicUrl, mediaType }))
         setUploadProgress(100)
-        setUploading(false)
-        return
-      }
 
-      // XHR bloccato (CORS) → fallback via server per file piccoli (max 4MB su Vercel)
-      if (file.size > 4 * 1024 * 1024) {
-        const mb = (file.size / 1024 / 1024).toFixed(1)
-        throw new Error(
-          `File ${mb}MB bloccato da CORS. Verifica che nel bucket R2 → Settings → CORS ` +
-          `ci siano: Origini *, Metodi GET/PUT/HEAD/DELETE, Header *, poi riprova.`
-        )
+      } else {
+        // Fallback: server Vercel (max 4MB — solo immagini o video compressi)
+        if (file.size > 4 * 1024 * 1024) {
+          throw new Error(
+            `File ${(file.size / 1024 / 1024).toFixed(1)}MB troppo grande. ` +
+            'Configura NEXT_PUBLIC_UPLOAD_WORKER_URL su Vercel per caricare video grandi.'
+          )
+        }
+        setUploadProgress(30)
+        const fd = new FormData()
+        fd.append('file', file)
+        const res = await fetch('/api/upload', { method: 'POST', body: fd })
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          throw new Error(d.error ?? `Errore server ${res.status}`)
+        }
+        const { publicUrl } = await res.json()
+        const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
+        setForm(f => ({ ...f, imageUrl: publicUrl, mediaType }))
+        setUploadProgress(100)
       }
-
-      // Fallback: carica via server Vercel (funziona sempre per file ≤ 4MB)
-      setUploadProgress(50)
-      const fd = new FormData()
-      fd.append('file', file)
-      const fallbackRes = await fetch('/api/upload', { method: 'POST', body: fd })
-      if (!fallbackRes.ok) {
-        const d = await fallbackRes.json().catch(() => ({}))
-        throw new Error(d.error ?? `Errore server ${fallbackRes.status}`)
-      }
-      const { publicUrl: fallbackUrl } = await fallbackRes.json()
-      const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
-      setForm(f => ({ ...f, imageUrl: fallbackUrl, mediaType }))
-      setUploadProgress(100)
 
     } catch (err: any) {
       setSaveError(`⚠ Upload fallito: ${err.message}`)
