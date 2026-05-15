@@ -86,9 +86,7 @@ export default function Home() {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
                 padding: '11px 16px', textDecoration: 'none',
-                background: 'linear-gradient(90deg,#7a2d00,#c45200,#e8a000,#c45200,#7a2d00)',
-                backgroundSize: '200% 100%',
-                animation: 'shimmer 2.5s linear infinite',
+                background: 'linear-gradient(90deg,#7a2d00 0%,#c45200 35%,#e8a000 50%,#c45200 65%,#7a2d00 100%)',
                 borderBottom: '1px solid rgba(255,180,0,.3)',
               }}
             >
