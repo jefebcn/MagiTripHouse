@@ -70,12 +70,13 @@ function AdminProductsInner() {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+
     setUploading(true)
     setUploadProgress(5)
     setSaveError('')
     try {
-      // Step 1: get presigned URL from server
-      const res = await fetch('/api/upload', {
+      // Step 1: ottieni URL firmato dal server (nessun dato del file passa per Vercel)
+      const res = await fetch('/api/upload/presign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: file.name, contentType: file.type }),
@@ -85,34 +86,34 @@ function AdminProductsInner() {
         throw new Error(data.error ?? `Errore server ${res.status}`)
       }
       const { signedUrl, publicUrl } = await res.json()
-      setUploadProgress(15)
+      setUploadProgress(10)
 
-      // Step 2: PUT file directly to R2 via XHR (more reliable than fetch on iOS Safari)
+      // Step 2: carica direttamente su R2 via XHR (con barra di progresso reale)
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
         xhr.open('PUT', signedUrl)
         xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
-        xhr.timeout = 180_000
+        xhr.timeout = 600_000 // 10 minuti
         xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable) {
-            setUploadProgress(15 + Math.round((ev.loaded / ev.total) * 83))
-          }
+          if (ev.lengthComputable)
+            setUploadProgress(10 + Math.round((ev.loaded / ev.total) * 88))
         }
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) resolve()
-          else reject(new Error(`R2 ha rifiutato il file: ${xhr.status} ${xhr.statusText}`))
+          else reject(new Error(`R2 ha rifiutato il file: ${xhr.status}`))
         }
-        xhr.onerror = () => reject(new Error('Errore di rete durante il caricamento'))
+        xhr.onerror = () => reject(new Error(
+          'Errore CORS: vai su /api/admin/setup-cors nel browser (una volta sola) e riprova'
+        ))
         xhr.ontimeout = () => reject(new Error('Timeout: connessione troppo lenta'))
         xhr.send(file)
       })
 
       const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
-      setForm((f) => ({ ...f, imageUrl: publicUrl, mediaType }))
+      setForm(f => ({ ...f, imageUrl: publicUrl, mediaType }))
       setUploadProgress(100)
     } catch (err: any) {
       setSaveError(`⚠ Upload fallito: ${err.message}`)
-      console.error('Upload failed', err)
     }
     setUploading(false)
   }
@@ -138,234 +139,331 @@ function AdminProductsInner() {
         setSaving(false)
         return
       }
-      await load()
       setEditing(null)
-      setForm({ ...EMPTY, ...(comboMode ? { category: 'combo', badge: 'combo' } : {}) })
-    } catch (err: any) {
-      setSaveError(err.message)
+      setForm({ ...EMPTY })
+      load()
+    } catch {
+      setSaveError('Errore di rete — riprova')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Eliminare questo prodotto?')) return
     await fetch(`/api/products/${id}`, { method: 'DELETE' })
-    await load()
-    if (editing?.id === id) {
-      setEditing(null)
-      setForm({ ...EMPTY })
-    }
+    load()
   }
 
-  async function handleMove(id: string, dir: 'up' | 'down') {
-    const idx = products.findIndex(p => p.id === id)
-    if (dir === 'up' && idx === 0) return
-    if (dir === 'down' && idx === products.length - 1) return
-    const other = products[dir === 'up' ? idx - 1 : idx + 1]
+  async function moveProduct(id: string, dir: -1 | 1) {
+    const sorted = [...products]
+    const idx = sorted.findIndex((p) => p.id === id)
+    const neighbor = sorted[idx + dir]
+    if (!neighbor) return
+    const myOrder = sorted[idx].sortOrder
+    const neighborOrder = neighbor.sortOrder
     await Promise.all([
-      fetch(`/api/products/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...products[idx], sortOrder: other.sortOrder }) }),
-      fetch(`/api/products/${other.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...other, sortOrder: products[idx].sortOrder }) }),
+      fetch(`/api/products/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: neighborOrder }) }),
+      fetch(`/api/products/${neighbor.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: myOrder }) }),
     ])
-    await load()
+    load()
   }
 
-  const inp: React.CSSProperties = {
-    width: '100%', background: '#0d1a0d', border: '1px solid #1e3a1e',
-    borderRadius: 8, padding: '9px 12px', color: '#edfaee', fontSize: '.9rem',
-    boxSizing: 'border-box',
-  }
-  const label: React.CSSProperties = {
-    fontSize: '.72rem', color: '#6a8a6a', letterSpacing: '.5px',
-    textTransform: 'uppercase', marginBottom: 4, display: 'block',
-  }
+  const inp = (label: string, key: keyof typeof EMPTY, type = 'text') => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>{label}</label>
+      <input
+        type={type}
+        value={String(form[key] ?? '')}
+        onChange={(e) => setForm((f) => ({ ...f, [key]: type === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value }))}
+        style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit', outline: 'none' }}
+      />
+    </div>
+  )
 
   const displayedProducts = comboMode
     ? products.filter(p => p.category === 'combo')
     : products
 
   return (
-    <div style={{ minHeight: '100vh', background: '#080c08', color: '#edfaee', fontFamily: "'DM Sans', sans-serif", padding: '16px 16px 80px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Link href="/admin" style={{ color: '#6a8a6a', fontSize: '1.2rem', textDecoration: 'none' }}>‹</Link>
-          <h1 style={{ margin: 0, fontSize: '1.1rem', fontFamily: "'Fredoka One', cursive" }}>
-            {comboMode ? '🔥 Combo' : '📦 Prodotti'}
-          </h1>
-        </div>
-        <button onClick={startCreate} style={{
-          background: comboMode ? 'linear-gradient(135deg,#ff6b00,#ff9500)' : 'linear-gradient(135deg,#3dff6e,#2fb344)',
-          border: 'none', borderRadius: 8, padding: '8px 16px',
-          color: '#000', fontWeight: 700, cursor: 'pointer', fontSize: '.85rem',
-        }}>+ Nuova</button>
+    <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
+        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>
+          {comboMode ? '🔥 Combo' : '📦 Prodotti'}
+        </span>
+        <button onClick={startCreate} style={{ marginLeft: 'auto', background: comboMode ? 'rgba(255,120,0,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${comboMode ? 'rgba(255,120,0,.4)' : 'rgba(61,255,110,.3)'}`, color: comboMode ? '#ff8c00' : 'var(--green)', borderRadius: 8, padding: '7px 14px', fontFamily: 'inherit', fontSize: '.82rem', fontWeight: 700, cursor: 'pointer' }}>
+          + Nuova {comboMode ? 'Combo' : ''}
+        </button>
       </div>
 
       {/* Form */}
-      <div style={{ background: '#111611', border: '1px solid #1e2a1e', borderRadius: 12, padding: 16, marginBottom: 20 }}>
-        <div style={{ fontWeight: 700, marginBottom: 14, fontSize: '.95rem' }}>
-          {editing ? '✏️ Modifica Prodotto' : '+ Nuovo Prodotto'}
-        </div>
-
-        {/* Upload */}
-        <div style={{ marginBottom: 14 }}>
-          <span style={label}>FOTO / VIDEO</span>
-          <div
-            onClick={() => fileRef.current?.click()}
-            style={{
-              border: '2px dashed #1e3a1e', borderRadius: 10, padding: '18px 12px',
-              textAlign: 'center', cursor: 'pointer', marginBottom: 8,
-              background: uploading ? 'rgba(61,255,110,.04)' : 'transparent',
-            }}
-          >
-            {uploading
-              ? `🔄 Caricamento... ${uploadProgress}%`
-              : form.imageUrl
-                ? `✅ File caricato`
-                : '📸 Carica nuovo file'
-            }
+      {(editing !== undefined && (editing !== null || form.name !== '' || true)) && (
+        <div style={{ background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.2)', borderRadius: 'var(--radius)', padding: 16, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem' }}>
+            {editing ? '✏️ Modifica Prodotto' : '➕ Nuovo Prodotto'}
           </div>
-          <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={handleUpload} />
-          <div style={{ textAlign: 'center', color: '#6a8a6a', fontSize: '.75rem', marginBottom: 6 }}>oppure incolla URL</div>
-          <input style={inp} placeholder="https://..." value={form.imageUrl ?? ''} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} />
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            {(['image', 'video'] as const).map(t => (
-              <button key={t} onClick={() => setForm(f => ({ ...f, mediaType: t }))} style={{
-                flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontSize: '.8rem', fontWeight: 600,
-                border: form.mediaType === t ? 'none' : '1px solid #1e3a1e',
-                background: form.mediaType === t ? 'linear-gradient(135deg,#3dff6e,#2fb344)' : '#0d1a0d',
-                color: form.mediaType === t ? '#000' : '#6a8a6a',
-              }}>{t === 'image' ? '🖼️ Immagine' : '🎥 Video'}</button>
-            ))}
-          </div>
-        </div>
 
-        <div style={{ marginBottom: 10 }}>
-          <span style={label}>NOME PRODOTTO</span>
-          <input style={inp} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <span style={label}>DESCRIZIONE</span>
-          <textarea style={{ ...inp, minHeight: 60, resize: 'vertical' }} value={form.description ?? ''} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <span style={label}>ORIGINE</span>
-          <input style={inp} value={form.origin ?? ''} onChange={e => setForm(f => ({ ...f, origin: e.target.value }))} />
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <span style={label}>EMOJI</span>
-          <input style={inp} value={form.emoji} onChange={e => setForm(f => ({ ...f, emoji: e.target.value }))} />
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <span style={label}>CATEGORIA</span>
-          <select style={{ ...inp }} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-            {['premium', 'frozen', 'new', 'hash', 'cbd', 'combo'].map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <span style={label}>BADGE</span>
-          <select style={{ ...inp }} value={form.badge ?? ''} onChange={e => setForm(f => ({ ...f, badge: e.target.value }))}>
-            <option value="">nessuno</option>
-            {['premium', 'frozen', 'new', 'hash', 'cbd', 'combo'].map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <span style={label}>TAG (virgola)</span>
-          <input style={inp} value={Array.isArray(form.tags) ? form.tags.join(', ') : form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) }))} />
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <span style={label}>STOCK (vuoto = illimitato)</span>
-          <input type="number" style={inp} value={form.stock ?? ''} onChange={e => setForm(f => ({ ...f, stock: e.target.value === '' ? null : Number(e.target.value) }))} />
-        </div>
-        <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '.85rem', cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.isOnSale ?? false} onChange={e => setForm(f => ({ ...f, isOnSale: e.target.checked }))} />
-            In sconto
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '.85rem', cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.isComingSoon ?? false} onChange={e => setForm(f => ({ ...f, isComingSoon: e.target.checked }))} />
-            Prossimamente
-          </label>
-        </div>
-
-        {/* Variants */}
-        <div style={{ marginBottom: 10 }}>
-          <span style={label}>TAGLI / VARIANTI</span>
-          {form.variants.map((v, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-              <input style={{ ...inp, flex: 2 }} placeholder="es. 1g" value={v.label} onChange={e => setForm(f => ({ ...f, variants: f.variants.map((vv, ii) => ii === i ? { ...vv, label: e.target.value } : vv) }))} />
-              <input type="number" style={{ ...inp, flex: 1 }} placeholder="€" value={v.price || ''} onChange={e => setForm(f => ({ ...f, variants: f.variants.map((vv, ii) => ii === i ? { ...vv, price: Number(e.target.value) } : vv) }))} />
-              <button onClick={() => setForm(f => ({ ...f, variants: f.variants.filter((_, ii) => ii !== i) }))} style={{ background: 'transparent', border: 'none', color: '#e83b3b', cursor: 'pointer', fontSize: '1rem' }}>×</button>
+          {/* Media upload */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>
+              Foto / Video
             </div>
-          ))}
-          <button onClick={() => setForm(f => ({ ...f, variants: [...f.variants, { label: '', price: 0 }] }))} style={{ fontSize: '.78rem', color: '#3dff6e', background: 'transparent', border: 'none', cursor: 'pointer' }}>+ Aggiungi taglio</button>
-        </div>
 
-        {/* Bundle picker — only for combo products */}
-        {form.category === 'combo' && (
-          <div style={{ marginBottom: 14 }}>
-            <span style={label}>PRODOTTI NEL COMBO</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {products.filter(p => p.category !== 'combo').map(p => {
-                const item = form.bundleItems?.find(b => b.productId === p.id)
-                const checked = !!item
-                return (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0d1a0d', borderRadius: 8, padding: '8px 10px', border: checked ? '1px solid rgba(61,255,110,.3)' : '1px solid #1e3a1e' }}>
-                    <input type="checkbox" checked={checked} onChange={e => {
-                      if (e.target.checked) {
-                        setForm(f => ({ ...f, bundleItems: [...(f.bundleItems ?? []), { productId: p.id, productName: p.name, emoji: p.emoji, qty: 1 }] }))
-                      } else {
-                        setForm(f => ({ ...f, bundleItems: (f.bundleItems ?? []).filter(b => b.productId !== p.id) }))
-                      }
-                    }} />
-                    <span style={{ flex: 1, fontSize: '.85rem' }}>{p.emoji} {p.name}</span>
-                    {checked && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button onClick={() => setForm(f => ({ ...f, bundleItems: (f.bundleItems ?? []).map(b => b.productId === p.id ? { ...b, qty: Math.max(1, b.qty - 1) } : b) }))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #1e3a1e', background: '#111611', color: '#edfaee', cursor: 'pointer', fontSize: '.9rem' }}>-</button>
-                        <span style={{ minWidth: 20, textAlign: 'center', fontSize: '.85rem' }}>{item!.qty}</span>
-                        <button onClick={() => setForm(f => ({ ...f, bundleItems: (f.bundleItems ?? []).map(b => b.productId === p.id ? { ...b, qty: b.qty + 1 } : b) }))} style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid #1e3a1e', background: '#111611', color: '#edfaee', cursor: 'pointer', fontSize: '.9rem' }}>+</button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+            {form.imageUrl && (
+              <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden' }}>
+                {form.mediaType === 'video'
+                  ? <video src={form.imageUrl} style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  : <img src={form.imageUrl} alt="" style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} />
+                }
+                <button
+                  onClick={() => setForm((f) => ({ ...f, imageUrl: '', mediaType: 'image' }))}
+                  style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: 20, color: '#fff', fontSize: '.72rem', padding: '4px 9px', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  ✕ Rimuovi
+                </button>
+              </div>
+            )}
+
+            <div
+              onClick={() => fileRef.current?.click()}
+              style={{
+                border: '2px dashed rgba(61,255,110,.3)', borderRadius: 12, padding: 16,
+                textAlign: 'center', cursor: 'pointer', color: 'var(--muted)', fontSize: '.85rem',
+              }}
+            >
+              {uploading ? `⏳ Upload ${uploadProgress}%` : '📸 Carica nuovo file'}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={handleUpload} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted)', fontSize: '.75rem' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              oppure incolla URL
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            </div>
+            <input
+              type="url"
+              placeholder="https://..."
+              value={form.imageUrl}
+              onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['image', 'video'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setForm((f) => ({ ...f, mediaType: t }))}
+                  style={{
+                    flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 600,
+                    background: form.mediaType === t ? 'rgba(61,255,110,.15)' : 'var(--bg3)',
+                    color: form.mediaType === t ? 'var(--green)' : 'var(--muted)',
+                    border: `1px solid ${form.mediaType === t ? 'rgba(61,255,110,.4)' : 'var(--border)'}`,
+                  }}
+                >
+                  {t === 'image' ? '🖼 Immagine' : '🎦 Video'}
+                </button>
+              ))}
             </div>
           </div>
-        )}
 
-        {saveError && (
-          <div style={{ background: 'rgba(232,59,59,.12)', border: '1px solid rgba(232,59,59,.4)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: '.82rem', color: '#ff8080' }}>
-            {saveError}
+          {inp('Nome prodotto', 'name')}
+          {inp('Descrizione', 'description')}
+          {inp('Origine', 'origin')}
+          {inp('Emoji', 'emoji')}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Categoria</label>
+            <select
+              value={form.category}
+              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value, badge: e.target.value }))}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit', outline: 'none' }}
+            >
+              {['premium','frozen','new','hash','cbd','combo'].map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
-        )}
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={handleSave} disabled={saving} style={{
-            flex: 1, background: saving ? '#1e3a1e' : comboMode ? 'linear-gradient(135deg,#ff6b00,#ff9500)' : 'linear-gradient(135deg,#3dff6e,#2fb344)',
-            border: 'none', borderRadius: 8, padding: '10px 0',
-            color: '#000', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
-          }}>{saving ? 'Salvataggio...' : editing ? 'Salva modifiche' : 'Crea prodotto'}</button>
-          {editing && (
-            <button onClick={() => { setEditing(null); setForm({ ...EMPTY }) }} style={{
-              padding: '10px 16px', borderRadius: 8, border: '1px solid #1e3a1e',
-              background: 'transparent', color: '#6a8a6a', cursor: 'pointer',
-            }}>Annulla</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Tag (separati da virgola)</label>
+            <input
+              type="text"
+              value={Array.isArray(form.tags) ? form.tags.join(', ') : form.tags}
+              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean) }))}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit', outline: 'none' }}
+            />
+          </div>
+
+          {inp('Giacenza (vuoto = illimitata, 0 = esaurito)', 'stock', 'number')}
+
+          {/* Stato prodotto */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Stato speciale</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, isOnSale: !f.isOnSale, isComingSoon: false }))}
+                style={{
+                  flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700, border: '1px solid',
+                  background: form.isOnSale ? 'rgba(232,59,59,.15)' : 'var(--bg3)',
+                  color:      form.isOnSale ? '#e83b3b'             : 'var(--muted)',
+                  borderColor: form.isOnSale ? 'rgba(232,59,59,.4)' : 'var(--border)',
+                }}
+              >🏷 In sconto</button>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, isComingSoon: !f.isComingSoon, isOnSale: false }))}
+                style={{
+                  flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700, border: '1px solid',
+                  background: form.isComingSoon ? 'rgba(59,130,246,.15)' : 'var(--bg3)',
+                  color:      form.isComingSoon ? '#7ec8f8'              : 'var(--muted)',
+                  borderColor: form.isComingSoon ? 'rgba(59,130,246,.4)' : 'var(--border)',
+                }}
+              >🕐 In arrivo</button>
+            </div>
+          </div>
+
+          {/* Bundle picker — solo per combo */}
+          {form.category === 'combo' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label style={{ fontSize: '.75rem', color: '#ff8c00', textTransform: 'uppercase', letterSpacing: '.4px' }}>🔥 Prodotti inclusi nella combo</label>
+              <div style={{ background: 'rgba(255,120,0,.06)', border: '1px solid rgba(255,120,0,.25)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {products.filter(p => p.category !== 'combo').map((p) => {
+                  const item = (form.bundleItems ?? []).find(b => b.productId === p.id)
+                  const selected = !!item
+                  return (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(e) => {
+                          const cur = form.bundleItems ?? []
+                          if (e.target.checked) {
+                            setForm(f => ({ ...f, bundleItems: [...cur, { productId: p.id, productName: p.name, emoji: p.emoji, qty: 1 }] }))
+                          } else {
+                            setForm(f => ({ ...f, bundleItems: cur.filter(b => b.productId !== p.id) }))
+                          }
+                        }}
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#ff8c00' }}
+                      />
+                      <span style={{ flex: 1, fontSize: '.85rem', color: selected ? 'var(--text)' : 'var(--muted)' }}>{p.emoji} {p.name}</span>
+                      {selected && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => setForm(f => ({ ...f, bundleItems: (f.bundleItems ?? []).map(b => b.productId === p.id ? { ...b, qty: Math.max(1, b.qty - 1) } : b) }))}
+                            style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid rgba(255,120,0,.4)', background: 'rgba(255,120,0,.1)', color: '#ff8c00', cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >−</button>
+                          <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700, color: '#ff8c00', fontSize: '.9rem' }}>{item!.qty}</span>
+                          <button
+                            type="button"
+                            onClick={() => setForm(f => ({ ...f, bundleItems: (f.bundleItems ?? []).map(b => b.productId === p.id ? { ...b, qty: b.qty + 1 } : b) }))}
+                            style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid rgba(255,120,0,.4)', background: 'rgba(255,120,0,.1)', color: '#ff8c00', cursor: 'pointer', fontFamily: 'inherit', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >+</button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                {products.filter(p => p.category !== 'combo').length === 0 && (
+                  <div style={{ fontSize: '.8rem', color: 'var(--muted)', textAlign: 'center', padding: '8px 0' }}>Nessun prodotto disponibile</div>
+                )}
+              </div>
+            </div>
           )}
+
+          {/* Variants */}
+          <div>
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 8 }}>Tagli & Prezzi</div>
+            {form.variants.map((v, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input
+                  placeholder="es. 5g"
+                  value={v.label}
+                  onChange={(e) => {
+                    const variants = [...form.variants]
+                    variants[i] = { ...variants[i], label: e.target.value }
+                    setForm((f) => ({ ...f, variants }))
+                  }}
+                  style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
+                />
+                <input
+                  type="number"
+                  placeholder="€"
+                  value={v.price || ''}
+                  onChange={(e) => {
+                    const variants = [...form.variants]
+                    variants[i] = { ...variants[i], price: Number(e.target.value) }
+                    setForm((f) => ({ ...f, variants }))
+                  }}
+                  style={{ width: 80, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
+                />
+                {form.variants.length > 1 && (
+                  <button
+                    onClick={() => setForm((f) => ({ ...f, variants: f.variants.filter((_, j) => j !== i) }))}
+                    style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', color: 'var(--red)', cursor: 'pointer' }}
+                  >✕</button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => setForm((f) => ({ ...f, variants: [...f.variants, { label: '', price: 0 }] }))}
+              style={{ width: '100%', background: 'var(--bg3)', border: '1.5px dashed rgba(61,255,110,.3)', borderRadius: 9, padding: 9, color: 'var(--green)', fontSize: '.82rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              ＋ Aggiungi Taglio
+            </button>
+          </div>
+
+          {saveError && (
+            <div style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 10, padding: '10px 14px', fontSize: '.82rem', color: 'var(--red)', marginBottom: 4 }}>
+              ⚠️ {saveError}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleSave}
+              disabled={saving || uploading}
+              className="checkout-btn"
+              style={{ flex: 1 }}
+            >
+              {saving ? 'Salvataggio...' : '💾 Salva Prodotto'}
+            </button>
+            <button
+              onClick={() => { setEditing(null); setForm({ ...EMPTY }) }}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: '15px 16px', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'inherit' }}
+            >
+              Annulla
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Product list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {displayedProducts.map((p, idx) => (
-          <div key={p.id} style={{ background: '#111611', border: '1px solid #1e2a1e', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: '1.4rem', flexShrink: 0 }}>{p.emoji}</div>
+          <div key={p.id} style={{ background: 'var(--card)', border: `1px solid ${p.category === 'combo' ? 'rgba(255,120,0,.3)' : 'var(--border)'}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', background: 'var(--bg3)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {p.imageUrl
+                ? p.mediaType === 'video'
+                  ? <span style={{ fontSize: '1.2rem' }}>▶</span>
+                  // eslint-disable-next-line @next/next/no-img-element
+                  : <img src={p.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <span style={{ fontSize: '1.2rem' }}>{p.emoji}</span>
+              }
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: '.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-              <div style={{ fontSize: '.72rem', color: '#6a8a6a' }}>{p.category}{p.stock === 0 ? ' — ESAURITO' : ''}</div>
+              <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>
+                {p.category === 'combo' && p.bundleItems?.length
+                  ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
+                  : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
+                {p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-              <button onClick={() => handleMove(p.id, 'up')} disabled={idx === 0} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #1e3a1e', background: 'transparent', color: '#6a8a6a', cursor: 'pointer', fontSize: '.75rem' }}>↑</button>
-              <button onClick={() => handleMove(p.id, 'down')} disabled={idx === displayedProducts.length - 1} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #1e3a1e', background: 'transparent', color: '#6a8a6a', cursor: 'pointer', fontSize: '.75rem' }}>↓</button>
-              <button onClick={() => startEdit(p)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #1e3a1e', background: 'transparent', color: '#3dff6e', cursor: 'pointer', fontSize: '.75rem' }}>✏️</button>
-              <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: 'rgba(232,59,59,.15)', color: '#e83b3b', cursor: 'pointer', fontSize: '.75rem' }}>🗑</button>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button onClick={() => moveProduct(p.id, -1)} disabled={idx === 0} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--muted)', fontSize: '.85rem' }}>↑</button>
+              <button onClick={() => moveProduct(p.id, 1)} disabled={idx === displayedProducts.length - 1} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--muted)', fontSize: '.85rem' }}>↓</button>
+              <button onClick={() => startEdit(p)} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
+              <button onClick={() => handleDelete(p.id)} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
             </div>
           </div>
         ))}

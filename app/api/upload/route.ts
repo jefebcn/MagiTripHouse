@@ -13,8 +13,6 @@ const r2 = new S3Client({
 
 export const maxDuration = 60
 
-// Single-shot upload for files that fit within Vercel's 4.5 MB body limit.
-// For larger files the admin page uses the multipart routes (start/part/complete).
 export async function POST(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
