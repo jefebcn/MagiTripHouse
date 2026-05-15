@@ -90,11 +90,12 @@ export default function Home() {
                 borderBottom: '1px solid rgba(255,180,0,.3)',
               }}
             >
-              <span style={{ fontSize: '1.2rem' }}>🎰</span>
+              <span style={{ fontSize: '1rem', flexShrink: 0 }}>🎰</span>
               <span style={{
                 fontFamily: "'Fredoka One', cursive",
-                fontSize: '.95rem', color: '#fff8e0',
-                letterSpacing: '.5px', textShadow: '0 1px 4px rgba(0,0,0,.4)',
+                fontSize: '.78rem', color: '#fff8e0',
+                letterSpacing: '.3px', textShadow: '0 1px 4px rgba(0,0,0,.4)',
+                whiteSpace: 'nowrap',
               }}>
                 PARTECIPA ALLA TOMBOLA — Clicca qui!
               </span>
