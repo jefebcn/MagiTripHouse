@@ -71,29 +71,44 @@ function AdminProductsInner() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 4 * 1024 * 1024) {
-      setSaveError('⚠ File troppo grande (max 4MB). Comprimi il video prima di caricarlo.')
-      if (fileRef.current) fileRef.current.value = ''
-      return
-    }
-
     setUploading(true)
-    setUploadProgress(20)
+    setUploadProgress(5)
     setSaveError('')
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      setUploadProgress(40)
-
-      const res = await fetch('/api/upload', { method: 'POST', body: fd })
-      setUploadProgress(90)
-
+      // Step 1: ottieni URL firmato dal server (nessun dato del file passa per Vercel)
+      const res = await fetch('/api/upload/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? `Errore server ${res.status}`)
       }
+      const { signedUrl, publicUrl } = await res.json()
+      setUploadProgress(10)
 
-      const { publicUrl } = await res.json()
+      // Step 2: carica direttamente su R2 via XHR (con barra di progresso reale)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', signedUrl)
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+        xhr.timeout = 600_000 // 10 minuti
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable)
+            setUploadProgress(10 + Math.round((ev.loaded / ev.total) * 88))
+        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve()
+          else reject(new Error(`R2 ha rifiutato il file: ${xhr.status}`))
+        }
+        xhr.onerror = () => reject(new Error(
+          'Errore CORS: vai su /api/admin/setup-cors nel browser (una volta sola) e riprova'
+        ))
+        xhr.ontimeout = () => reject(new Error('Timeout: connessione troppo lenta'))
+        xhr.send(file)
+      })
+
       const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
       setForm(f => ({ ...f, imageUrl: publicUrl, mediaType }))
       setUploadProgress(100)
