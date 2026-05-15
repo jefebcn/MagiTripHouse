@@ -3,7 +3,18 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 
 export async function GET() {
-  const products = await prisma.product.findMany({ orderBy: { sortOrder: 'asc' } })
+  const products = await prisma.product.findMany({
+    orderBy: [
+      { sortOrder: 'asc' },
+    ],
+  })
+  // Prodotti esauriti sempre in fondo, mantenendo l'ordine interno
+  products.sort((a, b) => {
+    const aOut = a.stock === 0 ? 1 : 0
+    const bOut = b.stock === 0 ? 1 : 0
+    if (aOut !== bOut) return aOut - bOut
+    return (a.sortOrder ?? 99) - (b.sortOrder ?? 99)
+  })
   return NextResponse.json(products)
 }
 
