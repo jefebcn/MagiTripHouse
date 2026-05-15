@@ -70,29 +70,35 @@ function AdminProductsInner() {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+
+    if (file.size > 4 * 1024 * 1024) {
+      setSaveError('⚠ File troppo grande (max 4MB). Comprimi il video prima di caricarlo.')
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+
     setUploading(true)
-    setUploadProgress(10)
+    setUploadProgress(20)
+    setSaveError('')
     try {
-      // Get presigned URL from server
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
-      })
-      if (!res.ok) throw new Error('Failed to get upload URL')
-      const { signedUrl, publicUrl } = await res.json()
-      setUploadProgress(30)
-      // Upload directly to R2
-      await fetch(signedUrl, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
-      })
+      const fd = new FormData()
+      fd.append('file', file)
+      setUploadProgress(40)
+
+      const res = await fetch('/api/upload', { method: 'POST', body: fd })
+      setUploadProgress(90)
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? `Errore server ${res.status}`)
+      }
+
+      const { publicUrl } = await res.json()
       const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
-      setForm((f) => ({ ...f, imageUrl: publicUrl, mediaType }))
+      setForm(f => ({ ...f, imageUrl: publicUrl, mediaType }))
       setUploadProgress(100)
-    } catch (err) {
-      console.error('Upload failed', err)
+    } catch (err: any) {
+      setSaveError(`⚠ Upload fallito: ${err.message}`)
     }
     setUploading(false)
   }

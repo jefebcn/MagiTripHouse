@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { auth } from '@/lib/auth'
 
 const r2 = new S3Client({
@@ -12,26 +11,28 @@ const r2 = new S3Client({
   },
 })
 
+export const maxDuration = 60
+
 export async function POST(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { filename, contentType } = await req.json()
-  if (!filename || !contentType) {
-    return NextResponse.json({ error: 'Missing filename or contentType' }, { status: 400 })
-  }
+  const formData = await req.formData()
+  const file = formData.get('file') as File | null
+  if (!file) return NextResponse.json({ error: 'Nessun file ricevuto' }, { status: 400 })
 
-  const ext = (filename as string).split('.').pop() ?? 'bin'
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
   const key = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+  const contentType = file.type || (ext.match(/mp4|mov|webm/) ? 'video/mp4' : 'image/jpeg')
 
-  const command = new PutObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME!,
-    Key: key,
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  await r2.send(new PutObjectCommand({
+    Bucket:      process.env.R2_BUCKET_NAME!,
+    Key:         key,
+    Body:        buffer,
     ContentType: contentType,
-  })
+  }))
 
-  const signedUrl = await getSignedUrl(r2, command, { expiresIn: 300 })
-  const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`
-
-  return NextResponse.json({ signedUrl, publicUrl })
+  return NextResponse.json({ publicUrl: `${process.env.R2_PUBLIC_URL}/${key}` })
 }
