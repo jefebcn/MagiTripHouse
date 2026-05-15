@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3'
-import { auth } from '@/lib/auth'
 
 const r2 = new S3Client({
   region: 'auto',
@@ -12,21 +11,21 @@ const r2 = new S3Client({
 })
 
 export async function GET() {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  await r2.send(new PutBucketCorsCommand({
-    Bucket: process.env.R2_BUCKET_NAME!,
-    CORSConfiguration: {
-      CORSRules: [{
-        AllowedOrigins: ['*'],
-        AllowedMethods: ['GET', 'PUT', 'HEAD', 'DELETE'],
-        AllowedHeaders: ['*'],
-        ExposeHeaders:  ['ETag'],
-        MaxAgeSeconds:  3600,
-      }],
-    },
-  }))
-
-  return NextResponse.json({ ok: true, message: 'CORS configurato correttamente su R2' })
+  try {
+    await r2.send(new PutBucketCorsCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      CORSConfiguration: {
+        CORSRules: [{
+          AllowedOrigins: ['*'],
+          AllowedMethods: ['GET', 'PUT', 'HEAD', 'DELETE'],
+          AllowedHeaders: ['*'],
+          ExposeHeaders:  ['ETag'],
+          MaxAgeSeconds:  3600,
+        }],
+      },
+    }))
+    return NextResponse.json({ ok: true, message: 'CORS configurato su R2' })
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: err.message }, { status: 500 })
+  }
 }
