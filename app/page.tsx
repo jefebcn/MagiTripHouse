@@ -78,6 +78,30 @@ export default function Home() {
       <div style={{ display: view === 'catalog' ? 'block' : 'none' }}>
         {isLoggedIn ? (
           <>
+            {/* Banner Tombola */}
+            <a
+              href="https://t.me/+hHYTnDvbiYgwYjY0"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                padding: '11px 16px', textDecoration: 'none',
+                background: 'linear-gradient(90deg,#7a2d00,#c45200,#e8a000,#c45200,#7a2d00)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 2.5s linear infinite',
+                borderBottom: '1px solid rgba(255,180,0,.3)',
+              }}
+            >
+              <span style={{ fontSize: '1.2rem' }}>🎰</span>
+              <span style={{
+                fontFamily: "'Fredoka One', cursive",
+                fontSize: '.95rem', color: '#fff8e0',
+                letterSpacing: '.5px', textShadow: '0 1px 4px rgba(0,0,0,.4)',
+              }}>
+                PARTECIPA ALLA TOMBOLA — Clicca qui!
+              </span>
+              <span style={{ fontSize: '1rem' }}>🎟️</span>
+            </a>
             <Header />
             <AnnouncementBanner />
             <Marquee />
