@@ -74,44 +74,77 @@ function AdminProductsInner() {
     setUploading(true)
     setUploadProgress(5)
     setSaveError('')
+
     try {
-      // Step 1: ottieni URL firmato dal server (nessun dato del file passa per Vercel)
-      const res = await fetch('/api/upload/presign', {
+      // Step 1: ottieni URL firmato — Vercel genera solo l'URL, non tocca i byte del file
+      const presignRes = await fetch('/api/upload/presign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: file.name, contentType: file.type }),
       })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? `Errore server ${res.status}`)
+      if (!presignRes.ok) {
+        const d = await presignRes.json().catch(() => ({}))
+        throw new Error(d.error ?? `Errore server ${presignRes.status}`)
       }
-      const { signedUrl, publicUrl } = await res.json()
+      const { signedUrl, publicUrl } = await presignRes.json()
       setUploadProgress(10)
 
-      // Step 2: carica direttamente su R2 via XHR (con barra di progresso reale)
-      await new Promise<void>((resolve, reject) => {
+      // Step 2: carica direttamente su R2 via XHR (nessun limite Vercel, progresso reale)
+      let directOk = false
+      let directErr = ''
+      await new Promise<void>((resolve) => {
         const xhr = new XMLHttpRequest()
         xhr.open('PUT', signedUrl)
         xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
-        xhr.timeout = 600_000 // 10 minuti
-        xhr.upload.onprogress = (ev) => {
+        xhr.timeout = 600_000
+        xhr.upload.onprogress = ev => {
           if (ev.lengthComputable)
-            setUploadProgress(10 + Math.round((ev.loaded / ev.total) * 88))
+            setUploadProgress(10 + Math.round((ev.loaded / ev.total) * 85))
         }
         xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve()
-          else reject(new Error(`R2 ha rifiutato il file: ${xhr.status}`))
+          if (xhr.status >= 200 && xhr.status < 300) directOk = true
+          else directErr = `R2 ${xhr.status}: ${xhr.statusText || 'errore sconosciuto'}`
+          resolve()
         }
-        xhr.onerror = () => reject(new Error(
-          'Errore CORS: vai su /api/admin/setup-cors nel browser (una volta sola) e riprova'
-        ))
-        xhr.ontimeout = () => reject(new Error('Timeout: connessione troppo lenta'))
+        xhr.onerror   = () => resolve() // CORS/network → proviamo fallback
+        xhr.ontimeout = () => { directErr = 'Timeout: connessione troppo lenta'; resolve() }
         xhr.send(file)
       })
 
+      if (directErr) throw new Error(directErr)
+
+      if (directOk) {
+        // Caricamento diretto su R2 riuscito — nessun limite di dimensione
+        const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
+        setForm(f => ({ ...f, imageUrl: publicUrl, mediaType }))
+        setUploadProgress(100)
+        setUploading(false)
+        return
+      }
+
+      // XHR bloccato (CORS) → fallback via server per file piccoli (max 4MB su Vercel)
+      if (file.size > 4 * 1024 * 1024) {
+        const mb = (file.size / 1024 / 1024).toFixed(1)
+        throw new Error(
+          `File ${mb}MB bloccato da CORS. Verifica che nel bucket R2 → Settings → CORS ` +
+          `ci siano: Origini *, Metodi GET/PUT/HEAD/DELETE, Header *, poi riprova.`
+        )
+      }
+
+      // Fallback: carica via server Vercel (funziona sempre per file ≤ 4MB)
+      setUploadProgress(50)
+      const fd = new FormData()
+      fd.append('file', file)
+      const fallbackRes = await fetch('/api/upload', { method: 'POST', body: fd })
+      if (!fallbackRes.ok) {
+        const d = await fallbackRes.json().catch(() => ({}))
+        throw new Error(d.error ?? `Errore server ${fallbackRes.status}`)
+      }
+      const { publicUrl: fallbackUrl } = await fallbackRes.json()
       const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
-      setForm(f => ({ ...f, imageUrl: publicUrl, mediaType }))
+      setForm(f => ({ ...f, imageUrl: fallbackUrl, mediaType }))
       setUploadProgress(100)
+
     } catch (err: any) {
       setSaveError(`⚠ Upload fallito: ${err.message}`)
     }
