@@ -52,7 +52,7 @@ export default function CartDrawer() {
         id: orderId,
         userId,
         total: total(),
-        items: items.map((x) => ({ id: x.id, label: x.variantLabel, price: x.variantPrice, qty: x.qty })),
+        items: items.map((x) => ({ id: x.id, name: x.productName, emoji: x.emoji, label: x.variantLabel, price: x.variantPrice, qty: x.qty })),
         note: note.trim() || null,
         referredBy: typeof localStorage !== 'undefined' ? localStorage.getItem('tp_ref') : null,
       }),
