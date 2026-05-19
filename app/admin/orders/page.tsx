@@ -36,16 +36,23 @@ const TABS = [
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([])
+  const [products, setProducts] = useState<Record<string, { name: string; emoji: string }>>({})
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('all')
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/orders')
-      .then(r => r.json())
-      .then(data => { setOrders(data); setLoading(false) })
-      .catch(() => setLoading(false))
+    Promise.all([
+      fetch('/api/orders').then(r => r.json()),
+      fetch('/api/products').then(r => r.json()),
+    ]).then(([ordersData, productsData]) => {
+      setOrders(ordersData)
+      const map: Record<string, { name: string; emoji: string }> = {}
+      for (const p of productsData) map[p.id] = { name: p.name, emoji: p.emoji }
+      setProducts(map)
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [])
 
   async function updateStatus(id: string, status: string) {
@@ -169,7 +176,7 @@ export default function AdminOrders() {
 
                   {/* Compact items summary (always visible) */}
                   <div style={{ fontSize: '.74rem', color: 'var(--muted)' }}>
-                    {items.map(x => `${x.emoji ?? ''} ${x.name ?? ''} ${x.label} ×${x.qty}`.trim()).join(' · ') || String(o.items)}
+                    {items.map(x => `${products[x.id]?.emoji ?? x.emoji ?? ''} ${products[x.id]?.name ?? x.name ?? x.id} ${x.label} ×${x.qty}`.trim()).join(' · ') || String(o.items)}
                   </div>
 
                   {/* Status badge */}
@@ -190,10 +197,10 @@ export default function AdminOrders() {
                           background: 'var(--bg)', borderRadius: 8, padding: '8px 10px',
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: '1.2rem' }}>{x.emoji ?? '🌿'}</span>
+                            <span style={{ fontSize: '1.2rem' }}>{products[x.id]?.emoji ?? x.emoji ?? '🌿'}</span>
                             <div>
                               <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--text)' }}>
-                                {x.name ?? x.id}
+                                {products[x.id]?.name ?? x.name ?? x.id}
                               </div>
                               <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>
                                 {x.label} · €{x.price.toFixed(2)}/u · ×{x.qty}
