@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
@@ -39,6 +39,11 @@ function AdminProductsInner() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const dragIdxRef = useRef<number | null>(null)
+  const hoverIdxRef = useRef<number | null>(null)
 
   async function load() {
     const res = await fetch('/api/products')
@@ -173,19 +178,54 @@ function AdminProductsInner() {
     load()
   }
 
-  async function moveProduct(id: string, dir: -1 | 1) {
-    const sorted = [...products]
-    const idx = sorted.findIndex((p) => p.id === id)
-    const neighbor = sorted[idx + dir]
-    if (!neighbor) return
-    const myOrder = sorted[idx].sortOrder
-    const neighborOrder = neighbor.sortOrder
-    await Promise.all([
-      fetch(`/api/products/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: neighborOrder }) }),
-      fetch(`/api/products/${neighbor.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: myOrder }) }),
-    ])
-    load()
-  }
+  const onDragTouchStart = useCallback((e: React.TouchEvent, idx: number) => {
+    e.preventDefault()
+    dragIdxRef.current = idx
+    hoverIdxRef.current = idx
+    setDragIdx(idx)
+    setHoverIdx(idx)
+  }, [])
+
+  const onDragTouchMove = useCallback((e: React.TouchEvent) => {
+    if (dragIdxRef.current === null) return
+    e.preventDefault()
+    const touch = e.touches[0]
+    const list = listRef.current
+    if (!list) return
+    const children = Array.from(list.children) as HTMLElement[]
+    for (let i = 0; i < children.length; i++) {
+      const rect = children[i].getBoundingClientRect()
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        hoverIdxRef.current = i
+        setHoverIdx(i)
+        break
+      }
+    }
+  }, [])
+
+  const onDragTouchEnd = useCallback(async () => {
+    const from = dragIdxRef.current
+    const to = hoverIdxRef.current
+    setDragIdx(null)
+    setHoverIdx(null)
+    dragIdxRef.current = null
+    hoverIdxRef.current = null
+    if (from === null || to === null || from === to) return
+    setProducts(prev => {
+      const list = [...prev]
+      const [moved] = list.splice(from, 1)
+      list.splice(to, 0, moved)
+      const updates = list.map((p, i) => ({ id: p.id, sortOrder: i }))
+      Promise.all(updates.map(u =>
+        fetch(`/api/products/${u.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sortOrder: u.sortOrder }),
+        })
+      )).catch(() => {})
+      return list.map((p, i) => ({ ...p, sortOrder: i }))
+    })
+  }, [])
 
   const inp = (label: string, key: keyof typeof EMPTY, type = 'text') => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -455,36 +495,81 @@ function AdminProductsInner() {
         </div>
       )}
 
+      {/* Drag hint */}
+      {displayedProducts.length > 1 && (
+        <div style={{ fontSize: '.72rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 8, opacity: .7 }}>
+          ☰ Tieni premuto e trascina per riordinare
+        </div>
+      )}
+
       {/* Product list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {displayedProducts.map((p, idx) => (
-          <div key={p.id} style={{ background: 'var(--card)', border: `1px solid ${p.category === 'combo' ? 'rgba(255,120,0,.3)' : 'var(--border)'}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', background: 'var(--bg3)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {p.imageUrl
-                ? p.mediaType === 'video'
-                  ? <span style={{ fontSize: '1.2rem' }}>▶</span>
-                  // eslint-disable-next-line @next/next/no-img-element
-                  : <img src={p.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <span style={{ fontSize: '1.2rem' }}>{p.emoji}</span>
-              }
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: '.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-              <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>
-                {p.category === 'combo' && p.bundleItems?.length
-                  ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
-                  : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
-                {p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
+      <div
+        ref={listRef}
+        style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+        onTouchMove={onDragTouchMove}
+        onTouchEnd={onDragTouchEnd}
+        onTouchCancel={onDragTouchEnd}
+      >
+        {displayedProducts.map((p, idx) => {
+          const isDragging = dragIdx === idx
+          const isHover = hoverIdx === idx && dragIdx !== null && dragIdx !== idx
+          return (
+            <div
+              key={p.id}
+              style={{
+                background: 'var(--card)',
+                border: isHover
+                  ? '2px solid var(--green)'
+                  : `1px solid ${p.category === 'combo' ? 'rgba(255,120,0,.3)' : 'var(--border)'}`,
+                borderRadius: 12, padding: '10px 12px',
+                display: 'flex', alignItems: 'center', gap: 10,
+                opacity: isDragging ? 0.4 : 1,
+                transform: isDragging ? 'scale(.97)' : 'scale(1)',
+                transition: 'opacity .15s, transform .15s, border-color .1s',
+                userSelect: 'none',
+              }}
+            >
+              {/* Drag handle */}
+              <div
+                onTouchStart={(e) => onDragTouchStart(e, idx)}
+                style={{
+                  flexShrink: 0, cursor: 'grab', touchAction: 'none',
+                  display: 'flex', flexDirection: 'column', gap: 3,
+                  padding: '6px 4px', alignItems: 'center',
+                }}
+              >
+                {[0,1,2].map(i => (
+                  <div key={i} style={{ width: 16, height: 2, borderRadius: 1, background: 'var(--muted)', opacity: .6 }} />
+                ))}
+              </div>
+
+              <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', background: 'var(--bg3)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {p.imageUrl
+                  ? p.mediaType === 'video'
+                    ? <span style={{ fontSize: '1.1rem' }}>▶</span>
+                    // eslint-disable-next-line @next/next/no-img-element
+                    : <img src={p.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <span style={{ fontSize: '1.1rem' }}>{p.emoji}</span>
+                }
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
+                  {p.category === 'combo' && p.bundleItems?.length
+                    ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
+                    : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
+                  {p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                <button onClick={() => startEdit(p)} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
+                <button onClick={() => handleDelete(p.id)} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-              <button onClick={() => moveProduct(p.id, -1)} disabled={idx === 0} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--muted)', fontSize: '.85rem' }}>↑</button>
-              <button onClick={() => moveProduct(p.id, 1)} disabled={idx === displayedProducts.length - 1} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--muted)', fontSize: '.85rem' }}>↓</button>
-              <button onClick={() => startEdit(p)} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
-              <button onClick={() => handleDelete(p.id)} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
