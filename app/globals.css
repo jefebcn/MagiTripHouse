@@ -44,10 +44,24 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(ellipse 70% 50% at -5% 8%, rgba(61,255,110,.07) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 108% 88%, rgba(61,255,110,.05) 0%, transparent 55%),
-    radial-gradient(ellipse 80% 60% at 52% 105%, rgba(245,200,66,.04) 0%, transparent 50%),
-    linear-gradient(170deg, #06100a 0%, #080c08 45%, #070b07 100%);
+    radial-gradient(ellipse 80% 55% at 50% -10%,  rgba(61,255,110,.09) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 40% at -8%  20%,   rgba(61,255,110,.06) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 40% at 108% 75%,   rgba(61,255,110,.05) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 50%  110%,  rgba(245,200,66,.04) 0%, transparent 50%),
+    linear-gradient(170deg, #05100a 0%, #080c08 45%, #060b07 100%);
+}
+
+/* Subtle dot grid — gives depth without distraction */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: radial-gradient(rgba(61,255,110,.055) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 30%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 30%, transparent 85%);
 }
 
 /* Every child of body sits above the bg */
