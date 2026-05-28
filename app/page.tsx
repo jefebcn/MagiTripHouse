@@ -85,21 +85,22 @@ export default function Home() {
               rel="noopener noreferrer"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                padding: '11px 16px', textDecoration: 'none',
-                background: 'linear-gradient(90deg,#7a2d00 0%,#c45200 35%,#e8a000 50%,#c45200 65%,#7a2d00 100%)',
-                borderBottom: '1px solid rgba(255,180,0,.3)',
+                padding: '10px 16px', textDecoration: 'none',
+                background: 'linear-gradient(90deg,#6b2700 0%,#b84800 30%,#e09000 50%,#b84800 70%,#6b2700 100%)',
+                borderBottom: '1px solid rgba(255,160,0,.25)',
+                boxShadow: '0 2px 12px rgba(200,100,0,.18)',
               }}
             >
-              <span style={{ fontSize: '1rem', flexShrink: 0 }}>🎰</span>
+              <span style={{ fontSize: '1rem', flexShrink: 0, display: 'inline-block', animation: 'tombola-pulse 2s ease-in-out infinite' }}>🎰</span>
               <span style={{
                 fontFamily: "'Fredoka One', cursive",
-                fontSize: '.78rem', color: '#fff8e0',
-                letterSpacing: '.3px', textShadow: '0 1px 4px rgba(0,0,0,.4)',
+                fontSize: '.78rem', color: '#fff3cc',
+                letterSpacing: '.5px', textShadow: '0 1px 6px rgba(0,0,0,.5)',
                 whiteSpace: 'nowrap',
               }}>
                 PARTECIPA ALLA TOMBOLA — Clicca qui!
               </span>
-              <span style={{ fontSize: '1rem' }}>🎟️</span>
+              <span style={{ fontSize: '1rem', flexShrink: 0, display: 'inline-block', animation: 'tombola-pulse 2s ease-in-out infinite .5s' }}>🎟️</span>
             </a>
             <Header />
             <AnnouncementBanner />
@@ -109,7 +110,7 @@ export default function Home() {
             <ProductGrid />
           </>
         ) : (
-          <div style={{ padding: '16px 16px 100px' }}>
+          <div style={{ padding: '0 16px 100px' }}>
             <AuthView />
           </div>
         )}
@@ -744,39 +745,150 @@ function AuthView() {
     setLoading(false)
   }
 
+  const FEATURES = [
+    { icon: '🔒', label: 'Sicuro' },
+    { icon: '🚀', label: '24/48h' },
+    { icon: '💎', label: 'Premium' },
+  ]
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 20 }}>
-      <div style={{ width: 74, height: 74, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.22), rgba(61,255,110,.05))', border: '2px solid rgba(61,255,110,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: 16, boxShadow: '0 0 20px rgba(61,255,110,.12)' }}>👤</div>
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', marginBottom: 4 }}>{mode === 'register' ? 'Crea Account' : 'Bentornato'}</div>
-      <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginBottom: 16, textAlign: 'center' }}>{mode === 'register' ? 'Registrati per accedere al Canale, Ordini e Affiliati' : 'Accedi con le tue credenziali'}</div>
-      {mode === 'login' && (
-        <div style={{ background: 'rgba(61,255,110,.06)', border: '1px solid rgba(61,255,110,.15)', borderRadius: 10, padding: '9px 14px', marginBottom: 16, width: '100%', maxWidth: 340, boxSizing: 'border-box' }}>
-          <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.5 }}>💡 <strong style={{ color: 'var(--text)' }}>Suggerimento:</strong> salva le credenziali nel tuo browser/portachiavi iPhone.<br />Se hai dimenticato la password, contatta l&apos;admin su <strong style={{ color: '#3b82f6' }}>@magichous8</strong>.</div>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+
+      {/* Hero */}
+      <div style={{
+        width: '100%', textAlign: 'center',
+        padding: '32px 0 24px',
+        background: 'radial-gradient(ellipse at 50% 0%,rgba(61,255,110,.08) 0%,transparent 65%)',
+        marginBottom: 4,
+      }}>
+        <img src="/logo.png" alt="Magic Trip House" style={{ width: 160, height: 'auto', objectFit: 'contain', marginBottom: 12, filter: 'drop-shadow(0 0 24px rgba(61,255,110,.35))' }} />
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', marginBottom: 6, color: 'var(--text)' }}>
+          {mode === 'register' ? 'Benvenuto nel negozio' : 'Bentornato 👋'}
         </div>
-      )}
-      <div style={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: 18, lineHeight: 1.5 }}>
+          {mode === 'register'
+            ? 'Crea il tuo account gratuito per ordinare'
+            : 'Accedi con le tue credenziali'}
+        </div>
+
+        {/* Feature pills */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+          {FEATURES.map(f => (
+            <div key={f.label} style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              background: 'rgba(61,255,110,.07)', border: '1px solid rgba(61,255,110,.18)',
+              borderRadius: 20, padding: '5px 12px',
+              fontSize: '.74rem', color: 'rgba(125,255,164,.85)',
+            }}>
+              <span>{f.icon}</span>
+              <span style={{ fontWeight: 600 }}>{f.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Mode tabs */}
+      <div style={{
+        display: 'flex', width: '100%', maxWidth: 340,
+        background: 'var(--bg3)', borderRadius: 14, padding: 4,
+        marginBottom: 20,
+      }}>
+        {(['register', 'login'] as const).map(m => (
+          <button
+            key={m}
+            onClick={() => { setMode(m); reset() }}
+            style={{
+              flex: 1, padding: '10px 0', borderRadius: 10,
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              fontSize: '.85rem', fontWeight: 700, transition: '.18s',
+              background: mode === m
+                ? 'linear-gradient(135deg,rgba(61,255,110,.22),rgba(61,255,110,.1))'
+                : 'transparent',
+              color: mode === m ? 'var(--green)' : 'var(--muted)',
+              boxShadow: mode === m ? 'inset 0 0 8px rgba(61,255,110,.1)' : 'none',
+            }}
+          >
+            {m === 'register' ? '✨ Registrati' : '🔑 Accedi'}
+          </button>
+        ))}
+      </div>
+
+      {/* Form card */}
+      <div style={{
+        width: '100%', maxWidth: 340,
+        background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.14)',
+        borderRadius: 18, padding: '22px 20px',
+        display: 'flex', flexDirection: 'column', gap: 12,
+        boxShadow: '0 4px 32px rgba(0,0,0,.25)',
+      }}>
         {mode === 'register' ? (
           <>
-            <input placeholder="Nome" value={regName} onChange={e => { setRegName(e.target.value); reset() }} style={inputStyle()} autoComplete="name" />
-            <input placeholder="Username (es. mario_97)" value={regHandle} onChange={e => { setRegHandle(e.target.value.replace(/\s/g, '')); reset() }} style={inputStyle()} autoComplete="username" />
-            <input type="password" placeholder="Password (min. 6 caratteri)" value={regPwd} onChange={e => { setRegPwd(e.target.value); reset() }} style={inputStyle()} autoComplete="new-password" />
-            <input type="password" placeholder="Conferma password" value={regPwd2} onChange={e => { setRegPwd2(e.target.value); reset() }} onKeyDown={e => e.key === 'Enter' && handleRegister()} style={inputStyle(!!error && regPwd2 !== regPwd)} autoComplete="new-password" />
-            {showAdmin && <input placeholder="Codice admin (opzionale)" value={adminCode} onChange={e => setAdminCode(e.target.value)} style={inputStyle()} autoComplete="off" />}
-            <button onClick={() => setShowAdmin(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '.7rem', cursor: 'pointer', textAlign: 'left', padding: '0 2px' }}>{showAdmin ? '▲ Nascondi codice admin' : '▼ Ho un codice admin'}</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: '.7rem', color: 'var(--muted)', letterSpacing: '.3px', textTransform: 'uppercase' }}>Nome</label>
+              <input placeholder="Es. Mario" value={regName} onChange={e => { setRegName(e.target.value); reset() }} style={inputStyle()} autoComplete="name" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: '.7rem', color: 'var(--muted)', letterSpacing: '.3px', textTransform: 'uppercase' }}>Username</label>
+              <input placeholder="mario_97" value={regHandle} onChange={e => { setRegHandle(e.target.value.replace(/\s/g, '')); reset() }} style={inputStyle()} autoComplete="username" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: '.7rem', color: 'var(--muted)', letterSpacing: '.3px', textTransform: 'uppercase' }}>Password</label>
+              <input type="password" placeholder="Min. 6 caratteri" value={regPwd} onChange={e => { setRegPwd(e.target.value); reset() }} style={inputStyle()} autoComplete="new-password" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: '.7rem', color: 'var(--muted)', letterSpacing: '.3px', textTransform: 'uppercase' }}>Conferma password</label>
+              <input type="password" placeholder="Ripeti la password" value={regPwd2} onChange={e => { setRegPwd2(e.target.value); reset() }} onKeyDown={e => e.key === 'Enter' && handleRegister()} style={inputStyle(!!error && regPwd2 !== regPwd)} autoComplete="new-password" />
+            </div>
+            {showAdmin && (
+              <input placeholder="Codice admin" value={adminCode} onChange={e => setAdminCode(e.target.value)} style={inputStyle()} autoComplete="off" />
+            )}
+            <button onClick={() => setShowAdmin(v => !v)} style={{ background: 'none', border: 'none', color: 'rgba(106,138,106,.5)', fontSize: '.68rem', cursor: 'pointer', textAlign: 'left', padding: 0, fontFamily: 'inherit' }}>
+              {showAdmin ? '▲ Nascondi codice admin' : '▼ Ho un codice admin'}
+            </button>
           </>
         ) : (
           <>
-            <input placeholder="Username" value={logHandle} onChange={e => { setLogHandle(e.target.value.replace(/\s/g, '')); reset() }} style={inputStyle()} autoComplete="username" />
-            <input type="password" placeholder="Password" value={logPwd} onChange={e => { setLogPwd(e.target.value); reset() }} onKeyDown={e => e.key === 'Enter' && handleLogin()} style={inputStyle()} autoComplete="current-password" />
+            <div style={{ background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.12)', borderRadius: 10, padding: '9px 13px', fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.55 }}>
+              💡 Password dimenticata? Scrivi a <strong style={{ color: '#3b82f6' }}>@magichous8</strong>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: '.7rem', color: 'var(--muted)', letterSpacing: '.3px', textTransform: 'uppercase' }}>Username</label>
+              <input placeholder="Il tuo username" value={logHandle} onChange={e => { setLogHandle(e.target.value.replace(/\s/g, '')); reset() }} style={inputStyle()} autoComplete="username" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: '.7rem', color: 'var(--muted)', letterSpacing: '.3px', textTransform: 'uppercase' }}>Password</label>
+              <input type="password" placeholder="La tua password" value={logPwd} onChange={e => { setLogPwd(e.target.value); reset() }} onKeyDown={e => e.key === 'Enter' && handleLogin()} style={inputStyle()} autoComplete="current-password" />
+            </div>
           </>
         )}
-        {error && <div style={{ fontSize: '.75rem', color: 'var(--red)', marginTop: -2, paddingLeft: 4 }}>⚠️ {error}</div>}
-        <button onClick={mode === 'register' ? handleRegister : handleLogin} disabled={loading} style={{ padding: '14px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: '1rem', cursor: loading ? 'default' : 'pointer', transition: '.2s', background: loading ? 'rgba(61,255,110,.08)' : 'rgba(61,255,110,.18)', border: '1.5px solid rgba(61,255,110,.5)', color: 'var(--green)', boxShadow: '0 0 16px rgba(61,255,110,.1)', marginTop: 4 }}>
-          {loading ? '...' : mode === 'register' ? '🚀 Crea Account' : '🔑 Accedi'}
+
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(232,59,59,.08)', border: '1px solid rgba(232,59,59,.25)', borderRadius: 9, padding: '9px 12px', fontSize: '.76rem', color: '#ff7070' }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        <button
+          onClick={mode === 'register' ? handleRegister : handleLogin}
+          disabled={loading}
+          style={{
+            padding: '14px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
+            fontSize: '1rem', cursor: loading ? 'default' : 'pointer', transition: '.2s',
+            background: loading
+              ? 'rgba(61,255,110,.06)'
+              : 'linear-gradient(135deg,rgba(61,255,110,.28),rgba(61,255,110,.15))',
+            border: '1.5px solid rgba(61,255,110,.55)',
+            color: 'var(--green)',
+            boxShadow: loading ? 'none' : '0 0 20px rgba(61,255,110,.15)',
+            marginTop: 4,
+          }}
+        >
+          {loading ? '⏳ Attendere...' : mode === 'register' ? '🚀 Crea Account Gratuito' : '🔑 Accedi'}
         </button>
-        <button onClick={() => { setMode(m => m === 'register' ? 'login' : 'register'); reset() }} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '.78rem', cursor: 'pointer', fontFamily: 'inherit', padding: '6px 4px' }}>
-          {mode === 'register' ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
-        </button>
+      </div>
+
+      <div style={{ fontSize: '.72rem', color: 'rgba(106,138,106,.5)', marginTop: 10, textAlign: 'center', lineHeight: 1.6, padding: '0 16px' }}>
+        🔒 Dati protetti · Nessun dato condiviso con terzi
       </div>
     </div>
   )
