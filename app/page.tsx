@@ -908,48 +908,105 @@ function RequestView() {
   return (
     <div style={{ paddingBottom: 100 }}>
 
-      {/* Header */}
-      <div style={{ padding: '18px 16px 0' }}>
-        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', marginBottom: 12 }}>
-          📦 Su Richiesta
-        </div>
+      {/* ── Spiegazione sezione ── */}
+      <div style={{
+        padding: '20px 16px 0',
+        display: 'flex', flexDirection: 'column', gap: 14,
+      }}>
 
-        {/* Info banner */}
-        <div style={{
-          background: 'linear-gradient(135deg,#1a1200,#2a1e00)',
-          border: '1px solid rgba(245,200,66,.3)',
-          borderRadius: 14, padding: '13px 16px',
-          display: 'flex', gap: 12, alignItems: 'flex-start',
-          marginBottom: 16,
-        }}>
-          <span style={{ fontSize: '1.4rem', flexShrink: 0, marginTop: 1 }}>🕐</span>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--gold)', letterSpacing: '.3px', marginBottom: 4 }}>
-              DISPONIBILI SU ORDINAZIONE
-            </div>
-            <div style={{ fontSize: '.74rem', color: 'rgba(245,200,66,.7)', lineHeight: 1.6 }}>
-              Prodotti non in stock locale · Spedizione in <strong style={{ color: 'var(--gold)' }}>4-5 giorni</strong> dal ricevimento del pagamento · Packaging discreto 🇮🇹
-            </div>
+        {/* Titolo */}
+        <div>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', marginBottom: 6 }}>
+            📦 Ordinabili su Richiesta
+          </div>
+          <div style={{ fontSize: '.84rem', color: 'var(--muted)', lineHeight: 1.65 }}>
+            Questa sezione raccoglie prodotti <strong style={{ color: 'var(--text)' }}>non disponibili nel nostro stock locale</strong>, ma che puoi ordinare appositamente per te. Una volta ricevuto il pagamento, procediamo con l&apos;ordine e la spedizione.
           </div>
         </div>
 
-        {/* How it works */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {/* Card spiegazione principale */}
+        <div style={{
+          background: 'linear-gradient(135deg,#1a1200 0%,#2a1e00 60%,#1a1200 100%)',
+          border: '1px solid rgba(245,200,66,.35)',
+          borderRadius: 16, padding: '16px 18px',
+          display: 'flex', flexDirection: 'column', gap: 12,
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(90deg,transparent,rgba(245,200,66,.03),transparent)',
+            animation: 'shimmer 4s ease infinite',
+          }} />
+
+          {/* Riga tempi */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(245,200,66,.12)', border: '1.5px solid rgba(245,200,66,.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem',
+            }}>🕐</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '.86rem', color: 'var(--gold)', marginBottom: 3 }}>
+                Tempi di consegna: 4-5 giorni lavorativi
+              </div>
+              <div style={{ fontSize: '.72rem', color: 'rgba(245,200,66,.65)', lineHeight: 1.5 }}>
+                I tempi partono dal momento in cui riceviamo il pagamento, non dall&apos;ordine.
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: 1, background: 'rgba(245,200,66,.12)' }} />
+
+          {/* Punti chiave */}
           {[
-            { n: '1', text: 'Scegli il prodotto' },
-            { n: '2', text: 'Aggiungi al carrello' },
-            { n: '3', text: 'Riceviamo il pagamento' },
-            { n: '4', text: 'Spedito in 4-5 gg' },
-          ].map(s => (
-            <div key={s.n} style={{
-              flex: 1, textAlign: 'center',
-              background: 'var(--bg3)', border: '1px solid var(--border)',
-              borderRadius: 10, padding: '8px 4px',
-            }}>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: 'var(--gold)' }}>{s.n}</div>
-              <div style={{ fontSize: '.58rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.3 }}>{s.text}</div>
+            { icon: '📦', text: 'Packaging discreto garantito — nessun riferimento al contenuto' },
+            { icon: '🇮🇹', text: 'Spedizione in tutta Italia tramite corriere espresso' },
+            { icon: '💬', text: 'Ti aggiorneremo via Telegram sull\'andamento dell\'ordine' },
+          ].map((item, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
+              <span style={{ fontSize: '.76rem', color: 'rgba(245,200,66,.7)', lineHeight: 1.55 }}>{item.text}</span>
             </div>
           ))}
+        </div>
+
+        {/* Come funziona — steps */}
+        <div>
+          <div style={{ fontSize: '.7rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', fontWeight: 700, marginBottom: 10 }}>
+            Come funziona
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+            {[
+              { n: '1', icon: '🛒', text: 'Scegli e aggiungi al carrello' },
+              { n: '2', icon: '💬', text: 'Confermi su Telegram' },
+              { n: '3', icon: '💰', text: 'Pagamento ricevuto' },
+              { n: '4', icon: '🚚', text: 'Spedito in 4-5 gg' },
+            ].map((s, i, arr) => (
+              <React.Fragment key={s.n}>
+                <div style={{
+                  flex: 1, textAlign: 'center',
+                  background: 'var(--bg3)', border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '10px 4px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                }}>
+                  <div style={{ fontSize: '1.1rem' }}>{s.icon}</div>
+                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--gold)' }}>{s.n}</div>
+                  <div style={{ fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.3, maxWidth: 52 }}>{s.text}</div>
+                </div>
+                {i < arr.length - 1 && (
+                  <div style={{ color: 'rgba(245,200,66,.3)', fontSize: '.75rem', flexShrink: 0, padding: '0 2px' }}>›</div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
+        {/* Separator */}
+        <div style={{ height: 1, background: 'rgba(61,255,110,.08)', margin: '4px 0' }} />
+
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', color: 'var(--muted)', letterSpacing: '.3px' }}>
+          🌿 Prodotti disponibili
         </div>
       </div>
 
