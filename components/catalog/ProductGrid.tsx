@@ -20,6 +20,7 @@ export default function ProductGrid() {
   const { filter, search, setFilter, setSearch } = useUIStore()
 
   const filtered = products.filter((p) => {
+    if (p.category === 'request') return false  // shown only in Su Richiesta tab
     const matchCat = filter === 'all' || p.category === filter || p.badge === filter
     const q = search.toLowerCase()
     const matchSearch =

@@ -12,6 +12,7 @@ import CartDrawer from '@/components/panels/CartDrawer'
 import ProductDetail from '@/components/panels/ProductDetail'
 import Lightbox from '@/components/panels/Lightbox'
 import { useTelegram } from '@/hooks/useTelegram'
+import { useProducts } from '@/hooks/useProducts'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -126,6 +127,10 @@ export default function Home() {
 
       <div style={{ display: view === 'affiliates' ? 'block' : 'none', padding: '16px 16px 100px' }}>
         {gated(<AffiliatesView />)}
+      </div>
+
+      <div style={{ display: view === 'request' ? 'block' : 'none' }}>
+        {gated(<RequestView />)}
       </div>
 
       <CartDrawer />
@@ -890,6 +895,140 @@ function AuthView() {
       <div style={{ fontSize: '.72rem', color: 'rgba(106,138,106,.5)', marginTop: 10, textAlign: 'center', lineHeight: 1.6, padding: '0 16px' }}>
         🔒 Dati protetti · Nessun dato condiviso con terzi
       </div>
+    </div>
+  )
+}
+
+function RequestView() {
+  const { products, isLoading } = useProducts()
+  const { setDetailProduct } = useUIStore()
+
+  const items = products.filter(p => p.category === 'request')
+
+  return (
+    <div style={{ paddingBottom: 100 }}>
+
+      {/* Header */}
+      <div style={{ padding: '18px 16px 0' }}>
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', marginBottom: 12 }}>
+          📦 Su Richiesta
+        </div>
+
+        {/* Info banner */}
+        <div style={{
+          background: 'linear-gradient(135deg,#1a1200,#2a1e00)',
+          border: '1px solid rgba(245,200,66,.3)',
+          borderRadius: 14, padding: '13px 16px',
+          display: 'flex', gap: 12, alignItems: 'flex-start',
+          marginBottom: 16,
+        }}>
+          <span style={{ fontSize: '1.4rem', flexShrink: 0, marginTop: 1 }}>🕐</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--gold)', letterSpacing: '.3px', marginBottom: 4 }}>
+              DISPONIBILI SU ORDINAZIONE
+            </div>
+            <div style={{ fontSize: '.74rem', color: 'rgba(245,200,66,.7)', lineHeight: 1.6 }}>
+              Prodotti non in stock locale · Spedizione in <strong style={{ color: 'var(--gold)' }}>4-5 giorni</strong> dal ricevimento del pagamento · Packaging discreto 🇮🇹
+            </div>
+          </div>
+        </div>
+
+        {/* How it works */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+          {[
+            { n: '1', text: 'Scegli il prodotto' },
+            { n: '2', text: 'Aggiungi al carrello' },
+            { n: '3', text: 'Riceviamo il pagamento' },
+            { n: '4', text: 'Spedito in 4-5 gg' },
+          ].map(s => (
+            <div key={s.n} style={{
+              flex: 1, textAlign: 'center',
+              background: 'var(--bg3)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '8px 4px',
+            }}>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: 'var(--gold)' }}>{s.n}</div>
+              <div style={{ fontSize: '.58rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.3 }}>{s.text}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Product list */}
+      {isLoading ? (
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[1,2,3].map(i => (
+            <div key={i} className="skeleton-shine" style={{ height: 88, borderRadius: 14 }} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '48px 24px' }}>
+          <div style={{ fontSize: '3rem', marginBottom: 12 }}>📭</div>
+          <div style={{ fontSize: '.9rem', fontWeight: 600, marginBottom: 6 }}>Nessun prodotto disponibile</div>
+          <div style={{ fontSize: '.78rem', opacity: .6 }}>Presto nuovi prodotti ordinabili</div>
+        </div>
+      ) : (
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {items.map(p => {
+            const firstVariant = p.variants?.[0]
+            const priceFrom = firstVariant?.price ?? 0
+            return (
+              <div
+                key={p.id}
+                onClick={() => setDetailProduct(p)}
+                style={{
+                  background: 'var(--card)',
+                  border: '1px solid rgba(245,200,66,.15)',
+                  borderRadius: 14, padding: '12px 14px',
+                  display: 'flex', gap: 14, alignItems: 'center',
+                  cursor: 'pointer', transition: '.15s',
+                  position: 'relative', overflow: 'hidden',
+                }}
+              >
+                {/* Thumb */}
+                <div style={{
+                  width: 64, height: 64, borderRadius: 10, overflow: 'hidden',
+                  background: 'var(--bg3)', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {p.imageUrl ? (
+                    p.mediaType === 'video'
+                      ? <span style={{ fontSize: '1.5rem' }}>▶</span>
+                      // eslint-disable-next-line @next/next/no-img-element
+                      : <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '2rem' }}>{p.emoji}</span>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '.9rem', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {p.name}
+                  </div>
+                  {p.origin && (
+                    <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginBottom: 4 }}>🌍 {p.origin}</div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: 'var(--green)' }}>
+                      da €{priceFrom}
+                    </span>
+                    <span style={{
+                      fontSize: '.6rem', fontWeight: 700,
+                      background: 'rgba(245,200,66,.12)', border: '1px solid rgba(245,200,66,.3)',
+                      borderRadius: 20, padding: '2px 8px', color: 'var(--gold)',
+                      letterSpacing: '.3px',
+                    }}>
+                      🕐 4-5 gg
+                    </span>
+                  </div>
+                </div>
+
+                <span style={{ color: 'var(--muted)', fontSize: '1rem' }}>›</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

@@ -337,7 +337,7 @@ function AdminProductsInner() {
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value, badge: e.target.value }))}
               style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit', outline: 'none' }}
             >
-              {['premium','frozen','new','hash','cbd','combo'].map((c) => <option key={c} value={c}>{c}</option>)}
+              {['premium','frozen','new','hash','cbd','combo','request'].map((c) => <option key={c} value={c}>{c === 'request' ? 'request (Su Richiesta)' : c}</option>)}
             </select>
           </div>
 

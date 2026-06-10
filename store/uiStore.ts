@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Product } from '@/hooks/useProducts'
 
-type View = 'catalog' | 'news' | 'orders' | 'affiliates' | 'account' | 'game'
+type View = 'catalog' | 'news' | 'orders' | 'affiliates' | 'account' | 'game' | 'request'
 
 interface UIState {
   view: View
