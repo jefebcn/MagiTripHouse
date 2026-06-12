@@ -9,6 +9,8 @@ interface Stats {
   users: { total: number; today: number; week: number }
   recentOrders: Array<{ id: string; userId: string; total: number; status: string; createdAt: string }>
   topProducts: Array<{ name: string; count: number }>
+  grams: { total: number; today: number; week: number; month: number; year: number }
+  gramsByProduct: Array<{ name: string; grams: number }>
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -29,6 +31,11 @@ const SECTIONS = [
 function fmt(n: number) {
   if (n >= 1000) return `€${(n / 1000).toFixed(1)}k`
   return `€${n.toFixed(2)}`
+}
+
+function fmtG(n: number) {
+  if (n >= 1000) return `${(n / 1000).toFixed(2)} kg`
+  return `${n % 1 === 0 ? n : n.toFixed(1)} g`
 }
 
 export default function AdminDashboard() {
@@ -162,6 +169,54 @@ export default function AdminDashboard() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Grams sold KPIs */}
+      {stats && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px' }}>⚖️ GRAMMI VENDUTI</div>
+            <div style={{ fontSize: '.7rem', color: 'var(--green)', fontWeight: 700 }}>{fmtG(stats.grams.total)} totali</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+            {([
+              { label: 'Oggi',  value: stats.grams.today },
+              { label: '7 gg',  value: stats.grams.week  },
+              { label: '30 gg', value: stats.grams.month },
+              { label: 'Anno',  value: stats.grams.year  },
+            ]).map(k => (
+              <div key={k.label} style={{
+                background: 'rgba(61,255,110,.04)', border: '1px solid rgba(61,255,110,.15)',
+                borderRadius: 10, padding: '9px 6px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: '.85rem', fontWeight: 800, color: 'var(--green)', fontFamily: "'Fredoka One', cursive", lineHeight: 1.1 }}>{fmtG(k.value)}</div>
+                <div style={{ fontSize: '.55rem', color: 'var(--muted)', marginTop: 3 }}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+          {stats.gramsByProduct.length > 0 && (
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              {stats.gramsByProduct.map((p, i) => {
+                const pct = stats.grams.total > 0 ? (p.grams / stats.grams.total) * 100 : 0
+                return (
+                  <div key={p.name} style={{
+                    padding: '9px 13px',
+                    borderBottom: i < stats.gramsByProduct.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontSize: '.75rem', fontWeight: 800, color: i === 0 ? 'var(--gold)' : 'var(--muted)', width: 16, textAlign: 'center' }}>{i + 1}</div>
+                      <div style={{ flex: 1, fontSize: '.78rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                      <div style={{ fontSize: '.7rem', color: 'var(--green)', fontWeight: 700 }}>{fmtG(p.grams)}</div>
+                    </div>
+                    <div style={{ marginLeft: 24, height: 3, background: 'var(--border)', borderRadius: 2 }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, var(--green), var(--green2))', borderRadius: 2 }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
