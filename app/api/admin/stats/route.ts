@@ -29,25 +29,36 @@ export async function GET() {
     return parseFloat(label.replace(/[^0-9.]/g, '')) || 0
   }
 
-  // Top products by quantity sold + grams aggregation
+  // Per-product aggregation: grams, revenue, qty, orders count
+  type ProductStat = { grams: number; revenue: number; qty: number; ordersCount: number }
+  const productStats: Record<string, ProductStat> = {}
   const productCounts: Record<string, number> = {}
-  const gramsByProduct: Record<string, number> = {}
   let gramsTotal = 0, gramsToday = 0, gramsWeek = 0, gramsMonth = 0, gramsYear = 0
 
   for (const order of orders) {
     const items = Array.isArray(order.items)
-      ? (order.items as { label?: string; id?: string; name?: string; qty?: number }[])
+      ? (order.items as { label?: string; id?: string; name?: string; qty?: number; price?: number }[])
       : []
     const orderDate = new Date(order.createdAt)
+    const seenProducts = new Set<string>()
     for (const item of items) {
       const key = item.label ?? item.id ?? '?'
       const qty = item.qty ?? 1
       productCounts[key] = (productCounts[key] ?? 0) + qty
 
+      const productName = item.name ?? item.label ?? item.id ?? '?'
       const g = parseGrams(item.label ?? '') * qty
+      const rev = (item.price ?? 0) * qty
+
+      if (!productStats[productName]) productStats[productName] = { grams: 0, revenue: 0, qty: 0, ordersCount: 0 }
+      productStats[productName].grams   += g
+      productStats[productName].revenue += rev
+      productStats[productName].qty     += qty
+      if (!seenProducts.has(productName)) {
+        productStats[productName].ordersCount += 1
+        seenProducts.add(productName)
+      }
       if (g > 0) {
-        const productName = item.name ?? item.label ?? item.id ?? '?'
-        gramsByProduct[productName] = (gramsByProduct[productName] ?? 0) + g
         gramsTotal += g
         if (orderDate >= todayStart)  gramsToday += g
         if (orderDate >= weekStart)   gramsWeek  += g
@@ -56,14 +67,22 @@ export async function GET() {
       }
     }
   }
+
   const topProducts = Object.entries(productCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([name, count]) => ({ name, count }))
 
-  const gramsByProductList = Object.entries(gramsByProduct)
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, grams]) => ({ name, grams }))
+  const productStatsList = Object.entries(productStats)
+    .sort((a, b) => b[1].grams - a[1].grams)
+    .map(([name, s]) => ({
+      name,
+      grams: s.grams,
+      revenue: s.revenue,
+      qty: s.qty,
+      ordersCount: s.ordersCount,
+      avgPricePerGram: s.grams > 0 ? s.revenue / s.grams : 0,
+    }))
 
   // Referral counts per affiliate code
   const refCounts: Record<string, number> = {}
@@ -114,7 +133,7 @@ export async function GET() {
       month: gramsMonth,
       year: gramsYear,
     },
-    gramsByProduct: gramsByProductList,
+    productStats: productStatsList,
     affiliates: affiliates.map(a => ({
       ...a,
       referralCount: refCounts[a.code] ?? 0,

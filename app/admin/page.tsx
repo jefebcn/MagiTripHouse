@@ -10,7 +10,7 @@ interface Stats {
   recentOrders: Array<{ id: string; userId: string; total: number; status: string; createdAt: string }>
   topProducts: Array<{ name: string; count: number }>
   grams: { total: number; today: number; week: number; month: number; year: number }
-  gramsByProduct: Array<{ name: string; grams: number }>
+  productStats: Array<{ name: string; grams: number; revenue: number; qty: number; ordersCount: number; avgPricePerGram: number }>
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -172,45 +172,112 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Grams sold KPIs */}
+      {/* Grams & Revenue per product */}
       {stats && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px' }}>⚖️ GRAMMI VENDUTI</div>
-            <div style={{ fontSize: '.7rem', color: 'var(--green)', fontWeight: 700 }}>{fmtG(stats.grams.total)} totali</div>
-          </div>
+
+          {/* Header + totals */}
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px', marginBottom: 8 }}>⚖️ PRODOTTI VENDUTI</div>
+
+          {/* 4 grams KPI chips */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
             {([
-              { label: 'Oggi',  value: stats.grams.today },
-              { label: '7 gg',  value: stats.grams.week  },
-              { label: '30 gg', value: stats.grams.month },
-              { label: 'Anno',  value: stats.grams.year  },
+              { label: 'Oggi',  g: stats.grams.today,  },
+              { label: '7 gg',  g: stats.grams.week,   },
+              { label: '30 gg', g: stats.grams.month,  },
+              { label: 'Anno',  g: stats.grams.year,   },
             ]).map(k => (
               <div key={k.label} style={{
                 background: 'rgba(61,255,110,.04)', border: '1px solid rgba(61,255,110,.15)',
-                borderRadius: 10, padding: '9px 6px', textAlign: 'center',
+                borderRadius: 10, padding: '8px 4px', textAlign: 'center',
               }}>
-                <div style={{ fontSize: '.85rem', fontWeight: 800, color: 'var(--green)', fontFamily: "'Fredoka One', cursive", lineHeight: 1.1 }}>{fmtG(k.value)}</div>
-                <div style={{ fontSize: '.55rem', color: 'var(--muted)', marginTop: 3 }}>{k.label}</div>
+                <div style={{ fontSize: '.8rem', fontWeight: 800, color: 'var(--green)', fontFamily: "'Fredoka One', cursive", lineHeight: 1.1 }}>{fmtG(k.g)}</div>
+                <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 2 }}>{k.label}</div>
               </div>
             ))}
           </div>
-          {stats.gramsByProduct.length > 0 && (
-            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-              {stats.gramsByProduct.map((p, i) => {
-                const pct = stats.grams.total > 0 ? (p.grams / stats.grams.total) * 100 : 0
+
+          {/* Summary bar: total grams + total revenue */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8,
+          }}>
+            <div style={{
+              background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.2)',
+              borderRadius: 10, padding: '10px 12px',
+              display: 'flex', flexDirection: 'column', gap: 2,
+            }}>
+              <div style={{ fontSize: '.58rem', color: 'var(--muted)' }}>Totale grammi mossi</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color: 'var(--green)' }}>{fmtG(stats.grams.total)}</div>
+            </div>
+            <div style={{
+              background: 'rgba(245,200,66,.05)', border: '1px solid rgba(245,200,66,.2)',
+              borderRadius: 10, padding: '10px 12px',
+              display: 'flex', flexDirection: 'column', gap: 2,
+            }}>
+              <div style={{ fontSize: '.58rem', color: 'var(--muted)' }}>Fatturato prodotti</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color: 'var(--gold)' }}>
+                {fmt(stats.productStats.reduce((s, p) => s + p.revenue, 0))}
+              </div>
+            </div>
+          </div>
+
+          {/* Per-product cards */}
+          {stats.productStats.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {stats.productStats.map((p, i) => {
+                const gramPct = stats.grams.total > 0 ? (p.grams / stats.grams.total) * 100 : 0
+                const totalRev = stats.productStats.reduce((s, x) => s + x.revenue, 0)
+                const revPct = totalRev > 0 ? (p.revenue / totalRev) * 100 : 0
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
                 return (
                   <div key={p.name} style={{
-                    padding: '9px 13px',
-                    borderBottom: i < stats.gramsByProduct.length - 1 ? '1px solid var(--border)' : 'none',
+                    background: 'var(--card)',
+                    border: i === 0 ? '1px solid rgba(245,200,66,.35)' : '1px solid var(--border)',
+                    borderRadius: 12, padding: '11px 13px',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontSize: '.75rem', fontWeight: 800, color: i === 0 ? 'var(--gold)' : 'var(--muted)', width: 16, textAlign: 'center' }}>{i + 1}</div>
-                      <div style={{ flex: 1, fontSize: '.78rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                      <div style={{ fontSize: '.7rem', color: 'var(--green)', fontWeight: 700 }}>{fmtG(p.grams)}</div>
+                    {/* Product name row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+                      <div style={{ fontSize: '.72rem', fontWeight: 800, color: i < 3 ? 'var(--gold)' : 'var(--muted)', minWidth: 18 }}>{medal ?? `${i + 1}`}</div>
+                      <div style={{ flex: 1, fontSize: '.8rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <div style={{ fontSize: '.62rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{p.ordersCount} ordini</div>
                     </div>
-                    <div style={{ marginLeft: 24, height: 3, background: 'var(--border)', borderRadius: 2 }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, var(--green), var(--green2))', borderRadius: 2 }} />
+
+                    {/* 4 metrics row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '.78rem', fontWeight: 800, color: 'var(--green)' }}>{fmtG(p.grams)}</div>
+                        <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 1 }}>grammi</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '.78rem', fontWeight: 800, color: 'var(--gold)' }}>{fmt(p.revenue)}</div>
+                        <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 1 }}>fatturato</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '.78rem', fontWeight: 800, color: 'var(--text)' }}>×{p.qty}</div>
+                        <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 1 }}>venduti</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '.78rem', fontWeight: 800, color: 'rgba(150,220,255,.9)' }}>
+                          {p.avgPricePerGram > 0 ? `€${p.avgPricePerGram.toFixed(2)}` : '—'}
+                        </div>
+                        <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 1 }}>€/g</div>
+                      </div>
+                    </div>
+
+                    {/* Dual progress bars */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontSize: '.5rem', color: 'var(--muted)', width: 30 }}>⚖️ {gramPct.toFixed(0)}%</div>
+                        <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2 }}>
+                          <div style={{ height: '100%', width: `${gramPct}%`, background: 'linear-gradient(90deg,var(--green),var(--green2))', borderRadius: 2, transition: 'width .4s' }} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontSize: '.5rem', color: 'var(--muted)', width: 30 }}>💶 {revPct.toFixed(0)}%</div>
+                        <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2 }}>
+                          <div style={{ height: '100%', width: `${revPct}%`, background: 'linear-gradient(90deg,var(--gold),#f5c842cc)', borderRadius: 2, transition: 'width .4s' }} />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )
