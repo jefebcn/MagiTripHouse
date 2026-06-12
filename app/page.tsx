@@ -85,8 +85,8 @@ export default function Home() {
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                padding: '10px 16px', textDecoration: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '7px 16px', textDecoration: 'none',
                 background: 'linear-gradient(90deg,#6b2700 0%,#b84800 30%,#e09000 50%,#b84800 70%,#6b2700 100%)',
                 borderBottom: '1px solid rgba(255,160,0,.25)',
                 boxShadow: '0 2px 12px rgba(200,100,0,.18)',
