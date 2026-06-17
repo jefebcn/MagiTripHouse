@@ -9,14 +9,14 @@ interface Product {
   id: string; name: string; description?: string; category: string; tags: string[];
   variants: Variant[]; stock?: number | null; imageUrl?: string; mediaType?: string;
   emoji: string; badge?: string; origin?: string; sortOrder: number;
-  isOnSale?: boolean; isComingSoon?: boolean; bundleItems?: BundleItem[] | null;
+  isOnSale?: boolean; isComingSoon?: boolean; hidden?: boolean; bundleItems?: BundleItem[] | null;
 }
 
 const EMPTY: Omit<Product, 'id' | 'sortOrder'> = {
   name: '', description: '', category: 'premium', tags: [],
   variants: [{ label: '', price: 0 }], stock: null,
   imageUrl: '', mediaType: 'image', emoji: '🌿', badge: '', origin: '',
-  isOnSale: false, isComingSoon: false, bundleItems: null,
+  isOnSale: false, isComingSoon: false, hidden: false, bundleItems: null,
 }
 
 export default function AdminProducts() {
@@ -46,7 +46,7 @@ function AdminProductsInner() {
   const hoverIdxRef = useRef<number | null>(null)
 
   async function load() {
-    const res = await fetch('/api/products')
+    const res = await fetch('/api/products?all=true')
     const data = await res.json()
     setProducts(data)
   }
@@ -68,7 +68,7 @@ function AdminProductsInner() {
       mediaType: p.mediaType ?? 'image', emoji: p.emoji,
       badge: p.badge ?? '', origin: p.origin ?? '',
       isOnSale: p.isOnSale ?? false, isComingSoon: p.isComingSoon ?? false,
-      bundleItems: p.bundleItems ?? null,
+      hidden: p.hidden ?? false, bundleItems: p.bundleItems ?? null,
     })
   }
 
@@ -151,6 +151,7 @@ function AdminProductsInner() {
         stock: form.stock !== null && form.stock !== undefined ? Number(form.stock) : null,
         isOnSale: form.isOnSale ?? false,
         isComingSoon: form.isComingSoon ?? false,
+        hidden: form.hidden ?? false,
       }
       const res = editing
         ? await fetch(`/api/products/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -377,6 +378,16 @@ function AdminProductsInner() {
                   borderColor: form.isComingSoon ? 'rgba(59,130,246,.4)' : 'var(--border)',
                 }}
               >🕐 In arrivo</button>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, hidden: !f.hidden }))}
+                style={{
+                  flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: '.8rem', fontWeight: 700, border: '1px solid',
+                  background: form.hidden ? 'rgba(106,138,106,.15)' : 'var(--bg3)',
+                  color:      form.hidden ? 'var(--muted)'          : 'var(--muted)',
+                  borderColor: form.hidden ? 'rgba(106,138,106,.4)' : 'var(--border)',
+                }}
+              >{form.hidden ? '🙈 Nascosto' : '👁 Visibile'}</button>
             </div>
           </div>
 
@@ -559,11 +570,20 @@ function AdminProductsInner() {
                   {p.category === 'combo' && p.bundleItems?.length
                     ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
                     : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
-                  {p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
+                  {p.hidden ? ' · 🙈 NASCOSTO' : p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                <button
+                  title={p.hidden ? 'Nasconsto — clicca per pubblicare' : 'Visibile — clicca per nascondere'}
+                  onClick={async () => {
+                    await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !p.hidden }) })
+                    load()
+                  }}
+                  style={{ background: p.hidden ? 'rgba(106,138,106,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${p.hidden ? 'rgba(106,138,106,.3)' : 'rgba(61,255,110,.35)'}`, borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: p.hidden ? 'var(--muted)' : 'var(--green)', fontSize: '.82rem' }}>
+                  {p.hidden ? '🙈' : '👁'}
+                </button>
                 <button onClick={() => startEdit(p)} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
                 <button onClick={() => handleDelete(p.id)} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
               </div>

@@ -2,13 +2,16 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 
-export async function GET() {
+export async function GET(req: Request) {
+  const showAll = new URL(req.url).searchParams.get('all') === 'true'
+  if (showAll) {
+    const session = await auth()
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const products = await prisma.product.findMany({
-    orderBy: [
-      { sortOrder: 'asc' },
-    ],
+    where: showAll ? {} : { hidden: false },
+    orderBy: [{ sortOrder: 'asc' }],
   })
-  // Prodotti esauriti sempre in fondo, mantenendo l'ordine interno
   products.sort((a, b) => {
     const aOut = a.stock === 0 ? 1 : 0
     const bOut = b.stock === 0 ? 1 : 0
@@ -39,6 +42,7 @@ export async function POST(req: Request) {
       sortOrder:    body.sortOrder ?? 99,
       isOnSale:     body.isOnSale ?? false,
       isComingSoon: body.isComingSoon ?? false,
+      hidden:       body.hidden ?? false,
       bundleItems:  body.bundleItems ?? null,
     },
   })
