@@ -40,10 +40,28 @@ function fmtG(n: number) {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
+  const [importState, setImportState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [importResult, setImportResult] = useState<{ created: number; skipped: number } | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/stats').then(r => r.json()).then(setStats).catch(() => {})
   }, [])
+
+  async function runImport() {
+    setImportState('loading')
+    try {
+      const res = await fetch('/api/admin/import-catalog', { method: 'POST' })
+      const data = await res.json()
+      if (data.ok) {
+        setImportResult({ created: data.created, skipped: data.skipped })
+        setImportState('done')
+      } else {
+        setImportState('error')
+      }
+    } catch {
+      setImportState('error')
+    }
+  }
 
   const today = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -289,7 +307,7 @@ export default function AdminDashboard() {
 
       {/* Navigation grid */}
       <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px', marginBottom: 8 }}>SEZIONI</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
         {SECTIONS.map(s => (
           <Link key={s.href} href={s.href} style={{ textDecoration: 'none' }}>
             <div style={{
@@ -303,6 +321,34 @@ export default function AdminDashboard() {
             </div>
           </Link>
         ))}
+      </div>
+
+      {/* Import catalog */}
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px', marginBottom: 8 }}>STRUMENTI</div>
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--border)',
+        borderRadius: 12, padding: '14px 16px',
+      }}>
+        <div style={{ fontSize: '.8rem', fontWeight: 700, marginBottom: 4 }}>📥 Importa catalogo GFZ</div>
+        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: 10 }}>
+          Aggiunge ~45 prodotti dal catalogo fornitore come bozze nascoste. Sicuro da rieseguire (salta i duplicati).
+        </div>
+        <button
+          onClick={runImport}
+          disabled={importState === 'loading'}
+          style={{
+            width: '100%', padding: '10px', borderRadius: 10,
+            fontFamily: 'inherit', fontWeight: 700, fontSize: '.85rem', cursor: importState === 'loading' ? 'not-allowed' : 'pointer',
+            background: importState === 'done' ? 'rgba(61,255,110,.12)' : importState === 'error' ? 'rgba(255,80,80,.12)' : 'rgba(245,200,66,.1)',
+            border: importState === 'done' ? '1.5px solid rgba(61,255,110,.5)' : importState === 'error' ? '1.5px solid rgba(255,80,80,.5)' : '1.5px solid rgba(245,200,66,.4)',
+            color: importState === 'done' ? 'var(--green)' : importState === 'error' ? '#ff5050' : 'var(--gold)',
+          }}
+        >
+          {importState === 'loading' ? '⏳ Importazione...' :
+           importState === 'done' ? `✅ Fatto — ${importResult?.created} creati, ${importResult?.skipped} saltati` :
+           importState === 'error' ? '❌ Errore — riprova' :
+           '📥 Avvia importazione'}
+        </button>
       </div>
     </div>
   )
