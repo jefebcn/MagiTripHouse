@@ -203,10 +203,10 @@ function AdminProductsInner() {
 
   function openBulkPanel() {
     const init: Record<string, Variant[]> = {}
-    for (const id of selectedIds) {
+    Array.from(selectedIds).forEach(id => {
       const p = products.find(x => x.id === id)
       if (p) init[id] = p.variants.map(v => ({ ...v }))
-    }
+    })
     setBulkPrices(init)
     setBulkOpen(true)
   }
