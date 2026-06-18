@@ -49,7 +49,8 @@ function AdminProductsInner() {
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
-  const [bulkPrices, setBulkPrices] = useState<Record<string, Variant[]>>({})
+  // shared prices: label → price (applies to ALL selected products that have that label)
+  const [bulkSharedPrices, setBulkSharedPrices] = useState<Record<string, number>>({})
   const [bulkSaving, setBulkSaving] = useState(false)
 
   async function load() {
@@ -202,12 +203,20 @@ function AdminProductsInner() {
   }
 
   function openBulkPanel() {
-    const init: Record<string, Variant[]> = {}
+    // Collect all unique labels across selected products (preserving order of first occurrence)
+    const seen = new Set<string>()
+    const initPrices: Record<string, number> = {}
     Array.from(selectedIds).forEach(id => {
       const p = products.find(x => x.id === id)
-      if (p) init[id] = p.variants.map(v => ({ ...v }))
+      if (!p) return
+      p.variants.forEach(v => {
+        if (!seen.has(v.label)) {
+          seen.add(v.label)
+          initPrices[v.label] = v.price
+        }
+      })
     })
-    setBulkPrices(init)
+    setBulkSharedPrices(initPrices)
     setBulkOpen(true)
   }
 
@@ -215,13 +224,20 @@ function AdminProductsInner() {
     setBulkSaving(true)
     try {
       await Promise.all(
-        Object.entries(bulkPrices).map(([id, variants]) =>
-          fetch(`/api/products/${id}`, {
+        Array.from(selectedIds).map(id => {
+          const p = products.find(x => x.id === id)
+          if (!p) return Promise.resolve()
+          const variants = p.variants.map(v =>
+            bulkSharedPrices[v.label] !== undefined
+              ? { ...v, price: bulkSharedPrices[v.label] }
+              : v
+          )
+          return fetch(`/api/products/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ variants }),
           })
-        )
+        })
       )
       setBulkOpen(false)
       setBulkMode(false)
@@ -720,50 +736,45 @@ function AdminProductsInner() {
               >✕</button>
             </div>
 
-            {/* Scrollable product list */}
-            <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Selected products summary */}
+            <div style={{ padding: '0 16px 8px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {Array.from(selectedIds).map(id => {
                 const p = products.find(x => x.id === id)
-                if (!p) return null
-                const variants = bulkPrices[id] ?? p.variants
-                return (
-                  <div key={id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 14px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: 10 }}>
-                      {p.emoji} {p.name}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                      {variants.map((v, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{
-                            fontSize: '.75rem', fontWeight: 700, color: 'var(--gold)',
-                            background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.25)',
-                            borderRadius: 6, padding: '4px 10px', minWidth: 48, textAlign: 'center', flexShrink: 0,
-                          }}>
-                            {v.label}
-                          </div>
-                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: '.8rem', color: 'var(--muted)' }}>€</span>
-                            <input
-                              type="number"
-                              value={v.price || ''}
-                              onChange={e => {
-                                const updated = variants.map((x, j) => j === i ? { ...x, price: Number(e.target.value) } : x)
-                                setBulkPrices(prev => ({ ...prev, [id]: updated }))
-                              }}
-                              style={{
-                                flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)',
-                                borderRadius: 8, padding: '8px 10px', color: 'var(--text)',
-                                fontSize: '.9rem', fontFamily: 'inherit', outline: 'none',
-                                fontWeight: 700,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
+                return p ? (
+                  <span key={id} style={{ fontSize: '.72rem', background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 20, padding: '3px 10px', color: 'var(--gold)' }}>
+                    {p.emoji} {p.name}
+                  </span>
+                ) : null
               })}
+            </div>
+            <div style={{ padding: '0 16px 10px', fontSize: '.72rem', color: 'var(--muted)' }}>
+              I prezzi qui sotto verranno applicati a tutti i prodotti selezionati.
+            </div>
+
+            {/* One row per variant label */}
+            <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {Object.entries(bulkSharedPrices).map(([label, price]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    fontSize: '.82rem', fontWeight: 700, color: 'var(--gold)',
+                    background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.25)',
+                    borderRadius: 8, padding: '8px 14px', minWidth: 64, textAlign: 'center', flexShrink: 0,
+                  }}>
+                    {label}
+                  </div>
+                  <span style={{ fontSize: '.85rem', color: 'var(--muted)', flexShrink: 0 }}>€</span>
+                  <input
+                    type="number"
+                    value={price || ''}
+                    onChange={e => setBulkSharedPrices(prev => ({ ...prev, [label]: Number(e.target.value) }))}
+                    style={{
+                      flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)',
+                      borderRadius: 10, padding: '10px 14px', color: 'var(--text)',
+                      fontSize: '1rem', fontFamily: 'inherit', outline: 'none', fontWeight: 700,
+                    }}
+                  />
+                </div>
+              ))}
             </div>
 
             {/* Save button */}
