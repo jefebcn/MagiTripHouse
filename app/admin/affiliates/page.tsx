@@ -137,10 +137,7 @@ export default function AdminAffiliates() {
       )}
 
 
-      {/* ── AFFILIATES TAB ── */}
-      {tab === 'affiliates' && (
-        <>
-          {/* Sort tabs */}
+      {/* Sort tabs */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
             {([
               { key: 'referrals', label: 'Referral' },
@@ -234,9 +231,6 @@ export default function AdminAffiliates() {
               })}
             </div>
           )}
-        </>
-      )}
-
     </div>
   )
 }
