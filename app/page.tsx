@@ -1102,11 +1102,310 @@ function AuthGate() {
   )
 }
 
+const TIER_META = {
+  bronze: { label: 'Bronze',  emoji: '🥉', color: '#cd7f32', bg: 'rgba(205,127,50,.12)',  border: 'rgba(205,127,50,.35)', rate: 5,  next: 5  },
+  silver: { label: 'Silver',  emoji: '🥈', color: '#a8a9ad', bg: 'rgba(168,169,173,.12)', border: 'rgba(168,169,173,.35)', rate: 8,  next: 15 },
+  gold:   { label: 'Gold',    emoji: '🥇', color: '#f5c842', bg: 'rgba(245,200,66,.14)',  border: 'rgba(245,200,66,.45)',  rate: 12, next: null },
+}
+
+interface AffMe {
+  code: string; tier: string; commissionEarned: number; commissionPaid: number
+  referralCount: number; referralRevenue: number; referralOrders: number
+  balance: number; pendingPayout: number
+  payouts: { id: string; amount: number; status: string; method: string; requestedAt: string; processedAt?: string }[]
+}
+
 function AffiliatesView() {
+  const { userHandle, isLoggedIn } = useUIStore()
+  const [data, setData] = React.useState<AffMe | null>(null)
+  const [loading, setLoading] = React.useState(false)
+  const [copied, setCopied] = React.useState(false)
+  const [payoutOpen, setPayoutOpen] = React.useState(false)
+  const [payoutAmount, setPayoutAmount] = React.useState('')
+  const [payoutMethod, setPayoutMethod] = React.useState<'crypto' | 'bonifico'>('crypto')
+  const [payoutNote, setPayoutNote] = React.useState('')
+  const [payoutSending, setPayoutSending] = React.useState(false)
+  const [payoutError, setPayoutError] = React.useState('')
+  const [payoutDone, setPayoutDone] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!isLoggedIn || !userHandle) return
+    setLoading(true)
+    // Ensure affiliate record exists then fetch stats
+    fetch('/api/affiliates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: userHandle }) })
+      .then(() => fetch(`/api/affiliates/me?username=${userHandle}`))
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [isLoggedIn, userHandle])
+
+  function copyCode() {
+    if (!data) return
+    navigator.clipboard.writeText(data.code).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+
+  async function requestPayout() {
+    if (!userHandle || !data) return
+    const amt = parseFloat(payoutAmount)
+    if (!amt || amt < 20) { setPayoutError('Minimo €20'); return }
+    if (amt > data.balance) { setPayoutError('Saldo insufficiente'); return }
+    setPayoutSending(true); setPayoutError('')
+    try {
+      const res = await fetch('/api/affiliates/payout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: userHandle, amount: amt, method: payoutMethod, note: payoutNote }),
+      })
+      const d = await res.json()
+      if (!res.ok) { setPayoutError(d.error ?? 'Errore'); setPayoutSending(false); return }
+      setPayoutDone(true)
+      setPayoutOpen(false)
+      // Refresh
+      fetch(`/api/affiliates/me?username=${userHandle}`).then(r => r.json()).then(setData).catch(() => {})
+    } catch { setPayoutError('Errore di rete') } finally { setPayoutSending(false) }
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '48px 24px', fontSize: '.88rem' }}>
+        <div style={{ fontSize: '3rem', marginBottom: 8 }}>🤝</div>
+        Accedi per vedere il tuo programma affiliati
+      </div>
+    )
+  }
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 48 }}>Caricamento...</div>
+  }
+
+  const tier = (data?.tier ?? 'bronze') as keyof typeof TIER_META
+  const meta = TIER_META[tier] ?? TIER_META.bronze
+  const nextMeta = tier === 'bronze' ? TIER_META.silver : tier === 'silver' ? TIER_META.gold : null
+  const progressPct = nextMeta
+    ? Math.min(100, ((data?.referralCount ?? 0) / (meta.next ?? 1)) * 100)
+    : 100
+
   return (
-    <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 32, fontSize: '.88rem' }}>
-      <div style={{ fontSize: '3rem', marginBottom: 8 }}>👥</div>
-      Programma affiliati disponibile prossimamente
+    <div style={{ padding: '0 0 24px' }}>
+
+      {/* Tier hero */}
+      <div style={{
+        background: `linear-gradient(135deg, ${meta.bg}, transparent)`,
+        border: `1px solid ${meta.border}`,
+        borderRadius: 16, padding: '18px 16px', marginBottom: 14,
+        display: 'flex', alignItems: 'center', gap: 14,
+      }}>
+        <div style={{ fontSize: '2.8rem', lineHeight: 1 }}>{meta.emoji}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: meta.color }}>{meta.label}</div>
+          <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>
+            {meta.rate}% di commissione su ogni ordine dei tuoi referral
+          </div>
+          {nextMeta && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.62rem', color: 'var(--muted)', marginBottom: 4 }}>
+                <span>{data?.referralCount ?? 0} referral</span>
+                <span>{meta.next} per {nextMeta.label} ({nextMeta.rate}%)</span>
+              </div>
+              <div style={{ height: 4, background: 'var(--border)', borderRadius: 2 }}>
+                <div style={{ height: '100%', width: `${progressPct}%`, background: meta.color, borderRadius: 2, transition: 'width .5s' }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Stats grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+        {[
+          { icon: '👥', label: 'Referral', value: data?.referralCount ?? 0, color: '#3b82f6' },
+          { icon: '📦', label: 'Ordini generati', value: data?.referralOrders ?? 0, color: 'var(--green)' },
+          { icon: '💶', label: 'Totale maturato', value: `€${(data?.commissionEarned ?? 0).toFixed(2)}`, color: 'var(--gold)' },
+          { icon: '💰', label: 'Saldo disponibile', value: `€${(data?.balance ?? 0).toFixed(2)}`, color: 'var(--green)' },
+        ].map(s => (
+          <div key={s.label} style={{
+            background: 'var(--card)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: '12px 14px',
+          }}>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 4 }}>{s.icon} {s.label}</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.25rem', color: s.color }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Referral code */}
+      <div style={{
+        background: 'rgba(245,200,66,.06)', border: '1.5px solid rgba(245,200,66,.3)',
+        borderRadius: 14, padding: '14px 16px', marginBottom: 14,
+      }}>
+        <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 8 }}>🔗 Il tuo codice referral</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            fontFamily: 'monospace', fontSize: '1.4rem', fontWeight: 800,
+            letterSpacing: '3px', color: 'var(--gold)', flex: 1,
+          }}>{data?.code ?? '——'}</div>
+          <button
+            onClick={copyCode}
+            style={{
+              background: copied ? 'rgba(61,255,110,.15)' : 'rgba(245,200,66,.12)',
+              border: `1px solid ${copied ? 'rgba(61,255,110,.4)' : 'rgba(245,200,66,.4)'}`,
+              color: copied ? 'var(--green)' : 'var(--gold)',
+              borderRadius: 10, padding: '8px 14px',
+              fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer',
+            }}
+          >{copied ? '✓ Copiato' : '📋 Copia'}</button>
+        </div>
+        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 8 }}>
+          Condividi questo codice: ogni utente che si registra con il tuo codice ti viene attribuito e guadagni sul suo primo ordine.
+        </div>
+      </div>
+
+      {/* Payout button */}
+      {(data?.balance ?? 0) >= 20 && !payoutDone ? (
+        <button
+          onClick={() => { setPayoutOpen(true); setPayoutError('') }}
+          style={{
+            width: '100%', padding: '14px', borderRadius: 14, marginBottom: 14,
+            fontFamily: 'inherit', fontWeight: 700, fontSize: '.95rem', cursor: 'pointer',
+            background: 'linear-gradient(135deg,rgba(61,255,110,.18),rgba(61,255,110,.08))',
+            border: '1.5px solid rgba(61,255,110,.5)', color: 'var(--green)',
+            boxShadow: '0 0 20px rgba(61,255,110,.1)',
+          }}
+        >💸 Richiedi pagamento — €{(data?.balance ?? 0).toFixed(2)} disponibili</button>
+      ) : payoutDone ? (
+        <div style={{
+          textAlign: 'center', padding: '12px', borderRadius: 12, marginBottom: 14,
+          background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.3)',
+          fontSize: '.82rem', color: 'var(--green)',
+        }}>✅ Richiesta inviata — ti contatteremo su Telegram</div>
+      ) : (
+        <div style={{
+          textAlign: 'center', padding: '11px', borderRadius: 12, marginBottom: 14,
+          background: 'var(--bg3)', border: '1px solid var(--border)',
+          fontSize: '.75rem', color: 'var(--muted)',
+        }}>💸 Minimo €20 per richiedere un pagamento · Saldo: €{(data?.balance ?? 0).toFixed(2)}</div>
+      )}
+
+      {/* Come funziona — tier table */}
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--border)',
+        borderRadius: 14, padding: '14px 16px', marginBottom: 14,
+      }}>
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', marginBottom: 12 }}>📋 Come funziona</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {Object.entries(TIER_META).map(([key, t]) => (
+            <div key={key} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: tier === key ? t.bg : 'transparent',
+              border: `1px solid ${tier === key ? t.border : 'transparent'}`,
+              borderRadius: 10, padding: '8px 10px',
+            }}>
+              <span style={{ fontSize: '1.2rem' }}>{t.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '.82rem', fontWeight: 700, color: t.color }}>{t.label}</div>
+                <div style={{ fontSize: '.65rem', color: 'var(--muted)' }}>
+                  {key === 'bronze' ? '0–4 referral' : key === 'silver' ? '5–14 referral' : '15+ referral'}
+                </div>
+              </div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: t.color }}>
+                {t.rate}%
+              </div>
+              {tier === key && <div style={{ fontSize: '.65rem', color: t.color, fontWeight: 700 }}>← tu</div>}
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 12, fontSize: '.68rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+          La commissione viene maturata automaticamente su ogni ordine completato da un tuo referral.
+          Minimo €20 per richiedere il pagamento via Bonifico o Crypto.
+        </div>
+      </div>
+
+      {/* Payout history */}
+      {(data?.payouts?.length ?? 0) > 0 && (
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 16px' }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', marginBottom: 10 }}>📜 Storico pagamenti</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {data!.payouts.map(p => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '.8rem', fontWeight: 700 }}>€{p.amount.toFixed(2)}</div>
+                  <div style={{ fontSize: '.62rem', color: 'var(--muted)' }}>
+                    {p.method === 'crypto' ? '₿ Crypto' : '🏦 Bonifico'} · {new Date(p.requestedAt).toLocaleDateString('it-IT')}
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: '.65rem', fontWeight: 700, borderRadius: 20, padding: '3px 10px',
+                  background: p.status === 'paid' ? 'rgba(61,255,110,.12)' : p.status === 'pending' ? 'rgba(245,200,66,.1)' : 'rgba(255,80,80,.1)',
+                  color: p.status === 'paid' ? 'var(--green)' : p.status === 'pending' ? 'var(--gold)' : '#ff5050',
+                  border: `1px solid ${p.status === 'paid' ? 'rgba(61,255,110,.3)' : p.status === 'pending' ? 'rgba(245,200,66,.3)' : 'rgba(255,80,80,.3)'}`,
+                }}>
+                  {p.status === 'paid' ? '✅ Pagato' : p.status === 'pending' ? '⏳ In attesa' : '❌ Rifiutato'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Payout request panel */}
+      {payoutOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)' }} onClick={() => setPayoutOpen(false)} />
+          <div style={{ position: 'relative', background: 'var(--bg2)', borderRadius: '20px 20px 0 0', padding: '20px 16px 40px', border: '1px solid var(--border)' }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', marginBottom: 16 }}>💸 Richiedi pagamento</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 6 }}>Importo (disponibile €{(data?.balance ?? 0).toFixed(2)})</div>
+                <input
+                  type="number"
+                  placeholder="es. 50"
+                  value={payoutAmount}
+                  onChange={e => setPayoutAmount(e.target.value)}
+                  style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '1rem', fontFamily: 'inherit', outline: 'none' }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 6 }}>Metodo di pagamento</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['crypto', 'bonifico'] as const).map(m => (
+                    <button key={m} onClick={() => setPayoutMethod(m)} style={{
+                      flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem',
+                      background: payoutMethod === m ? 'rgba(245,200,66,.15)' : 'var(--bg3)',
+                      color: payoutMethod === m ? 'var(--gold)' : 'var(--muted)',
+                      border: `1px solid ${payoutMethod === m ? 'rgba(245,200,66,.4)' : 'var(--border)'}`,
+                    }}>
+                      {m === 'crypto' ? '₿ Crypto' : '🏦 Bonifico'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 6 }}>Note (wallet / IBAN)</div>
+                <input
+                  type="text"
+                  placeholder={payoutMethod === 'crypto' ? 'es. BTC: bc1q...' : 'es. IT60 X054 2811 1010 0000 0123 456'}
+                  value={payoutNote}
+                  onChange={e => setPayoutNote(e.target.value)}
+                  style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
+                />
+              </div>
+              {payoutError && <div style={{ fontSize: '.78rem', color: '#ff5050' }}>⚠️ {payoutError}</div>}
+              <button
+                onClick={requestPayout}
+                disabled={payoutSending}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: 14,
+                  fontFamily: 'inherit', fontWeight: 700, fontSize: '.95rem', cursor: payoutSending ? 'not-allowed' : 'pointer',
+                  background: 'linear-gradient(135deg,rgba(61,255,110,.2),rgba(61,255,110,.08))',
+                  border: '1.5px solid rgba(61,255,110,.5)', color: 'var(--green)',
+                }}
+              >{payoutSending ? '⏳ Invio...' : '✅ Invia richiesta'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

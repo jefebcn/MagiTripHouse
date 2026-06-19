@@ -41,12 +41,28 @@ model Order {
 }
 
 model Affiliate {
-  id         String    @id @default(cuid())
-  username   String    @unique
-  code       String    @unique
-  referredBy String?
-  referredAt DateTime?
-  joinedAt   DateTime  @default(now())
+  id               String    @id @default(cuid())
+  username         String    @unique
+  code             String    @unique
+  referredBy       String?
+  referredAt       DateTime?
+  joinedAt         DateTime  @default(now())
+  tier             String    @default("bronze")
+  commissionRate   Float     @default(0.05)
+  commissionEarned Float     @default(0)
+  commissionPaid   Float     @default(0)
+}
+
+model CommissionPayout {
+  id            String    @id @default(cuid())
+  affiliateCode String
+  username      String
+  amount        Float
+  status        String    @default("pending")
+  method        String    @default("crypto")
+  note          String?
+  requestedAt   DateTime  @default(now())
+  processedAt   DateTime?
 }
 
 model NewsFeed {
