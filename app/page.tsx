@@ -1120,13 +1120,6 @@ function AffiliatesView() {
   const [data, setData] = React.useState<AffMe | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
-  const [payoutOpen, setPayoutOpen] = React.useState(false)
-  const [payoutAmount, setPayoutAmount] = React.useState('')
-  const [payoutMethod, setPayoutMethod] = React.useState<'crypto' | 'bonifico'>('crypto')
-  const [payoutNote, setPayoutNote] = React.useState('')
-  const [payoutSending, setPayoutSending] = React.useState(false)
-  const [payoutError, setPayoutError] = React.useState('')
-  const [payoutDone, setPayoutDone] = React.useState(false)
 
   React.useEffect(() => {
     if (!isLoggedIn || !userHandle) return
@@ -1144,27 +1137,6 @@ function AffiliatesView() {
     navigator.clipboard.writeText(data.code).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
-  }
-
-  async function requestPayout() {
-    if (!userHandle || !data) return
-    const amt = parseFloat(payoutAmount)
-    if (!amt || amt < 20) { setPayoutError('Minimo €20'); return }
-    if (amt > data.balance) { setPayoutError('Saldo insufficiente'); return }
-    setPayoutSending(true); setPayoutError('')
-    try {
-      const res = await fetch('/api/affiliates/payout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: userHandle, amount: amt, method: payoutMethod, note: payoutNote }),
-      })
-      const d = await res.json()
-      if (!res.ok) { setPayoutError(d.error ?? 'Errore'); setPayoutSending(false); return }
-      setPayoutDone(true)
-      setPayoutOpen(false)
-      // Refresh
-      fetch(`/api/affiliates/me?username=${userHandle}`).then(r => r.json()).then(setData).catch(() => {})
-    } catch { setPayoutError('Errore di rete') } finally { setPayoutSending(false) }
   }
 
   if (!isLoggedIn) {
@@ -1262,31 +1234,25 @@ function AffiliatesView() {
         </div>
       </div>
 
-      {/* Payout button */}
-      {(data?.balance ?? 0) >= 20 && !payoutDone ? (
-        <button
-          onClick={() => { setPayoutOpen(true); setPayoutError('') }}
-          style={{
-            width: '100%', padding: '14px', borderRadius: 14, marginBottom: 14,
-            fontFamily: 'inherit', fontWeight: 700, fontSize: '.95rem', cursor: 'pointer',
-            background: 'linear-gradient(135deg,rgba(61,255,110,.18),rgba(61,255,110,.08))',
-            border: '1.5px solid rgba(61,255,110,.5)', color: 'var(--green)',
-            boxShadow: '0 0 20px rgba(61,255,110,.1)',
-          }}
-        >💸 Richiedi pagamento — €{(data?.balance ?? 0).toFixed(2)} disponibili</button>
-      ) : payoutDone ? (
-        <div style={{
-          textAlign: 'center', padding: '12px', borderRadius: 12, marginBottom: 14,
-          background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.3)',
-          fontSize: '.82rem', color: 'var(--green)',
-        }}>✅ Richiesta inviata — ti contatteremo su Telegram</div>
-      ) : (
-        <div style={{
-          textAlign: 'center', padding: '11px', borderRadius: 12, marginBottom: 14,
-          background: 'var(--bg3)', border: '1px solid var(--border)',
-          fontSize: '.75rem', color: 'var(--muted)',
-        }}>💸 Minimo €20 per richiedere un pagamento · Saldo: €{(data?.balance ?? 0).toFixed(2)}</div>
-      )}
+      {/* Cart credit callout */}
+      <div style={{
+        background: (data?.balance ?? 0) > 0 ? 'rgba(61,255,110,.07)' : 'var(--bg3)',
+        border: `1.5px solid ${(data?.balance ?? 0) > 0 ? 'rgba(61,255,110,.35)' : 'var(--border)'}`,
+        borderRadius: 14, padding: '13px 16px', marginBottom: 14,
+        display: 'flex', alignItems: 'center', gap: 12,
+      }}>
+        <span style={{ fontSize: '1.6rem' }}>🛒</span>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '.85rem', color: (data?.balance ?? 0) > 0 ? 'var(--green)' : 'var(--muted)' }}>
+            {(data?.balance ?? 0) > 0
+              ? `€${(data!.balance).toFixed(2)} di credito disponibile`
+              : 'Nessun credito disponibile'}
+          </div>
+          <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>
+            Il credito si applica direttamente nel carrello come sconto
+          </div>
+        </div>
+      </div>
 
       {/* Come funziona — tier table */}
       <div style={{
@@ -1317,95 +1283,11 @@ function AffiliatesView() {
           ))}
         </div>
         <div style={{ marginTop: 12, fontSize: '.68rem', color: 'var(--muted)', lineHeight: 1.6 }}>
-          La commissione viene maturata automaticamente su ogni ordine completato da un tuo referral.
-          Minimo €20 per richiedere il pagamento via Bonifico o Crypto.
+          La commissione viene maturata automaticamente su ogni ordine dei tuoi referral.
+          Il credito si usa come sconto direttamente nel carrello al momento dell'ordine.
         </div>
       </div>
 
-      {/* Payout history */}
-      {(data?.payouts?.length ?? 0) > 0 && (
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 16px' }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem', marginBottom: 10 }}>📜 Storico pagamenti</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {data!.payouts.map(p => (
-              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '.8rem', fontWeight: 700 }}>€{p.amount.toFixed(2)}</div>
-                  <div style={{ fontSize: '.62rem', color: 'var(--muted)' }}>
-                    {p.method === 'crypto' ? '₿ Crypto' : '🏦 Bonifico'} · {new Date(p.requestedAt).toLocaleDateString('it-IT')}
-                  </div>
-                </div>
-                <div style={{
-                  fontSize: '.65rem', fontWeight: 700, borderRadius: 20, padding: '3px 10px',
-                  background: p.status === 'paid' ? 'rgba(61,255,110,.12)' : p.status === 'pending' ? 'rgba(245,200,66,.1)' : 'rgba(255,80,80,.1)',
-                  color: p.status === 'paid' ? 'var(--green)' : p.status === 'pending' ? 'var(--gold)' : '#ff5050',
-                  border: `1px solid ${p.status === 'paid' ? 'rgba(61,255,110,.3)' : p.status === 'pending' ? 'rgba(245,200,66,.3)' : 'rgba(255,80,80,.3)'}`,
-                }}>
-                  {p.status === 'paid' ? '✅ Pagato' : p.status === 'pending' ? '⏳ In attesa' : '❌ Rifiutato'}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Payout request panel */}
-      {payoutOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)' }} onClick={() => setPayoutOpen(false)} />
-          <div style={{ position: 'relative', background: 'var(--bg2)', borderRadius: '20px 20px 0 0', padding: '20px 16px 40px', border: '1px solid var(--border)' }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', marginBottom: 16 }}>💸 Richiedi pagamento</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 6 }}>Importo (disponibile €{(data?.balance ?? 0).toFixed(2)})</div>
-                <input
-                  type="number"
-                  placeholder="es. 50"
-                  value={payoutAmount}
-                  onChange={e => setPayoutAmount(e.target.value)}
-                  style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '1rem', fontFamily: 'inherit', outline: 'none' }}
-                />
-              </div>
-              <div>
-                <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 6 }}>Metodo di pagamento</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {(['crypto', 'bonifico'] as const).map(m => (
-                    <button key={m} onClick={() => setPayoutMethod(m)} style={{
-                      flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem',
-                      background: payoutMethod === m ? 'rgba(245,200,66,.15)' : 'var(--bg3)',
-                      color: payoutMethod === m ? 'var(--gold)' : 'var(--muted)',
-                      border: `1px solid ${payoutMethod === m ? 'rgba(245,200,66,.4)' : 'var(--border)'}`,
-                    }}>
-                      {m === 'crypto' ? '₿ Crypto' : '🏦 Bonifico'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 6 }}>Note (wallet / IBAN)</div>
-                <input
-                  type="text"
-                  placeholder={payoutMethod === 'crypto' ? 'es. BTC: bc1q...' : 'es. IT60 X054 2811 1010 0000 0123 456'}
-                  value={payoutNote}
-                  onChange={e => setPayoutNote(e.target.value)}
-                  style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
-                />
-              </div>
-              {payoutError && <div style={{ fontSize: '.78rem', color: '#ff5050' }}>⚠️ {payoutError}</div>}
-              <button
-                onClick={requestPayout}
-                disabled={payoutSending}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: 14,
-                  fontFamily: 'inherit', fontWeight: 700, fontSize: '.95rem', cursor: payoutSending ? 'not-allowed' : 'pointer',
-                  background: 'linear-gradient(135deg,rgba(61,255,110,.2),rgba(61,255,110,.08))',
-                  border: '1.5px solid rgba(61,255,110,.5)', color: 'var(--green)',
-                }}
-              >{payoutSending ? '⏳ Invio...' : '✅ Invia richiesta'}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

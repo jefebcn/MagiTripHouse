@@ -18,18 +18,6 @@ interface AffiliateRow {
   referralRevenue: number
 }
 
-interface Payout {
-  id: string
-  affiliateCode: string
-  username: string
-  amount: number
-  status: string
-  method: string
-  note?: string
-  requestedAt: string
-  processedAt?: string
-}
-
 interface Commissions {
   totalEarned: number
   totalPaid: number
@@ -44,19 +32,15 @@ const TIER_META: Record<string, { emoji: string; color: string; bg: string; labe
 
 export default function AdminAffiliates() {
   const [affiliates, setAffiliates] = useState<AffiliateRow[]>([])
-  const [pendingPayouts, setPendingPayouts] = useState<Payout[]>([])
   const [commissions, setCommissions] = useState<Commissions | null>(null)
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState<'recent' | 'referrals' | 'revenue' | 'earnings'>('referrals')
   const [copied, setCopied] = useState<string | null>(null)
-  const [updatingPayout, setUpdatingPayout] = useState<string | null>(null)
-  const [tab, setTab] = useState<'affiliates' | 'payouts'>('affiliates')
 
   async function load() {
     try {
       const d = await fetch('/api/admin/stats').then(r => r.json())
       setAffiliates(d.affiliates ?? [])
-      setPendingPayouts(d.pendingPayouts ?? [])
       setCommissions(d.commissions ?? null)
     } finally {
       setLoading(false)
@@ -69,17 +53,6 @@ export default function AdminAffiliates() {
     navigator.clipboard.writeText(code).catch(() => {})
     setCopied(code)
     setTimeout(() => setCopied(null), 1500)
-  }
-
-  async function updatePayout(id: string, status: string) {
-    setUpdatingPayout(id)
-    await fetch('/api/admin/payouts', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status }),
-    })
-    await load()
-    setUpdatingPayout(null)
   }
 
   const sorted = [...affiliates].sort((a, b) => {
@@ -163,26 +136,6 @@ export default function AdminAffiliates() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        {([
-          { key: 'affiliates', label: `👥 Affiliati (${affiliates.length})` },
-          { key: 'payouts',    label: `💸 Pagamenti${pendingPayouts.length > 0 ? ` (${pendingPayouts.length})` : ''}` },
-        ] as const).map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              flex: 1, borderRadius: 20, padding: '7px 12px',
-              fontSize: '.78rem', fontWeight: 700, cursor: 'pointer',
-              fontFamily: 'inherit', border: '1px solid',
-              background: tab === t.key ? 'rgba(61,255,110,.12)' : 'var(--bg3)',
-              color:      tab === t.key ? 'var(--green)'         : 'var(--muted)',
-              borderColor: tab === t.key ? 'rgba(61,255,110,.35)' : 'var(--border)',
-            }}
-          >{t.label}</button>
-        ))}
-      </div>
 
       {/* ── AFFILIATES TAB ── */}
       {tab === 'affiliates' && (
@@ -284,91 +237,6 @@ export default function AdminAffiliates() {
         </>
       )}
 
-      {/* ── PAYOUTS TAB ── */}
-      {tab === 'payouts' && (
-        <PayoutsTab pendingPayouts={pendingPayouts} onUpdate={updatePayout} updatingId={updatingPayout} onReload={load} />
-      )}
-    </div>
-  )
-}
-
-function PayoutsTab({ pendingPayouts, onUpdate, updatingId, onReload }: {
-  pendingPayouts: Payout[]
-  onUpdate: (id: string, status: string) => void
-  updatingId: string | null
-  onReload: () => void
-}) {
-  const [allPayouts, setAllPayouts] = useState<Payout[]>([])
-  const [loadingAll, setLoadingAll] = useState(false)
-  const [showAll, setShowAll] = useState(false)
-
-  async function loadAll() {
-    setLoadingAll(true)
-    const data = await fetch('/api/admin/payouts').then(r => r.json())
-    setAllPayouts(data)
-    setLoadingAll(false)
-    setShowAll(true)
-  }
-
-  const payouts = showAll ? allPayouts : pendingPayouts
-
-  if (payouts.length === 0 && !showAll) {
-    return (
-      <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '48px 24px', fontSize: '.85rem' }}>
-        <div style={{ fontSize: '2rem', marginBottom: 8 }}>💸</div>
-        Nessuna richiesta in attesa
-        <button onClick={loadAll} style={{ display: 'block', margin: '16px auto 0', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 16px', fontSize: '.78rem', color: 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
-          Vedi storico completo
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {!showAll && (
-        <button onClick={loadAll} disabled={loadingAll} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 16px', fontSize: '.78rem', color: 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 4 }}>
-          {loadingAll ? 'Caricamento...' : 'Vedi storico completo'}
-        </button>
-      )}
-      {payouts.map(p => (
-        <div key={p.id} style={{ background: 'var(--card)', border: `1px solid ${p.status === 'pending' ? 'rgba(255,140,0,.3)' : 'var(--border)'}`, borderRadius: 12, padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '.88rem' }}>@{p.username}</div>
-              <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>
-                {p.method === 'crypto' ? '₿ Crypto' : '🏦 Bonifico'} · {new Date(p.requestedAt).toLocaleDateString('it-IT')}
-              </div>
-              {p.note && <div style={{ fontSize: '.68rem', color: 'var(--gold)', marginTop: 4, wordBreak: 'break-all' }}>📋 {p.note}</div>}
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', color: 'var(--gold)' }}>€{p.amount.toFixed(2)}</div>
-              <div style={{
-                fontSize: '.62rem', fontWeight: 700, borderRadius: 20, padding: '2px 8px', marginTop: 4,
-                display: 'inline-block',
-                background: p.status === 'paid' ? 'rgba(61,255,110,.12)' : p.status === 'pending' ? 'rgba(255,140,0,.12)' : 'rgba(255,80,80,.1)',
-                color: p.status === 'paid' ? 'var(--green)' : p.status === 'pending' ? '#ff8c00' : '#ff5050',
-              }}>
-                {p.status === 'paid' ? '✅ Pagato' : p.status === 'pending' ? '⏳ In attesa' : '❌ Rifiutato'}
-              </div>
-            </div>
-          </div>
-          {p.status === 'pending' && (
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button
-                onClick={() => onUpdate(p.id, 'paid')}
-                disabled={updatingId === p.id}
-                style={{ flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.4)', color: 'var(--green)' }}
-              >{updatingId === p.id ? '...' : '✅ Segna pagato'}</button>
-              <button
-                onClick={() => onUpdate(p.id, 'rejected')}
-                disabled={updatingId === p.id}
-                style={{ flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', background: 'rgba(255,80,80,.08)', border: '1px solid rgba(255,80,80,.3)', color: '#ff5050' }}
-              >❌ Rifiuta</button>
-            </div>
-          )}
-        </div>
-      ))}
     </div>
   )
 }

@@ -25,6 +25,21 @@ export async function POST(req: Request) {
     },
   })
 
+  // Deduct affiliate store credit if applied
+  if (body.affiliateCredit > 0 && body.affiliateUsername) {
+    prisma.affiliate.findUnique({ where: { username: body.affiliateUsername } }).then(async aff => {
+      if (!aff) return
+      const available = aff.commissionEarned - aff.commissionPaid
+      const credit = Math.min(body.affiliateCredit, available)
+      if (credit > 0) {
+        await prisma.affiliate.update({
+          where: { username: body.affiliateUsername },
+          data: { commissionPaid: { increment: credit } },
+        })
+      }
+    }).catch(() => {})
+  }
+
   // Credit commission to affiliate if order has referral code
   if (order.referredBy) {
     prisma.affiliate.findUnique({ where: { code: order.referredBy } }).then(async aff => {
