@@ -26,10 +26,23 @@ const TRUST_CHIPS = [
   { icon: '⭐', label: 'Top quality' },
 ]
 
+const MEETUP_DEADLINE = new Date('2026-07-01T00:00:00')
+
 export default function HubView() {
   const { goToCatalog, setView, userName } = useUIStore()
   const { products } = useProducts()
   const firstName = (userName || '').trim().split(/\s+/)[0]
+
+  const [now, setNow] = React.useState(() => new Date())
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+
+  const msLeft = MEETUP_DEADLINE.getTime() - now.getTime()
+  const meetupActive = msLeft > 0
+  const daysLeft = Math.max(0, Math.floor(msLeft / 86_400_000))
+  const hoursLeft = Math.max(0, Math.floor((msLeft % 86_400_000) / 3_600_000))
 
   const countByOrigin = (o: ShipOrigin) =>
     products.filter(p => (p.shipFrom ?? 'spain') === o && p.category !== 'request').length
@@ -97,6 +110,81 @@ export default function HubView() {
           <span style={{ flex: 1, color: 'var(--muted)', fontSize: '.92rem' }}>Cerca un prodotto…</span>
           <span style={{ fontSize: '.85rem', color: 'var(--muted)' }}>›</span>
         </button>
+      </div>
+
+      {/* Meetup banner */}
+      <div style={{ padding: '12px 16px 4px' }}>
+        <div style={{
+          position: 'relative', overflow: 'hidden',
+          background: meetupActive
+            ? 'linear-gradient(135deg, rgba(139,92,246,.18) 0%, var(--card) 70%)'
+            : 'linear-gradient(135deg, rgba(80,80,100,.15) 0%, var(--card) 70%)',
+          border: meetupActive ? '1.5px solid rgba(139,92,246,.45)' : '1.5px solid rgba(120,120,140,.3)',
+          borderRadius: 18, padding: '16px 16px 14px',
+          boxShadow: meetupActive ? '0 4px 20px rgba(139,92,246,.15)' : 'none',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <span style={{ fontSize: '2rem', lineHeight: 1, flexShrink: 0 }}>
+              {meetupActive ? '🤝' : '😴'}
+            </span>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{
+                  fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem',
+                  color: meetupActive ? '#c084fc' : 'var(--muted)',
+                }}>
+                  Meetup
+                </span>
+                {meetupActive && (
+                  <span style={{
+                    background: 'rgba(139,92,246,.22)', border: '1px solid rgba(139,92,246,.4)',
+                    borderRadius: 20, padding: '2px 9px',
+                    fontSize: '.64rem', color: '#d8b4fe', fontWeight: 700, letterSpacing: '.3px',
+                  }}>
+                    DISPONIBILE
+                  </span>
+                )}
+                {!meetupActive && (
+                  <span style={{
+                    background: 'rgba(100,100,120,.2)', border: '1px solid rgba(120,120,140,.3)',
+                    borderRadius: 20, padding: '2px 9px',
+                    fontSize: '.64rem', color: 'var(--muted)', fontWeight: 700, letterSpacing: '.3px',
+                  }}>
+                    SOLO SPEDIZIONE
+                  </span>
+                )}
+              </div>
+
+              {meetupActive ? (
+                <>
+                  <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
+                    Ritiro a mano disponibile · nessun costo di spedizione
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                    <span style={{ fontSize: '.68rem', color: 'rgba(192,132,252,.8)', fontWeight: 600 }}>
+                      ⏳ Termina tra
+                    </span>
+                    <span style={{
+                      background: 'rgba(139,92,246,.25)', border: '1px solid rgba(139,92,246,.35)',
+                      borderRadius: 8, padding: '3px 9px',
+                      fontSize: '.75rem', color: '#e9d5ff', fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                    }}>
+                      {daysLeft}g {hoursLeft}h
+                    </span>
+                    <span style={{ fontSize: '.64rem', color: 'rgba(192,132,252,.6)' }}>
+                      (1 luglio)
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 5, lineHeight: 1.4 }}>
+                  Il meetup è momentaneamente sospeso.<br />
+                  Utilizziamo solo spedizione per questo periodo.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Shipping origin cards */}
