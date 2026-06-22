@@ -58,14 +58,14 @@ export default function HubView() {
       <Header />
 
       {/* Welcome block under logo */}
-      <div style={{ textAlign: 'center', padding: '2px 16px 0' }}>
+      <div style={{ textAlign: 'center', padding: '14px 16px 0' }}>
         <div style={{ fontSize: '.92rem', color: 'var(--text)', fontWeight: 600 }}>
           {firstName ? <>Bentornato, <span style={{ color: 'var(--green)' }}>{firstName}</span> 👋</> : <>Benvenuto su Magic Trip House 👋</>}
         </div>
         <div style={{ fontSize: '.72rem', color: 'rgba(106,138,106,.85)', marginTop: 3 }}>
           Premium quality · spedizione discreta in tutta Europa
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 7, marginTop: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 7, marginTop: 12, flexWrap: 'wrap' }}>
           {TRUST_CHIPS.map((c) => (
             <span key={c.label} style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -79,6 +79,7 @@ export default function HubView() {
         </div>
       </div>
 
+      <div style={{ marginTop: 14 }} />
       <Marquee />
 
       {/* Search — tap to enter catalog */}
