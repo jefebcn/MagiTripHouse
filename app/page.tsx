@@ -2,12 +2,8 @@
 import React from 'react'
 import { useUIStore } from '@/store/uiStore'
 import BottomNav from '@/components/layout/BottomNav'
-import AnnouncementBanner from '@/components/layout/AnnouncementBanner'
-import Marquee from '@/components/layout/Marquee'
-import Header from '@/components/layout/Header'
-import CategoryFilter from '@/components/catalog/CategoryFilter'
-import SearchBar from '@/components/catalog/SearchBar'
-import ProductGrid from '@/components/catalog/ProductGrid'
+import HubView from '@/components/home/HubView'
+import CatalogView from '@/components/catalog/CatalogView'
 import CartDrawer from '@/components/panels/CartDrawer'
 import ProductDetail from '@/components/panels/ProductDetail'
 import Lightbox from '@/components/panels/Lightbox'
@@ -76,41 +72,16 @@ export default function Home() {
 
       {view === 'game' && <GameView />}
 
+      <div style={{ display: view === 'hub' ? 'block' : 'none' }}>
+        {isLoggedIn ? <HubView /> : (
+          <div style={{ padding: '0 16px 100px' }}>
+            <AuthView />
+          </div>
+        )}
+      </div>
+
       <div style={{ display: view === 'catalog' ? 'block' : 'none' }}>
-        {isLoggedIn ? (
-          <>
-            {/* Banner Tombola */}
-            <a
-              href="https://t.me/+hHYTnDvbiYgwYjY0"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '7px 16px', textDecoration: 'none',
-                background: 'linear-gradient(90deg,#6b2700 0%,#b84800 30%,#e09000 50%,#b84800 70%,#6b2700 100%)',
-                borderBottom: '1px solid rgba(255,160,0,.25)',
-                boxShadow: '0 2px 12px rgba(200,100,0,.18)',
-              }}
-            >
-              <span style={{ fontSize: '1rem', flexShrink: 0, display: 'inline-block', animation: 'tombola-pulse 2s ease-in-out infinite' }}>🎰</span>
-              <span style={{
-                fontFamily: "'Fredoka One', cursive",
-                fontSize: '.78rem', color: '#fff3cc',
-                letterSpacing: '.5px', textShadow: '0 1px 6px rgba(0,0,0,.5)',
-                whiteSpace: 'nowrap',
-              }}>
-                PARTECIPA ALLA TOMBOLA — Clicca qui!
-              </span>
-              <span style={{ fontSize: '1rem', flexShrink: 0, display: 'inline-block', animation: 'tombola-pulse 2s ease-in-out infinite .5s' }}>🎟️</span>
-            </a>
-            <Header />
-            <AnnouncementBanner />
-            <Marquee />
-            <CategoryFilter />
-            <SearchBar />
-            <ProductGrid />
-          </>
-        ) : (
+        {isLoggedIn ? <CatalogView /> : (
           <div style={{ padding: '0 16px 100px' }}>
             <AuthView />
           </div>
@@ -1284,7 +1255,7 @@ function AffiliatesView() {
         </div>
         <div style={{ marginTop: 12, fontSize: '.68rem', color: 'var(--muted)', lineHeight: 1.6 }}>
           La commissione viene maturata automaticamente su ogni ordine dei tuoi referral.
-          Il credito si usa come sconto direttamente nel carrello al momento dell'ordine.
+          Il credito si usa come sconto direttamente nel carrello al momento dell&apos;ordine.
         </div>
       </div>
 

@@ -17,10 +17,11 @@ function SkeletonCard() {
 
 export default function ProductGrid() {
   const { products, isLoading } = useProducts()
-  const { filter, search, setFilter, setSearch } = useUIStore()
+  const { filter, search, shipFilter, setFilter, setSearch } = useUIStore()
 
   const filtered = products.filter((p) => {
     if (p.category === 'request') return false  // shown only in Su Richiesta tab
+    const matchShip = !shipFilter || (p.shipFrom ?? 'spain') === shipFilter
     const matchCat = filter === 'all' || p.category === filter || p.badge === filter
     const q = search.toLowerCase()
     const matchSearch =
@@ -29,7 +30,7 @@ export default function ProductGrid() {
       (p.description ?? '').toLowerCase().includes(q) ||
       (p.origin ?? '').toLowerCase().includes(q) ||
       p.tags.some((t) => t.toLowerCase().includes(q))
-    return matchCat && matchSearch
+    return matchShip && matchCat && matchSearch
   })
 
   if (isLoading) {

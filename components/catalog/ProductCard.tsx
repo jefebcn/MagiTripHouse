@@ -198,6 +198,19 @@ export default function ProductCard({ product: p, index }: Props) {
           }}>SCONTO</div>
         )}
 
+        {/* Ship origin flag — bottom left */}
+        {!unavailable && (
+          <div style={{
+            position: 'absolute', bottom: 8, left: 8,
+            background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)',
+            border: '1px solid rgba(255,255,255,.15)',
+            borderRadius: 20, padding: '2px 8px',
+            fontSize: '.62rem', fontWeight: 700, color: '#fff', letterSpacing: '.3px',
+          }}>
+            {(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹 Italia' : '🇪🇸 Spagna'}
+          </div>
+        )}
+
         {/* ESAURITO overlay */}
         {isExhausted && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

@@ -9,14 +9,14 @@ interface Product {
   id: string; name: string; description?: string; category: string; tags: string[];
   variants: Variant[]; stock?: number | null; imageUrl?: string; mediaType?: string;
   emoji: string; badge?: string; origin?: string; sortOrder: number;
-  isOnSale?: boolean; isComingSoon?: boolean; hidden?: boolean; bundleItems?: BundleItem[] | null;
+  isOnSale?: boolean; isComingSoon?: boolean; hidden?: boolean; shipFrom?: string; bundleItems?: BundleItem[] | null;
 }
 
 const EMPTY: Omit<Product, 'id' | 'sortOrder'> = {
   name: '', description: '', category: 'premium', tags: [],
   variants: [{ label: '', price: 0 }], stock: null,
   imageUrl: '', mediaType: 'image', emoji: '🌿', badge: '', origin: '',
-  isOnSale: false, isComingSoon: false, hidden: false, bundleItems: null,
+  isOnSale: false, isComingSoon: false, hidden: false, shipFrom: 'spain', bundleItems: null,
 }
 
 export default function AdminProducts() {
@@ -76,7 +76,7 @@ function AdminProductsInner() {
       mediaType: p.mediaType ?? 'image', emoji: p.emoji,
       badge: p.badge ?? '', origin: p.origin ?? '',
       isOnSale: p.isOnSale ?? false, isComingSoon: p.isComingSoon ?? false,
-      hidden: p.hidden ?? false, bundleItems: p.bundleItems ?? null,
+      hidden: p.hidden ?? false, shipFrom: p.shipFrom ?? 'spain', bundleItems: p.bundleItems ?? null,
     })
   }
 
@@ -160,6 +160,7 @@ function AdminProductsInner() {
         isOnSale: form.isOnSale ?? false,
         isComingSoon: form.isComingSoon ?? false,
         hidden: form.hidden ?? false,
+        shipFrom: form.shipFrom ?? 'spain',
       }
       const res = editing
         ? await fetch(`/api/products/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -415,6 +416,29 @@ function AdminProductsInner() {
           {inp('Origine', 'origin')}
           {inp('Emoji', 'emoji')}
 
+          {/* Ship origin */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Spedizione da</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {([
+                { id: 'spain', label: '🇪🇸 Spagna', color: '#f5c842' },
+                { id: 'italy', label: '🇮🇹 Italia',  color: '#3dff6e' },
+              ] as const).map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, shipFrom: s.id }))}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: '.85rem', fontWeight: 700, border: '1px solid',
+                    background: form.shipFrom === s.id ? `${s.color}22` : 'var(--bg3)',
+                    color: form.shipFrom === s.id ? s.color : 'var(--muted)',
+                    borderColor: form.shipFrom === s.id ? `${s.color}88` : 'var(--border)',
+                  }}
+                >{s.label}</button>
+              ))}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Categoria</label>
             <select
@@ -656,7 +680,9 @@ function AdminProductsInner() {
               </div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ marginRight: 4 }}>{(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹' : '🇪🇸'}</span>{p.name}
+                </div>
                 <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
                   {p.category === 'combo' && p.bundleItems?.length
                     ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
