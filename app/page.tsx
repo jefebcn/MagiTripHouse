@@ -219,7 +219,7 @@ function NewsView() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', paddingBottom: 80 }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(8,12,8,.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(61,255,110,.12)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => setView('catalog')} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1.3rem', cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}>‹</button>
+        <button onClick={() => setView('hub')} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1.3rem', cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}>‹</button>
         <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: 'rgba(61,255,110,.15)', border: '1.5px solid rgba(61,255,110,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📡</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', lineHeight: 1.2 }}>Magic Trip House</div>
@@ -600,6 +600,9 @@ function AccountView() {
             <span style={{ fontSize: '.72rem', fontWeight: 700, color: codeCopied ? 'var(--green)' : 'var(--muted)', transition: '.2s' }}>{codeCopied ? '✓ Copiato!' : '📋 Copia'}</span>
           </button>
           <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.6)', marginTop: 8, lineHeight: 1.5 }}>Condividi questo codice — ogni amico che si registra con il tuo codice ti viene attribuito.</div>
+          <button onClick={() => setView('affiliates')} style={{ width: '100%', marginTop: 10, background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 10, padding: '10px', color: 'var(--gold)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}>
+            🤝 Vedi programma affiliati completo →
+          </button>
         </div>
       )}
 
@@ -872,12 +875,27 @@ function AuthView() {
 
 function RequestView() {
   const { products, isLoading } = useProducts()
-  const { setDetailProduct } = useUIStore()
+  const { setDetailProduct, setView } = useUIStore()
 
   const items = products.filter(p => p.category === 'request')
 
   return (
     <div style={{ paddingBottom: 100 }}>
+
+      {/* Sticky header */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 20,
+        background: 'rgba(8,12,8,.96)', backdropFilter: 'blur(16px)',
+        borderBottom: '1px solid rgba(245,200,66,.12)',
+        padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <button
+          onClick={() => setView('hub')}
+          aria-label="Torna alla home"
+          style={{ flexShrink: 0, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 10, width: 36, height: 36, cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >‹</button>
+        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem' }}>📦 Su Richiesta</span>
+      </div>
 
       {/* ── Spiegazione sezione ── */}
       <div style={{
@@ -1087,7 +1105,7 @@ interface AffMe {
 }
 
 function AffiliatesView() {
-  const { userHandle, isLoggedIn } = useUIStore()
+  const { userHandle, isLoggedIn, setView } = useUIStore()
   const [data, setData] = React.useState<AffMe | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
@@ -1132,6 +1150,16 @@ function AffiliatesView() {
 
   return (
     <div style={{ padding: '0 0 24px' }}>
+
+      {/* Header with back to hub */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <button
+          onClick={() => setView('hub')}
+          aria-label="Torna alla home"
+          style={{ flexShrink: 0, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 10, width: 36, height: 36, cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >‹</button>
+        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem' }}>🤝 Affiliati</span>
+      </div>
 
       {/* Tier hero */}
       <div style={{
