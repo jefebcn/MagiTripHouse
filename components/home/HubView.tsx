@@ -7,6 +7,11 @@ import { useUIStore } from '@/store/uiStore'
 import { useProducts } from '@/hooks/useProducts'
 import { SHIP_META, type ShipOrigin } from '@/store/cartStore'
 
+const SHIP_DESC: Record<ShipOrigin, string> = {
+  spain: 'Catalogo completo · Cali, Hash, Frozen',
+  italy: 'Spedizione rapida dall’Italia',
+}
+
 const CATEGORY_SHORTCUTS = [
   { id: 'premium', label: 'Premium', emoji: '💎' },
   { id: 'frozen',  label: 'Frozen',  emoji: '🧊' },
@@ -67,8 +72,11 @@ export default function HubView() {
 
       {/* Shipping origin cards */}
       <div style={{ padding: '12px 16px 4px' }}>
-        <div style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', fontWeight: 700, marginBottom: 10, paddingLeft: 2 }}>
+        <div style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', fontWeight: 700, marginBottom: 2, paddingLeft: 2 }}>
           🚚 Scegli la spedizione
+        </div>
+        <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.7)', marginBottom: 10, paddingLeft: 2, lineHeight: 1.4 }}>
+          Ogni spedizione ha il suo carrello e i suoi tempi di consegna.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {(['spain', 'italy'] as ShipOrigin[]).map((o) => {
@@ -90,6 +98,7 @@ export default function HubView() {
               >
                 <div style={{ fontSize: '2.4rem', lineHeight: 1 }}>{sm.flag}</div>
                 <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', color: sm.color }}>{sm.label}</div>
+                <div style={{ fontSize: '.66rem', color: 'var(--muted)', lineHeight: 1.35 }}>{SHIP_DESC[o]}</div>
                 <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>🚚 {sm.delivery}</div>
                 <div style={{ fontSize: '.68rem', color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>
                   {n} {n === 1 ? 'prodotto' : 'prodotti'} ›

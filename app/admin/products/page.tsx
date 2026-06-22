@@ -249,6 +249,26 @@ function AdminProductsInner() {
     }
   }
 
+  async function setBulkShipFrom(shipFrom: 'spain' | 'italy') {
+    setBulkSaving(true)
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map(id =>
+          fetch(`/api/products/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shipFrom }),
+          })
+        )
+      )
+      setBulkMode(false)
+      setSelectedIds(new Set())
+      load()
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
   const onDragTouchStart = useCallback((e: React.TouchEvent, idx: number) => {
     e.preventDefault()
     dragIdxRef.current = idx
@@ -332,7 +352,7 @@ function AdminProductsInner() {
             fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer',
           }}
         >
-          {bulkMode ? '✕ Annulla' : '💶 Prezzi'}
+          {bulkMode ? '✕ Annulla' : '☑️ Multi'}
         </button>
         {!bulkMode && (
           <button onClick={startCreate} style={{ background: comboMode ? 'rgba(255,120,0,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${comboMode ? 'rgba(255,120,0,.4)' : 'rgba(61,255,110,.3)'}`, color: comboMode ? '#ff8c00' : 'var(--green)', borderRadius: 8, padding: '7px 14px', fontFamily: 'inherit', fontSize: '.82rem', fontWeight: 700, cursor: 'pointer' }}>
@@ -715,26 +735,33 @@ function AdminProductsInner() {
       {bulkMode && (
         <div style={{
           position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 200, display: 'flex', gap: 10, alignItems: 'center',
+          zIndex: 200, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center',
           background: 'var(--card)', border: '1.5px solid rgba(245,200,66,.45)',
-          borderRadius: 50, padding: '10px 18px',
+          borderRadius: 24, padding: '10px 14px',
           boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-          whiteSpace: 'nowrap',
+          maxWidth: 'calc(100vw - 24px)',
         }}>
-          <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
+          <span style={{ fontSize: '.8rem', color: 'var(--muted)', width: '100%', textAlign: 'center' }}>
             {selectedIds.size === 0 ? 'Seleziona prodotti' : `${selectedIds.size} selezionat${selectedIds.size === 1 ? 'o' : 'i'}`}
           </span>
           {selectedIds.size > 0 && (
-            <button
-              onClick={openBulkPanel}
-              style={{
-                background: 'rgba(245,200,66,.15)', border: '1px solid rgba(245,200,66,.5)',
-                color: 'var(--gold)', borderRadius: 20, padding: '6px 16px',
-                fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer',
-              }}
-            >
-              💶 Modifica prezzi →
-            </button>
+            <>
+              <button
+                onClick={() => setBulkShipFrom('spain')}
+                disabled={bulkSaving}
+                style={{ background: 'rgba(245,200,66,.12)', border: '1px solid rgba(245,200,66,.45)', color: '#f5c842', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+              >🇪🇸 Spagna</button>
+              <button
+                onClick={() => setBulkShipFrom('italy')}
+                disabled={bulkSaving}
+                style={{ background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.45)', color: 'var(--green)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+              >🇮🇹 Italia</button>
+              <button
+                onClick={openBulkPanel}
+                disabled={bulkSaving}
+                style={{ background: 'rgba(245,200,66,.15)', border: '1px solid rgba(245,200,66,.5)', color: 'var(--gold)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+              >💶 Prezzi</button>
+            </>
           )}
         </div>
       )}
