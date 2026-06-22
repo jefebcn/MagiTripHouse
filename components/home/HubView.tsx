@@ -1,7 +1,6 @@
 'use client'
 import React from 'react'
 import Header from '@/components/layout/Header'
-import AnnouncementBanner from '@/components/layout/AnnouncementBanner'
 import Marquee from '@/components/layout/Marquee'
 import { useUIStore } from '@/store/uiStore'
 import { useProducts } from '@/hooks/useProducts'
@@ -21,9 +20,16 @@ const CATEGORY_SHORTCUTS = [
   { id: 'combo',   label: 'Combo',   emoji: '🔥' },
 ]
 
+const TRUST_CHIPS = [
+  { icon: '🔒', label: 'Discreto' },
+  { icon: '🚚', label: 'Tutta Europa' },
+  { icon: '⭐', label: 'Top quality' },
+]
+
 export default function HubView() {
-  const { goToCatalog, setView } = useUIStore()
+  const { goToCatalog, setView, userName } = useUIStore()
   const { products } = useProducts()
+  const firstName = (userName || '').trim().split(/\s+/)[0]
 
   const countByOrigin = (o: ShipOrigin) =>
     products.filter(p => (p.shipFrom ?? 'spain') === o && p.category !== 'request').length
@@ -50,7 +56,29 @@ export default function HubView() {
         <span style={{ fontSize: '1rem', flexShrink: 0, display: 'inline-block', animation: 'tombola-pulse 2s ease-in-out infinite .5s' }}>🎟️</span>
       </a>
       <Header />
-      <AnnouncementBanner />
+
+      {/* Welcome block under logo */}
+      <div style={{ textAlign: 'center', padding: '2px 16px 0' }}>
+        <div style={{ fontSize: '.92rem', color: 'var(--text)', fontWeight: 600 }}>
+          {firstName ? <>Bentornato, <span style={{ color: 'var(--green)' }}>{firstName}</span> 👋</> : <>Benvenuto su Magic Trip House 👋</>}
+        </div>
+        <div style={{ fontSize: '.72rem', color: 'rgba(106,138,106,.85)', marginTop: 3 }}>
+          Premium quality · spedizione discreta in tutta Europa
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 7, marginTop: 10, flexWrap: 'wrap' }}>
+          {TRUST_CHIPS.map((c) => (
+            <span key={c.label} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'var(--bg3)', border: '1px solid rgba(61,255,110,.18)',
+              borderRadius: 20, padding: '5px 11px',
+              fontSize: '.7rem', color: 'var(--muted)', fontWeight: 600,
+            }}>
+              <span>{c.icon}</span>{c.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
       <Marquee />
 
       {/* Search — tap to enter catalog */}
