@@ -7,7 +7,7 @@ import { useProducts } from '@/hooks/useProducts'
 import { SHIP_META, type ShipOrigin } from '@/store/cartStore'
 
 const SHIP_DESC: Partial<Record<ShipOrigin, string>> = {
-  spain: 'Catalogo completo · Cali, Hash, Frozen',
+  spain: 'Cali · Hash · Frozen · Premium',
   italy: 'Spedizione rapida dall’Italia',
 }
 
@@ -41,7 +41,7 @@ export default function HubView() {
 
   const msLeft = MEETUP_DEADLINE.getTime() - now.getTime()
   const meetupActive = msLeft > 0
-  const daysLeft = Math.max(0, Math.floor(msLeft / 86_400_000))
+  const daysLeft  = Math.max(0, Math.floor(msLeft / 86_400_000))
   const hoursLeft = Math.max(0, Math.floor((msLeft % 86_400_000) / 3_600_000))
 
   const countByOrigin = (o: ShipOrigin) =>
@@ -49,157 +49,135 @@ export default function HubView() {
 
   return (
     <div style={{ paddingBottom: 110 }}>
-      <Header />
 
-      {/* Welcome block under logo */}
-      <div style={{ textAlign: 'center', padding: '14px 16px 0' }}>
-        <div style={{ fontSize: '.92rem', color: 'var(--text)', fontWeight: 600 }}>
-          {firstName ? <>Bentornato, <span style={{ color: 'var(--green)' }}>{firstName}</span> 👋</> : <>Benvenuto su Magic Trip House 👋</>}
+      {/* ═══════════ HERO ═══════════ */}
+      <div style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* Disco glow concentrato dietro il logo */}
+        <div style={{
+          position: 'absolute', top: 0, left: '50%',
+          transform: 'translateX(-50%)',
+          width: 340, height: 200,
+          background: 'radial-gradient(ellipse, rgba(61,255,110,.22) 0%, rgba(61,255,110,.06) 45%, transparent 70%)',
+          pointerEvents: 'none', zIndex: 0,
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Header />
         </div>
-        <div style={{ fontSize: '.72rem', color: 'rgba(106,138,106,.85)', marginTop: 3 }}>
-          Premium quality · spedizione discreta in tutta Europa
+
+        {/* Greeting */}
+        <div style={{ textAlign: 'center', padding: '6px 24px 20px', position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '.15px', lineHeight: 1.4 }}>
+            {firstName
+              ? <>Bentornato, <span style={{ color: 'var(--green)', textShadow: '0 0 14px rgba(61,255,110,.55)' }}>{firstName}</span> 👋</>
+              : <>Benvenuto su <span style={{ color: 'var(--green)', textShadow: '0 0 14px rgba(61,255,110,.55)' }}>Magic Trip House</span> 👋</>
+            }
+          </div>
+          <div style={{ fontSize: '.73rem', color: 'rgba(106,138,106,.8)', marginTop: 4, letterSpacing: '.3px' }}>
+            Premium quality · spedizione discreta · tutta Europa
+          </div>
+
+          {/* Trust chips */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+            {TRUST_CHIPS.map(c => (
+              <span key={c.label} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                background: 'rgba(61,255,110,.07)',
+                border: '1px solid rgba(61,255,110,.2)',
+                borderRadius: 20, padding: '5px 13px',
+                fontSize: '.7rem', color: 'rgba(237,250,238,.72)', fontWeight: 600,
+              }}>
+                <span>{c.icon}</span>{c.label}
+              </span>
+            ))}
+          </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 7, marginTop: 12, flexWrap: 'wrap' }}>
-          {TRUST_CHIPS.map((c) => (
-            <span key={c.label} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'var(--bg3)', border: '1px solid rgba(61,255,110,.18)',
-              borderRadius: 20, padding: '5px 11px',
-              fontSize: '.7rem', color: 'var(--muted)', fontWeight: 600,
-            }}>
-              <span>{c.icon}</span>{c.label}
-            </span>
-          ))}
-        </div>
+
+        {/* Separatore sfumato */}
+        <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(61,255,110,.18) 30%, rgba(61,255,110,.18) 70%, transparent)', margin: '0 24px' }} />
       </div>
 
-      <div style={{ marginTop: 14 }} />
-      <Marquee />
+      {/* ═══════════ MARQUEE ═══════════ */}
+      <div style={{ marginTop: 14 }}>
+        <Marquee />
+      </div>
 
-      {/* Search — tap to enter catalog */}
-      <div style={{ padding: '14px 16px 4px' }}>
+      {/* ═══════════ SEARCH ═══════════ */}
+      <div style={{ padding: '16px 16px 0' }}>
         <button
           onClick={() => goToCatalog({ ship: null })}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-            background: 'var(--bg3)', border: '1.5px solid var(--border)',
-            borderRadius: 16, padding: '14px 16px', cursor: 'pointer',
-            fontFamily: 'inherit', textAlign: 'left',
+            background: 'rgba(61,255,110,.05)',
+            border: '1.5px solid rgba(61,255,110,.2)',
+            borderRadius: 16, padding: '14px 18px',
+            cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            boxShadow: '0 0 0 0 rgba(61,255,110,0)',
+            transition: 'box-shadow .2s, border-color .2s',
           }}
         >
-          <span style={{ fontSize: '1.05rem', color: 'var(--green)' }}>🔍</span>
-          <span style={{ flex: 1, color: 'var(--muted)', fontSize: '.92rem' }}>Cerca un prodotto…</span>
-          <span style={{ fontSize: '.85rem', color: 'var(--muted)' }}>›</span>
+          <span style={{ fontSize: '1.1rem', color: 'var(--green)', opacity: .9 }}>🔍</span>
+          <span style={{ flex: 1, color: 'rgba(106,138,106,.8)', fontSize: '.92rem' }}>Cerca un prodotto…</span>
+          <span style={{ fontSize: '.82rem', color: 'rgba(61,255,110,.5)', fontWeight: 700 }}>›</span>
         </button>
       </div>
 
-      {/* Meetup banner */}
-      <div style={{ padding: '12px 16px 4px' }}>
-        <div style={{
-          position: 'relative', overflow: 'hidden',
-          background: meetupActive
-            ? 'linear-gradient(135deg, rgba(139,92,246,.18) 0%, var(--card) 70%)'
-            : 'linear-gradient(135deg, rgba(80,80,100,.15) 0%, var(--card) 70%)',
-          border: meetupActive ? '1.5px solid rgba(139,92,246,.45)' : '1.5px solid rgba(120,120,140,.3)',
-          borderRadius: 18, padding: '16px 16px 14px',
-          boxShadow: meetupActive ? '0 4px 20px rgba(139,92,246,.15)' : 'none',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-            <span style={{ fontSize: '2rem', lineHeight: 1, flexShrink: 0 }}>
-              {meetupActive ? '🤝' : '😴'}
-            </span>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{
-                  fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem',
-                  color: meetupActive ? '#c084fc' : 'var(--muted)',
-                }}>
-                  Meetup
-                </span>
-                {meetupActive && (
-                  <span style={{
-                    background: 'rgba(139,92,246,.22)', border: '1px solid rgba(139,92,246,.4)',
-                    borderRadius: 20, padding: '2px 9px',
-                    fontSize: '.64rem', color: '#d8b4fe', fontWeight: 700, letterSpacing: '.3px',
-                  }}>
-                    DISPONIBILE
-                  </span>
-                )}
-                {!meetupActive && (
-                  <span style={{
-                    background: 'rgba(100,100,120,.2)', border: '1px solid rgba(120,120,140,.3)',
-                    borderRadius: 20, padding: '2px 9px',
-                    fontSize: '.64rem', color: 'var(--muted)', fontWeight: 700, letterSpacing: '.3px',
-                  }}>
-                    SOLO SPEDIZIONE
-                  </span>
-                )}
-              </div>
+      {/* ═══════════ SEZIONE CATALOGO ═══════════ */}
+      <div style={{ padding: '22px 16px 0' }}>
 
-              {meetupActive ? (
-                <>
-                  <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
-                    Ritiro a mano disponibile · nessun costo di spedizione
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                    <span style={{ fontSize: '.68rem', color: 'rgba(192,132,252,.8)', fontWeight: 600 }}>
-                      ⏳ Termina tra
-                    </span>
-                    <span style={{
-                      background: 'rgba(139,92,246,.25)', border: '1px solid rgba(139,92,246,.35)',
-                      borderRadius: 8, padding: '3px 9px',
-                      fontSize: '.75rem', color: '#e9d5ff', fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                    }}>
-                      {daysLeft}g {hoursLeft}h
-                    </span>
-                    <span style={{ fontSize: '.64rem', color: 'rgba(192,132,252,.6)' }}>
-                      (1 luglio)
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 5, lineHeight: 1.4 }}>
-                  Il meetup è momentaneamente sospeso.<br />
-                  Utilizziamo solo spedizione per questo periodo.
-                </div>
-              )}
-            </div>
-          </div>
+        {/* Label sezione */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <div style={{ width: 3, height: 16, background: 'var(--green)', borderRadius: 2, boxShadow: 'var(--led-green)' }} />
+          <span style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.7px', fontWeight: 700 }}>
+            Entra nel catalogo
+          </span>
         </div>
-      </div>
 
-      {/* Shipping origin cards */}
-      <div style={{ padding: '12px 16px 4px' }}>
-        <div style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', fontWeight: 700, marginBottom: 2, paddingLeft: 2 }}>
-          🚚 Scegli la spedizione
-        </div>
-        <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.7)', marginBottom: 10, paddingLeft: 2, lineHeight: 1.4 }}>
-          Ogni spedizione ha il suo carrello e i suoi tempi di consegna.
-        </div>
+        {/* Spain + Italy cards */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
           {(['spain', 'italy'] as ShipOrigin[]).map((o) => {
             const sm = SHIP_META[o]
-            const n = countByOrigin(o)
+            const n  = countByOrigin(o)
             return (
               <button
                 key={o}
                 onClick={() => goToCatalog({ ship: o })}
                 style={{
                   position: 'relative', overflow: 'hidden',
-                  background: `linear-gradient(160deg, ${sm.color}1f 0%, var(--card) 65%)`,
-                  border: `1.5px solid ${sm.color}55`,
-                  borderRadius: 18, padding: '18px 14px 16px',
+                  background: `linear-gradient(150deg, ${sm.color}18 0%, var(--card) 60%)`,
+                  border: `1.5px solid ${sm.color}44`,
+                  borderRadius: 20, padding: '20px 14px 18px',
                   cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                  display: 'flex', flexDirection: 'column', gap: 6,
-                  boxShadow: `0 4px 20px rgba(0,0,0,.3), 0 0 24px ${sm.color}14`,
+                  display: 'flex', flexDirection: 'column', gap: 5,
+                  boxShadow: `0 6px 24px rgba(0,0,0,.35), 0 0 28px ${sm.color}12`,
+                  minHeight: 150,
                 }}
               >
-                <div style={{ fontSize: '2.4rem', lineHeight: 1 }}>{sm.flag}</div>
-                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', color: sm.color }}>{sm.label}</div>
-                <div style={{ fontSize: '.66rem', color: 'var(--muted)', lineHeight: 1.35 }}>{SHIP_DESC[o]}</div>
-                <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>🚚 {sm.delivery}</div>
-                <div style={{ fontSize: '.68rem', color: 'var(--text)', fontWeight: 600, marginTop: 2 }}>
-                  {n} {n === 1 ? 'prodotto' : 'prodotti'} ›
+                {/* Cerchio decorativo sfondo */}
+                <div style={{
+                  position: 'absolute', right: -28, top: -28,
+                  width: 110, height: 110, borderRadius: '50%',
+                  background: `radial-gradient(circle, ${sm.color}22 0%, transparent 70%)`,
+                  pointerEvents: 'none',
+                }} />
+
+                <div style={{ fontSize: '2.8rem', lineHeight: 1 }}>{sm.flag}</div>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.25rem', color: sm.color, letterSpacing: '.3px' }}>
+                  {sm.label}
+                </div>
+                <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.75)', lineHeight: 1.4 }}>
+                  {SHIP_DESC[o]}
+                </div>
+                <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>🚚 {sm.delivery}</div>
+                <div style={{ marginTop: 6 }}>
+                  <span style={{
+                    display: 'inline-block',
+                    background: `${sm.color}18`, border: `1px solid ${sm.color}40`,
+                    borderRadius: 20, padding: '3px 10px',
+                    fontSize: '.66rem', color: sm.color, fontWeight: 700,
+                  }}>
+                    {n} prodott{n === 1 ? 'o' : 'i'} ›
+                  </span>
                 </div>
               </button>
             )
@@ -209,101 +187,149 @@ export default function HubView() {
         {/* Pharma card — full width */}
         {(() => {
           const sm = SHIP_META['pharma']
-          const n = countByOrigin('pharma')
+          const n  = countByOrigin('pharma')
           return (
             <button
               onClick={() => goToCatalog({ ship: 'pharma' })}
               style={{
                 width: '100%', position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, rgba(129,140,248,.14) 0%, var(--card) 65%)',
-                border: '1.5px solid rgba(129,140,248,.4)',
-                borderRadius: 18, padding: '16px 16px 14px',
+                background: 'linear-gradient(135deg, rgba(129,140,248,.12) 0%, var(--card) 60%)',
+                border: '1.5px solid rgba(129,140,248,.32)',
+                borderRadius: 20, padding: '18px 18px 16px',
                 cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                display: 'flex', alignItems: 'center', gap: 16,
-                boxShadow: '0 4px 20px rgba(0,0,0,.3), 0 0 24px rgba(129,140,248,.1)',
+                display: 'flex', alignItems: 'center', gap: 18,
+                boxShadow: '0 6px 24px rgba(0,0,0,.35), 0 0 28px rgba(129,140,248,.08)',
               }}
             >
-              <div style={{ fontSize: '2.6rem', lineHeight: 1, flexShrink: 0 }}>💊</div>
+              <div style={{
+                position: 'absolute', right: -30, top: -30,
+                width: 130, height: 130, borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(129,140,248,.18) 0%, transparent 70%)',
+                pointerEvents: 'none',
+              }} />
+
+              <div style={{ fontSize: '2.8rem', lineHeight: 1, flexShrink: 0 }}>💊</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color: '#818cf8' }}>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', color: '#818cf8', letterSpacing: '.3px' }}>
                   Pharma EU
                 </div>
-                <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.35 }}>
+                <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.75)', marginTop: 2, lineHeight: 1.4 }}>
                   Deus Medical · Astera Labs · Biaxol
                 </div>
-                <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-                  <span style={{ fontSize: '.68rem', color: 'var(--muted)' }}>🚚 {sm.delivery}</span>
-                  <span style={{ fontSize: '.68rem', color: 'var(--text)', fontWeight: 600 }}>{n} {n === 1 ? 'prodotto' : 'prodotti'} ›</span>
+                <div style={{ fontSize: '.65rem', color: 'var(--muted)', marginTop: 3 }}>🚚 {sm.delivery}</div>
+                <div style={{ marginTop: 8 }}>
+                  <span style={{
+                    display: 'inline-block',
+                    background: 'rgba(129,140,248,.16)', border: '1px solid rgba(129,140,248,.35)',
+                    borderRadius: 20, padding: '3px 10px',
+                    fontSize: '.66rem', color: '#a5b4fc', fontWeight: 700,
+                  }}>
+                    {n} prodott{n === 1 ? 'o' : 'i'} ›
+                  </span>
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, alignItems: 'flex-end' }}>
-                <span style={{ fontSize: '.62rem', background: 'rgba(129,140,248,.18)', border: '1px solid rgba(129,140,248,.35)', borderRadius: 20, padding: '3px 8px', color: '#a5b4fc', fontWeight: 700 }}>💉 💊 🧬 🧪 🔄</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                {['💉','💊','🧬','🧪','🔄'].map(e => (
+                  <span key={e} style={{ fontSize: '1rem' }}>{e}</span>
+                ))}
               </div>
             </button>
           )
         })()}
       </div>
 
-      {/* Category shortcuts */}
-      <div style={{ padding: '18px 16px 4px' }}>
-        <div style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', fontWeight: 700, marginBottom: 10, paddingLeft: 2 }}>
-          🗂️ Categorie
+      {/* ═══════════ CATEGORIE (scroll orizzontale) ═══════════ */}
+      <div style={{ marginTop: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', marginBottom: 12 }}>
+          <div style={{ width: 3, height: 16, background: 'var(--gold)', borderRadius: 2, boxShadow: 'var(--led-gold)' }} />
+          <span style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.7px', fontWeight: 700 }}>
+            Sfoglia categoria
+          </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-          {CATEGORY_SHORTCUTS.map((c) => (
+        <div style={{ display: 'flex', gap: 9, overflowX: 'auto', padding: '0 16px 4px', scrollbarWidth: 'none' }}>
+          {CATEGORY_SHORTCUTS.map(c => (
             <button
               key={c.id}
               onClick={() => goToCatalog({ ship: null, category: c.id })}
               style={{
+                flexShrink: 0,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
                 background: 'var(--card)', border: '1px solid var(--border)',
-                borderRadius: 14, padding: '14px 8px', cursor: 'pointer',
-                fontFamily: 'inherit', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: 6,
+                borderRadius: 16, padding: '14px 12px', cursor: 'pointer',
+                fontFamily: 'inherit', minWidth: 66,
+                transition: 'border-color .15s, background .15s',
               }}
             >
-              <span style={{ fontSize: '1.5rem' }}>{c.emoji}</span>
-              <span style={{ fontSize: '.74rem', color: 'var(--text)', fontWeight: 600 }}>{c.label}</span>
+              <span style={{ fontSize: '1.65rem' }}>{c.emoji}</span>
+              <span style={{ fontSize: '.7rem', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>{c.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Quick links */}
-      <div style={{ padding: '18px 16px 4px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* ═══════════ MEETUP — banda compatta ═══════════ */}
+      <div style={{ margin: '20px 16px 0' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 14px', borderRadius: 14,
+          background: meetupActive ? 'rgba(139,92,246,.07)' : 'rgba(60,60,80,.06)',
+          border: meetupActive ? '1px solid rgba(139,92,246,.22)' : '1px solid rgba(100,100,130,.15)',
+        }}>
+          <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{meetupActive ? '🤝' : '😴'}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: '.82rem', fontWeight: 700, color: meetupActive ? '#c084fc' : 'var(--muted)' }}>
+              Meetup{!meetupActive ? ' sospeso' : ''}
+            </span>
+            {meetupActive
+              ? <span style={{ fontSize: '.69rem', color: 'var(--muted)', marginLeft: 8 }}>ritiro a mano · {daysLeft}g {hoursLeft}h rimasti</span>
+              : <span style={{ fontSize: '.69rem', color: 'var(--muted)', marginLeft: 8 }}>solo spedizione per questo periodo</span>
+            }
+          </div>
+          {meetupActive && (
+            <span style={{
+              background: 'rgba(139,92,246,.2)', border: '1px solid rgba(139,92,246,.32)',
+              borderRadius: 20, padding: '3px 9px',
+              fontSize: '.62rem', color: '#d8b4fe', fontWeight: 700, flexShrink: 0,
+            }}>LIVE</span>
+          )}
+        </div>
+      </div>
+
+      {/* ═══════════ QUICK LINKS ═══════════ */}
+      <div style={{ margin: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button
           onClick={() => setView('request')}
           style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            background: 'linear-gradient(135deg, rgba(59,130,246,.1), var(--card))',
-            border: '1px solid rgba(59,130,246,.3)', borderRadius: 14,
-            padding: '14px 16px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.2)',
+            borderRadius: 14, padding: '13px 16px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
           }}
         >
-          <span style={{ fontSize: '1.5rem' }}>📦</span>
+          <span style={{ fontSize: '1.3rem' }}>📦</span>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: '.9rem', color: 'var(--text)' }}>Su Richiesta</div>
-            <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>Ordina prodotti non in catalogo</div>
+            <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--text)' }}>Su Richiesta</div>
+            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 1 }}>Ordina prodotti non in catalogo</div>
           </div>
-          <span style={{ color: 'var(--muted)' }}>›</span>
+          <span style={{ fontSize: '.82rem', color: 'rgba(59,130,246,.5)', fontWeight: 700 }}>›</span>
         </button>
 
         <button
           onClick={() => setView('affiliates')}
           style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            background: 'linear-gradient(135deg, rgba(245,200,66,.1), var(--card))',
-            border: '1px solid rgba(245,200,66,.3)', borderRadius: 14,
-            padding: '14px 16px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.2)',
+            borderRadius: 14, padding: '13px 16px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
           }}
         >
-          <span style={{ fontSize: '1.5rem' }}>🤝</span>
+          <span style={{ fontSize: '1.3rem' }}>🤝</span>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: '.9rem', color: 'var(--text)' }}>Programma Affiliati</div>
-            <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>Invita amici e guadagna credito</div>
+            <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--text)' }}>Programma Affiliati</div>
+            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 1 }}>Invita amici e guadagna credito</div>
           </div>
-          <span style={{ color: 'var(--muted)' }}>›</span>
+          <span style={{ fontSize: '.82rem', color: 'rgba(245,200,66,.5)', fontWeight: 700 }}>›</span>
         </button>
       </div>
+
     </div>
   )
 }
