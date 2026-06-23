@@ -42,7 +42,8 @@ export default function BulkImagesPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [matches, setMatches] = useState<Match[]>([])
   const [uploading, setUploading] = useState(false)
-  const [progress, setProgress] = useState({ done: 0, total: 0 })
+  const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 })
+  const [errors, setErrors] = useState<string[]>([])
   const [done, setDone] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -86,27 +87,41 @@ export default function BulkImagesPage() {
     const toUpload = matches.filter(m => m.productId)
     if (!toUpload.length) return
     setUploading(true)
-    setProgress({ done: 0, total: toUpload.length })
+    setErrors([])
+    setProgress({ done: 0, total: toUpload.length, failed: 0 })
+    let failed = 0
 
     for (let i = 0; i < toUpload.length; i++) {
       const m = toUpload[i]
       try {
-        // Upload image to R2
+        // 1. Upload immagine su R2
         const fd = new FormData()
         fd.append('file', m.file)
-        const res = await fetch('/api/upload', { method: 'POST', body: fd })
-        const { publicUrl } = await res.json()
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: fd })
+        if (!uploadRes.ok) {
+          const err = await uploadRes.text()
+          throw new Error(`Upload fallito (${uploadRes.status}): ${err}`)
+        }
+        const uploadData = await uploadRes.json()
+        const publicUrl = uploadData.publicUrl
+        if (!publicUrl) throw new Error('URL pubblico mancante nella risposta upload')
 
-        // Patch product with new imageUrl
-        await fetch(`/api/products/${m.productId}`, {
+        // 2. Aggiorna prodotto con nuovo imageUrl
+        const patchRes = await fetch(`/api/products/${m.productId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageUrl: publicUrl, mediaType: 'image' }),
         })
+        if (!patchRes.ok) {
+          const err = await patchRes.text()
+          throw new Error(`PATCH prodotto fallito (${patchRes.status}): ${err}`)
+        }
       } catch (e) {
-        console.error('Failed for', m.file.name, e)
+        failed++
+        const msg = e instanceof Error ? e.message : String(e)
+        setErrors(prev => [...prev, `${m.file.name}: ${msg}`])
       }
-      setProgress({ done: i + 1, total: toUpload.length })
+      setProgress({ done: i + 1, total: toUpload.length, failed })
     }
 
     setUploading(false)
@@ -242,21 +257,34 @@ export default function BulkImagesPage() {
           }}
         >
           {uploading
-            ? `⏳ Upload ${progress.done}/${progress.total}…`
+            ? `⏳ ${progress.done}/${progress.total}… (${progress.failed} errori)`
             : `⬆️ Upload ${assigned.length} immagini`}
         </button>
       )}
 
       {/* Done */}
       {done && (
-        <div style={{ textAlign: 'center', padding: '24px 0' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>✅</div>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', color: 'var(--green)' }}>
-            {progress.total} immagini caricate!
+        <div style={{ padding: '24px 0' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>{progress.failed === 0 ? '✅' : '⚠️'}</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', color: progress.failed === 0 ? 'var(--green)' : 'var(--gold)' }}>
+              {progress.total - progress.failed} caricate · {progress.failed} errori
+            </div>
+            <Link href="/admin/products" style={{ display: 'inline-block', marginTop: 16, color: 'var(--muted)', fontSize: '.85rem', textDecoration: 'none' }}>
+              ← Torna ai prodotti
+            </Link>
           </div>
-          <Link href="/admin/products" style={{ display: 'inline-block', marginTop: 16, color: 'var(--muted)', fontSize: '.85rem', textDecoration: 'none' }}>
-            ← Torna ai prodotti
-          </Link>
+
+          {errors.length > 0 && (
+            <div style={{ marginTop: 20, background: 'rgba(232,59,59,.08)', border: '1px solid rgba(232,59,59,.25)', borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--red)', marginBottom: 8 }}>Dettaglio errori:</div>
+              {errors.map((e, i) => (
+                <div key={i} style={{ fontSize: '.68rem', color: 'rgba(232,59,59,.8)', marginBottom: 4, wordBreak: 'break-all' }}>
+                  • {e}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
