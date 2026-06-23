@@ -740,6 +740,7 @@ function AuthView() {
         background: 'radial-gradient(ellipse at 50% 0%,rgba(61,255,110,.08) 0%,transparent 65%)',
         marginBottom: 4,
       }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="Magic Trip House" style={{ width: 160, height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto 12px', filter: 'drop-shadow(0 0 24px rgba(61,255,110,.35))' }} />
         <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', marginBottom: 6, color: 'var(--text)' }}>
           {mode === 'register' ? 'Benvenuto nel negozio' : 'Bentornato 👋'}

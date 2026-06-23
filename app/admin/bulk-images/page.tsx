@@ -239,6 +239,16 @@ export default function BulkImagesPage() {
         </div>
       )}
 
+      {/* Live errors during upload */}
+      {uploading && errors.length > 0 && (
+        <div style={{ marginBottom: 80, background: 'rgba(232,59,59,.08)', border: '1px solid rgba(232,59,59,.25)', borderRadius: 12, padding: '12px 14px' }}>
+          <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--red)', marginBottom: 8 }}>Ultimi errori:</div>
+          {errors.slice(-5).map((e, i) => (
+            <div key={i} style={{ fontSize: '.64rem', color: 'rgba(232,59,59,.8)', marginBottom: 3, wordBreak: 'break-all' }}>• {e}</div>
+          ))}
+        </div>
+      )}
+
       {/* Upload button */}
       {matches.length > 0 && !done && (
         <button
