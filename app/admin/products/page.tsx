@@ -341,10 +341,15 @@ function AdminProductsInner() {
         <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>
           {comboMode ? '🔥 Combo' : '📦 Prodotti'}
         </span>
+        {!comboMode && !bulkMode && (
+          <Link href="/admin/bulk-images" style={{ marginLeft: 'auto', background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.25)', color: 'var(--green)', borderRadius: 8, padding: '7px 11px', fontSize: '.78rem', fontWeight: 700, textDecoration: 'none' }}>
+            🖼️ Bulk
+          </Link>
+        )}
         <button
           onClick={toggleBulkMode}
           style={{
-            marginLeft: 'auto',
+            marginLeft: comboMode ? 'auto' : undefined,
             background: bulkMode ? 'rgba(245,200,66,.18)' : 'var(--bg3)',
             border: `1px solid ${bulkMode ? 'rgba(245,200,66,.5)' : 'var(--border)'}`,
             color: bulkMode ? 'var(--gold)' : 'var(--muted)',
