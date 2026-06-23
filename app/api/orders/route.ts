@@ -24,6 +24,37 @@ export async function POST(req: Request) {
       referredBy: body.referredBy ?? null,
     },
   })
+
+  // Deduct affiliate store credit if applied
+  if (body.affiliateCredit > 0 && body.affiliateUsername) {
+    prisma.affiliate.findUnique({ where: { username: body.affiliateUsername } }).then(async aff => {
+      if (!aff) return
+      const available = aff.commissionEarned - aff.commissionPaid
+      const credit = Math.min(body.affiliateCredit, available)
+      if (credit > 0) {
+        await prisma.affiliate.update({
+          where: { username: body.affiliateUsername },
+          data: { commissionPaid: { increment: credit } },
+        })
+      }
+    }).catch(() => {})
+  }
+
+  // Credit commission to affiliate if order has referral code
+  if (order.referredBy) {
+    prisma.affiliate.findUnique({ where: { code: order.referredBy } }).then(async aff => {
+      if (!aff) return
+      const refCount = await prisma.affiliate.count({ where: { referredBy: aff.code } })
+      const newTier = refCount >= 15 ? 'gold' : refCount >= 5 ? 'silver' : 'bronze'
+      const newRate = newTier === 'gold' ? 0.12 : newTier === 'silver' ? 0.08 : 0.05
+      const commission = order.total * newRate
+      await prisma.affiliate.update({
+        where: { code: order.referredBy! },
+        data: { commissionEarned: { increment: commission }, tier: newTier, commissionRate: newRate },
+      })
+    }).catch(() => {})
+  }
+
   notifyAdminOrder(order).catch(() => {})
   return NextResponse.json(order, { status: 201 })
 }

@@ -9,14 +9,14 @@ interface Product {
   id: string; name: string; description?: string; category: string; tags: string[];
   variants: Variant[]; stock?: number | null; imageUrl?: string; mediaType?: string;
   emoji: string; badge?: string; origin?: string; sortOrder: number;
-  isOnSale?: boolean; isComingSoon?: boolean; hidden?: boolean; bundleItems?: BundleItem[] | null;
+  isOnSale?: boolean; isComingSoon?: boolean; hidden?: boolean; shipFrom?: string; bundleItems?: BundleItem[] | null;
 }
 
 const EMPTY: Omit<Product, 'id' | 'sortOrder'> = {
   name: '', description: '', category: 'premium', tags: [],
   variants: [{ label: '', price: 0 }], stock: null,
   imageUrl: '', mediaType: 'image', emoji: '🌿', badge: '', origin: '',
-  isOnSale: false, isComingSoon: false, hidden: false, bundleItems: null,
+  isOnSale: false, isComingSoon: false, hidden: false, shipFrom: 'spain', bundleItems: null,
 }
 
 export default function AdminProducts() {
@@ -45,6 +45,14 @@ function AdminProductsInner() {
   const dragIdxRef = useRef<number | null>(null)
   const hoverIdxRef = useRef<number | null>(null)
 
+  // Bulk price edit
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
+  // shared prices: label → price (applies to ALL selected products that have that label)
+  const [bulkSharedPrices, setBulkSharedPrices] = useState<Record<string, number>>({})
+  const [bulkSaving, setBulkSaving] = useState(false)
+
   async function load() {
     const res = await fetch('/api/products?all=true')
     const data = await res.json()
@@ -68,7 +76,7 @@ function AdminProductsInner() {
       mediaType: p.mediaType ?? 'image', emoji: p.emoji,
       badge: p.badge ?? '', origin: p.origin ?? '',
       isOnSale: p.isOnSale ?? false, isComingSoon: p.isComingSoon ?? false,
-      hidden: p.hidden ?? false, bundleItems: p.bundleItems ?? null,
+      hidden: p.hidden ?? false, shipFrom: p.shipFrom ?? 'spain', bundleItems: p.bundleItems ?? null,
     })
   }
 
@@ -152,6 +160,7 @@ function AdminProductsInner() {
         isOnSale: form.isOnSale ?? false,
         isComingSoon: form.isComingSoon ?? false,
         hidden: form.hidden ?? false,
+        shipFrom: form.shipFrom ?? 'spain',
       }
       const res = editing
         ? await fetch(`/api/products/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -177,6 +186,87 @@ function AdminProductsInner() {
     if (!confirm('Eliminare questo prodotto?')) return
     await fetch(`/api/products/${id}`, { method: 'DELETE' })
     load()
+  }
+
+  function toggleBulkMode() {
+    setBulkMode(m => !m)
+    setSelectedIds(new Set())
+    setBulkOpen(false)
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function openBulkPanel() {
+    // Collect all unique labels across selected products (preserving order of first occurrence)
+    const seen = new Set<string>()
+    const initPrices: Record<string, number> = {}
+    Array.from(selectedIds).forEach(id => {
+      const p = products.find(x => x.id === id)
+      if (!p) return
+      p.variants.forEach(v => {
+        if (!seen.has(v.label)) {
+          seen.add(v.label)
+          initPrices[v.label] = v.price
+        }
+      })
+    })
+    setBulkSharedPrices(initPrices)
+    setBulkOpen(true)
+  }
+
+  async function saveBulkPrices() {
+    setBulkSaving(true)
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map(id => {
+          const p = products.find(x => x.id === id)
+          if (!p) return Promise.resolve()
+          const variants = p.variants.map(v =>
+            bulkSharedPrices[v.label] !== undefined
+              ? { ...v, price: bulkSharedPrices[v.label] }
+              : v
+          )
+          return fetch(`/api/products/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ variants }),
+          })
+        })
+      )
+      setBulkOpen(false)
+      setBulkMode(false)
+      setSelectedIds(new Set())
+      load()
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  async function setBulkShipFrom(shipFrom: 'spain' | 'italy' | 'pharma') {
+    setBulkSaving(true)
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map(id =>
+          fetch(`/api/products/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shipFrom }),
+          })
+        )
+      )
+      setBulkMode(false)
+      setSelectedIds(new Set())
+      load()
+    } finally {
+      setBulkSaving(false)
+    }
   }
 
   const onDragTouchStart = useCallback((e: React.TouchEvent, idx: number) => {
@@ -246,14 +336,48 @@ function AdminProductsInner() {
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
         <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>
           {comboMode ? '🔥 Combo' : '📦 Prodotti'}
         </span>
-        <button onClick={startCreate} style={{ marginLeft: 'auto', background: comboMode ? 'rgba(255,120,0,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${comboMode ? 'rgba(255,120,0,.4)' : 'rgba(61,255,110,.3)'}`, color: comboMode ? '#ff8c00' : 'var(--green)', borderRadius: 8, padding: '7px 14px', fontFamily: 'inherit', fontSize: '.82rem', fontWeight: 700, cursor: 'pointer' }}>
-          + Nuova {comboMode ? 'Combo' : ''}
+        {!comboMode && !bulkMode && (
+          <Link href="/admin/bulk-images" style={{ marginLeft: 'auto', background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.25)', color: 'var(--green)', borderRadius: 8, padding: '7px 11px', fontSize: '.78rem', fontWeight: 700, textDecoration: 'none' }}>
+            🖼️ Bulk
+          </Link>
+        )}
+        <button
+          onClick={toggleBulkMode}
+          style={{
+            marginLeft: comboMode ? 'auto' : undefined,
+            background: bulkMode ? 'rgba(245,200,66,.18)' : 'var(--bg3)',
+            border: `1px solid ${bulkMode ? 'rgba(245,200,66,.5)' : 'var(--border)'}`,
+            color: bulkMode ? 'var(--gold)' : 'var(--muted)',
+            borderRadius: 8, padding: '7px 12px',
+            fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          {bulkMode ? '✕ Annulla' : '☑️ Multi'}
         </button>
+        {!bulkMode && (
+          <>
+            {!comboMode && (
+              <button
+                onClick={async () => {
+                  if (!confirm('Importare 105 prodotti Pharma EU? I duplicati verranno saltati.')) return
+                  const res = await fetch('/api/admin/import-pharma', { method: 'POST' })
+                  const d = await res.json()
+                  alert(`✅ Importati: ${d.created} · Saltati: ${d.skipped}`)
+                  load()
+                }}
+                style={{ background: 'rgba(129,140,248,.12)', border: '1px solid rgba(129,140,248,.4)', color: '#818cf8', borderRadius: 8, padding: '7px 12px', fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer' }}
+              >💊 Import</button>
+            )}
+            <button onClick={startCreate} style={{ background: comboMode ? 'rgba(255,120,0,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${comboMode ? 'rgba(255,120,0,.4)' : 'rgba(61,255,110,.3)'}`, color: comboMode ? '#ff8c00' : 'var(--green)', borderRadius: 8, padding: '7px 14px', fontFamily: 'inherit', fontSize: '.82rem', fontWeight: 700, cursor: 'pointer' }}>
+              + Nuova {comboMode ? 'Combo' : ''}
+            </button>
+          </>
+        )}
       </div>
 
       {/* Form */}
@@ -331,6 +455,30 @@ function AdminProductsInner() {
           {inp('Origine', 'origin')}
           {inp('Emoji', 'emoji')}
 
+          {/* Ship origin */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Spedizione da</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {([
+                { id: 'spain',  label: '🇪🇸 Spagna',    color: '#f5c842' },
+                { id: 'italy',  label: '🇮🇹 Italia',    color: '#3dff6e' },
+                { id: 'pharma', label: '💊 Pharma EU',  color: '#818cf8' },
+              ] as const).map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, shipFrom: s.id }))}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: '.85rem', fontWeight: 700, border: '1px solid',
+                    background: form.shipFrom === s.id ? `${s.color}22` : 'var(--bg3)',
+                    color: form.shipFrom === s.id ? s.color : 'var(--muted)',
+                    borderColor: form.shipFrom === s.id ? `${s.color}88` : 'var(--border)',
+                  }}
+                >{s.label}</button>
+              ))}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Categoria</label>
             <select
@@ -338,7 +486,16 @@ function AdminProductsInner() {
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value, badge: e.target.value }))}
               style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit', outline: 'none' }}
             >
-              {['premium','frozen','new','hash','cbd','combo','request'].map((c) => <option key={c} value={c}>{c === 'request' ? 'request (Su Richiesta)' : c}</option>)}
+              {['premium','frozen','new','hash','cbd','combo','request','injectable','oral','sarms','peptides','pct'].map((c) => (
+                <option key={c} value={c}>{
+                  c === 'request' ? 'request (Su Richiesta)' :
+                  c === 'injectable' ? '💉 injectable' :
+                  c === 'oral' ? '💊 oral' :
+                  c === 'sarms' ? '🧬 sarms' :
+                  c === 'peptides' ? '🧪 peptides' :
+                  c === 'pct' ? '🔄 pct' : c
+                }</option>
+              ))}
             </select>
           </div>
 
@@ -524,35 +681,42 @@ function AdminProductsInner() {
         {displayedProducts.map((p, idx) => {
           const isDragging = dragIdx === idx
           const isHover = hoverIdx === idx && dragIdx !== null && dragIdx !== idx
+          const isSelected = selectedIds.has(p.id)
           return (
             <div
               key={p.id}
+              onClick={bulkMode ? () => toggleSelect(p.id) : undefined}
               style={{
-                background: 'var(--card)',
-                border: isHover
-                  ? '2px solid var(--green)'
-                  : `1px solid ${p.category === 'combo' ? 'rgba(255,120,0,.3)' : 'var(--border)'}`,
+                background: isSelected ? 'rgba(245,200,66,.07)' : 'var(--card)',
+                border: isSelected
+                  ? '2px solid rgba(245,200,66,.6)'
+                  : isHover
+                    ? '2px solid var(--green)'
+                    : `1px solid ${p.category === 'combo' ? 'rgba(255,120,0,.3)' : 'var(--border)'}`,
                 borderRadius: 12, padding: '10px 12px',
                 display: 'flex', alignItems: 'center', gap: 10,
                 opacity: isDragging ? 0.4 : 1,
                 transform: isDragging ? 'scale(.97)' : 'scale(1)',
-                transition: 'opacity .15s, transform .15s, border-color .1s',
+                transition: 'opacity .15s, transform .15s, border-color .1s, background .1s',
                 userSelect: 'none',
+                cursor: bulkMode ? 'pointer' : 'default',
               }}
             >
-              {/* Drag handle */}
-              <div
-                onTouchStart={(e) => onDragTouchStart(e, idx)}
-                style={{
-                  flexShrink: 0, cursor: 'grab', touchAction: 'none',
-                  display: 'flex', flexDirection: 'column', gap: 3,
-                  padding: '6px 4px', alignItems: 'center',
-                }}
-              >
-                {[0,1,2].map(i => (
-                  <div key={i} style={{ width: 16, height: 2, borderRadius: 1, background: 'var(--muted)', opacity: .6 }} />
-                ))}
-              </div>
+              {/* Drag handle OR checkbox */}
+              {bulkMode ? (
+                <div style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, border: `2px solid ${isSelected ? 'var(--gold)' : 'var(--border)'}`, background: isSelected ? 'rgba(245,200,66,.2)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', fontSize: '.9rem' }}>
+                  {isSelected && '✓'}
+                </div>
+              ) : (
+                <div
+                  onTouchStart={(e) => onDragTouchStart(e, idx)}
+                  style={{ flexShrink: 0, cursor: 'grab', touchAction: 'none', display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 4px', alignItems: 'center' }}
+                >
+                  {[0,1,2].map(i => (
+                    <div key={i} style={{ width: 16, height: 2, borderRadius: 1, background: 'var(--muted)', opacity: .6 }} />
+                  ))}
+                </div>
+              )}
 
               <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', background: 'var(--bg3)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {p.imageUrl
@@ -565,7 +729,9 @@ function AdminProductsInner() {
               </div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ marginRight: 4 }}>{(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹' : (p.shipFrom ?? 'spain') === 'pharma' ? '💊' : '🇪🇸'}</span>{p.name}
+                </div>
                 <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
                   {p.category === 'combo' && p.bundleItems?.length
                     ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
@@ -574,23 +740,149 @@ function AdminProductsInner() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                <button
-                  title={p.hidden ? 'Nasconsto — clicca per pubblicare' : 'Visibile — clicca per nascondere'}
-                  onClick={async () => {
-                    await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !p.hidden }) })
-                    load()
-                  }}
-                  style={{ background: p.hidden ? 'rgba(106,138,106,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${p.hidden ? 'rgba(106,138,106,.3)' : 'rgba(61,255,110,.35)'}`, borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: p.hidden ? 'var(--muted)' : 'var(--green)', fontSize: '.82rem' }}>
-                  {p.hidden ? '🙈' : '👁'}
-                </button>
-                <button onClick={() => startEdit(p)} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
-                <button onClick={() => handleDelete(p.id)} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
-              </div>
+              {!bulkMode && (
+                <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                  <button
+                    title={p.hidden ? 'Nasconsto — clicca per pubblicare' : 'Visibile — clicca per nascondere'}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !p.hidden }) })
+                      load()
+                    }}
+                    style={{ background: p.hidden ? 'rgba(106,138,106,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${p.hidden ? 'rgba(106,138,106,.3)' : 'rgba(61,255,110,.35)'}`, borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: p.hidden ? 'var(--muted)' : 'var(--green)', fontSize: '.82rem' }}>
+                    {p.hidden ? '🙈' : '👁'}
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); startEdit(p) }} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
+                </div>
+              )}
             </div>
           )
         })}
       </div>
+      {/* Bulk mode: floating action bar */}
+      {bulkMode && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 200, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center',
+          background: 'var(--card)', border: '1.5px solid rgba(245,200,66,.45)',
+          borderRadius: 24, padding: '10px 14px',
+          boxShadow: '0 8px 32px rgba(0,0,0,.4)',
+          maxWidth: 'calc(100vw - 24px)',
+        }}>
+          <span style={{ fontSize: '.8rem', color: 'var(--muted)', width: '100%', textAlign: 'center' }}>
+            {selectedIds.size === 0 ? 'Seleziona prodotti' : `${selectedIds.size} selezionat${selectedIds.size === 1 ? 'o' : 'i'}`}
+          </span>
+          {selectedIds.size > 0 && (
+            <>
+              <button
+                onClick={() => setBulkShipFrom('spain')}
+                disabled={bulkSaving}
+                style={{ background: 'rgba(245,200,66,.12)', border: '1px solid rgba(245,200,66,.45)', color: '#f5c842', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+              >🇪🇸 Spagna</button>
+              <button
+                onClick={() => setBulkShipFrom('italy')}
+                disabled={bulkSaving}
+                style={{ background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.45)', color: 'var(--green)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+              >🇮🇹 Italia</button>
+              <button
+                onClick={() => setBulkShipFrom('pharma')}
+                disabled={bulkSaving}
+                style={{ background: 'rgba(129,140,248,.12)', border: '1px solid rgba(129,140,248,.45)', color: '#818cf8', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+              >💊 Pharma</button>
+              <button
+                onClick={openBulkPanel}
+                disabled={bulkSaving}
+                style={{ background: 'rgba(245,200,66,.15)', border: '1px solid rgba(245,200,66,.5)', color: 'var(--gold)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+              >💶 Prezzi</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Bulk price editor panel */}
+      {bulkOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.55)' }} onClick={() => setBulkOpen(false)} />
+          <div style={{
+            position: 'relative', background: 'var(--bg2)', borderRadius: '20px 20px 0 0',
+            padding: '0 0 32px', maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+            border: '1px solid var(--border)',
+          }}>
+            {/* Handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 0' }}>
+              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border)' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px 8px' }}>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem' }}>
+                💶 Modifica prezzi — {selectedIds.size} prodott{selectedIds.size === 1 ? 'o' : 'i'}
+              </div>
+              <button
+                onClick={() => setBulkOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1.2rem', cursor: 'pointer', padding: 4 }}
+              >✕</button>
+            </div>
+
+            {/* Selected products summary */}
+            <div style={{ padding: '0 16px 8px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {Array.from(selectedIds).map(id => {
+                const p = products.find(x => x.id === id)
+                return p ? (
+                  <span key={id} style={{ fontSize: '.72rem', background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 20, padding: '3px 10px', color: 'var(--gold)' }}>
+                    {p.emoji} {p.name}
+                  </span>
+                ) : null
+              })}
+            </div>
+            <div style={{ padding: '0 16px 10px', fontSize: '.72rem', color: 'var(--muted)' }}>
+              I prezzi qui sotto verranno applicati a tutti i prodotti selezionati.
+            </div>
+
+            {/* One row per variant label */}
+            <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {Object.entries(bulkSharedPrices).map(([label, price]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    fontSize: '.82rem', fontWeight: 700, color: 'var(--gold)',
+                    background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.25)',
+                    borderRadius: 8, padding: '8px 14px', minWidth: 64, textAlign: 'center', flexShrink: 0,
+                  }}>
+                    {label}
+                  </div>
+                  <span style={{ fontSize: '.85rem', color: 'var(--muted)', flexShrink: 0 }}>€</span>
+                  <input
+                    type="number"
+                    value={price || ''}
+                    onChange={e => setBulkSharedPrices(prev => ({ ...prev, [label]: Number(e.target.value) }))}
+                    style={{
+                      flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)',
+                      borderRadius: 10, padding: '10px 14px', color: 'var(--text)',
+                      fontSize: '1rem', fontFamily: 'inherit', outline: 'none', fontWeight: 700,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Save button */}
+            <div style={{ padding: '16px 16px 0' }}>
+              <button
+                onClick={saveBulkPrices}
+                disabled={bulkSaving}
+                style={{
+                  width: '100%', padding: '15px', borderRadius: 14,
+                  fontFamily: 'inherit', fontWeight: 700, fontSize: '1rem', cursor: bulkSaving ? 'not-allowed' : 'pointer',
+                  background: 'linear-gradient(135deg,rgba(245,200,66,.25),rgba(245,200,66,.12))',
+                  border: '1.5px solid rgba(245,200,66,.6)',
+                  color: 'var(--gold)', boxShadow: '0 0 20px rgba(245,200,66,.15)',
+                }}
+              >
+                {bulkSaving ? '⏳ Salvataggio...' : `💾 Salva tutti i prezzi`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

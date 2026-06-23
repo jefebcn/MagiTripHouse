@@ -2,7 +2,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import { useUIStore } from '@/store/uiStore'
-import { useCartStore } from '@/store/cartStore'
+import { useCartStore, SHIP_META, type ShipOrigin } from '@/store/cartStore'
 import { useSwipeToClose } from '@/hooks/useSwipeToClose'
 import type { Variant } from '@/hooks/useProducts'
 
@@ -83,7 +83,7 @@ export default function ProductDetail() {
     const effectiveVariant: Variant = isGramBased && customGrams > 0
       ? { label: `${customGrams}g`, price: displayPrice }
       : (variant ?? { label: '?', price: 0 })
-    addItem(product.id, product.name, effectiveVariant, qty, product.imageUrl, product.mediaType, product.emoji)
+    addItem(product.id, product.name, effectiveVariant, qty, product.imageUrl, product.mediaType, product.emoji, (product.shipFrom ?? 'spain') as ShipOrigin)
     close()
     haptic(60)
   }
@@ -169,6 +169,20 @@ export default function ProductDetail() {
               🌍 {product.origin}
             </div>
           )}
+          {(() => {
+            const sm = SHIP_META[(product.shipFrom ?? 'spain') as ShipOrigin]
+            return (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8,
+                background: 'var(--bg3)', border: `1px solid ${sm.color}44`,
+                borderRadius: 20, padding: '4px 12px',
+              }}>
+                <span>{sm.flag}</span>
+                <span style={{ fontSize: '.74rem', color: 'var(--text)', fontWeight: 600 }}>Spedizione {sm.label}</span>
+                <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>· 🚚 {sm.delivery}</span>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Description */}

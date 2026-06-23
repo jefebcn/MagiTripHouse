@@ -30,8 +30,8 @@ export default function Header() {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      padding: '10px 16px 4px',
-      background: 'var(--bg)',
+      padding: '22px 16px 8px',
+      background: 'transparent',
       position: 'relative',
       overflow: 'visible',
     }}>
@@ -75,8 +75,8 @@ export default function Header() {
         <Image
           src="/logo.png"
           alt="Magic Trip House"
-          width={130}
-          height={65}
+          width={155}
+          height={78}
           style={{ objectFit: 'contain', display: 'block' }}
           priority
         />

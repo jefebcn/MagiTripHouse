@@ -27,12 +27,17 @@ export async function POST(req: Request) {
 
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  await r2.send(new PutObjectCommand({
-    Bucket:      process.env.R2_BUCKET_NAME!,
-    Key:         key,
-    Body:        buffer,
-    ContentType: contentType,
-  }))
+  try {
+    await r2.send(new PutObjectCommand({
+      Bucket:      process.env.R2_BUCKET_NAME!,
+      Key:         key,
+      Body:        buffer,
+      ContentType: contentType,
+    }))
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: `R2 upload failed: ${msg}` }, { status: 500 })
+  }
 
   return NextResponse.json({ publicUrl: `${process.env.R2_PUBLIC_URL}/${key}` })
 }

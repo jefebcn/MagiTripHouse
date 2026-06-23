@@ -20,6 +20,8 @@ export interface Product {
   sortOrder: number
   isOnSale: boolean
   isComingSoon: boolean
+  hidden?: boolean
+  shipFrom?: string
   bundleItems?: BundleItem[] | null
   createdAt: string
 }

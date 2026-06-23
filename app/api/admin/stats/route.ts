@@ -14,10 +14,11 @@ export async function GET() {
   const monthStart = new Date(todayStart); monthStart.setDate(todayStart.getDate() - 30)
   const yearStart = new Date(todayStart); yearStart.setFullYear(todayStart.getFullYear() - 1)
 
-  const [orders, users, affiliates] = await Promise.all([
+  const [orders, users, affiliates, payouts] = await Promise.all([
     prisma.order.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.user.findMany({ select: { createdAt: true } }),
     prisma.affiliate.findMany({ orderBy: { joinedAt: 'desc' } }),
+    prisma.commissionPayout.findMany({ orderBy: { requestedAt: 'desc' } }),
   ])
 
   const revenue = (from?: Date) =>
@@ -138,6 +139,13 @@ export async function GET() {
       ...a,
       referralCount: refCounts[a.code] ?? 0,
       referralRevenue: refRevenue[a.code] ?? 0,
+      balance: a.commissionEarned - a.commissionPaid,
     })),
+    commissions: {
+      totalEarned: affiliates.reduce((s, a) => s + a.commissionEarned, 0),
+      totalPaid: affiliates.reduce((s, a) => s + a.commissionPaid, 0),
+      totalPending: payouts.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
+    },
+    pendingPayouts: payouts.filter(p => p.status === 'pending'),
   })
 }

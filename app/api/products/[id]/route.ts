@@ -27,6 +27,7 @@ export async function PUT(req: Request, { params }: Ctx) {
       isOnSale:     body.isOnSale ?? false,
       isComingSoon: body.isComingSoon ?? false,
       hidden:       body.hidden ?? false,
+      shipFrom:     body.shipFrom ?? 'spain',
       bundleItems:  body.bundleItems ?? null,
     },
   })

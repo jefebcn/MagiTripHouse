@@ -1,12 +1,17 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Product } from '@/hooks/useProducts'
+import type { ShipOrigin } from '@/store/cartStore'
 
-type View = 'catalog' | 'news' | 'orders' | 'affiliates' | 'account' | 'game' | 'request'
+type View = 'hub' | 'catalog' | 'news' | 'orders' | 'affiliates' | 'account' | 'game' | 'request'
+export type { ShipOrigin }
 
 interface UIState {
   view: View
   setView: (v: View) => void
+  shipFilter: ShipOrigin | null
+  setShipFilter: (s: ShipOrigin | null) => void
+  goToCatalog: (opts?: { ship?: ShipOrigin | null; category?: string; search?: string }) => void
   cartOpen: boolean
   setCartOpen: (v: boolean) => void
   detailProduct: Product | null
@@ -43,8 +48,16 @@ interface UIState {
 export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
-      view: 'catalog',
+      view: 'hub',
       setView: (view) => set({ view }),
+      shipFilter: null,
+      setShipFilter: (shipFilter) => set({ shipFilter }),
+      goToCatalog: (opts) => set({
+        view: 'catalog',
+        shipFilter: opts?.ship !== undefined ? opts.ship : null,
+        filter: opts?.category ?? 'all',
+        search: opts?.search ?? '',
+      }),
       cartOpen: false,
       setCartOpen: (cartOpen) => set({ cartOpen }),
       detailProduct: null,
