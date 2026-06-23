@@ -49,25 +49,6 @@ export default function HubView() {
 
   return (
     <div style={{ paddingBottom: 110 }}>
-      {/* Tombola banner */}
-      <a
-        href="https://t.me/+hHYTnDvbiYgwYjY0"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          padding: '7px 16px', textDecoration: 'none',
-          background: 'linear-gradient(90deg,#6b2700 0%,#b84800 30%,#e09000 50%,#b84800 70%,#6b2700 100%)',
-          borderBottom: '1px solid rgba(255,160,0,.25)',
-          boxShadow: '0 2px 12px rgba(200,100,0,.18)',
-        }}
-      >
-        <span style={{ fontSize: '1rem', flexShrink: 0, display: 'inline-block', animation: 'tombola-pulse 2s ease-in-out infinite' }}>🎰</span>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.78rem', color: '#fff3cc', letterSpacing: '.5px', textShadow: '0 1px 6px rgba(0,0,0,.5)', whiteSpace: 'nowrap' }}>
-          PARTECIPA ALLA TOMBOLA — Clicca qui!
-        </span>
-        <span style={{ fontSize: '1rem', flexShrink: 0, display: 'inline-block', animation: 'tombola-pulse 2s ease-in-out infinite .5s' }}>🎟️</span>
-      </a>
       <Header />
 
       {/* Welcome block under logo */}
