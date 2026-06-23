@@ -1,9 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Product } from '@/hooks/useProducts'
+import type { ShipOrigin } from '@/store/cartStore'
 
 type View = 'hub' | 'catalog' | 'news' | 'orders' | 'affiliates' | 'account' | 'game' | 'request'
-export type ShipOrigin = 'spain' | 'italy'
+export type { ShipOrigin }
 
 interface UIState {
   view: View

@@ -6,7 +6,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useProducts } from '@/hooks/useProducts'
 import { SHIP_META, type ShipOrigin } from '@/store/cartStore'
 
-const SHIP_DESC: Record<ShipOrigin, string> = {
+const SHIP_DESC: Partial<Record<ShipOrigin, string>> = {
   spain: 'Catalogo completo · Cali, Hash, Frozen',
   italy: 'Spedizione rapida dall’Italia',
 }
