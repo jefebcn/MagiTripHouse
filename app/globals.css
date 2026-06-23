@@ -44,24 +44,39 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(ellipse 80% 55% at 50% -10%,  rgba(61,255,110,.09) 0%, transparent 60%),
-    radial-gradient(ellipse 55% 40% at -8%  20%,   rgba(61,255,110,.06) 0%, transparent 55%),
-    radial-gradient(ellipse 55% 40% at 108% 75%,   rgba(61,255,110,.05) 0%, transparent 55%),
-    radial-gradient(ellipse 70% 50% at 50%  110%,  rgba(245,200,66,.04) 0%, transparent 50%),
-    linear-gradient(170deg, #05100a 0%, #080c08 45%, #060b07 100%);
+    /* Logo halo — forte, pulsa via CSS */
+    radial-gradient(ellipse 100% 70% at 50% -6%,  rgba(61,255,110,.26) 0%, transparent 55%),
+    /* Verde sinistra */
+    radial-gradient(ellipse 65% 55% at -8%  22%,   rgba(61,255,110,.12) 0%, transparent 52%),
+    /* Viola destra — accento psichedelico */
+    radial-gradient(ellipse 65% 55% at 108% 42%,   rgba(139,92,246,.10) 0%, transparent 52%),
+    /* Verde basso-sinistra */
+    radial-gradient(ellipse 70% 45% at 18%  92%,   rgba(61,255,110,.07) 0%, transparent 50%),
+    /* Oro basso-destra */
+    radial-gradient(ellipse 65% 42% at 82%  96%,   rgba(245,200,66,.06) 0%, transparent 48%),
+    /* Viola centro-fondo */
+    radial-gradient(ellipse 80% 60% at 50%  105%,  rgba(139,92,246,.05) 0%, transparent 55%),
+    /* Base sfumata verso blu notte */
+    linear-gradient(170deg, #040f07 0%, #060c08 42%, #07090e 100%);
+  animation: bgGlowPulse 9s ease-in-out infinite;
 }
 
-/* Subtle dot grid — gives depth without distraction */
+/* Grain texture + dot grid */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background-image: radial-gradient(rgba(61,255,110,.055) 1px, transparent 1px);
-  background-size: 26px 26px;
-  mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 30%, transparent 85%);
-  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 30%, transparent 85%);
+  /* Rumore SVG per texture grana/street-art */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"),
+    radial-gradient(rgba(61,255,110,.05) 1px, transparent 1px);
+  background-size: 250px 250px, 28px 28px;
+  opacity: 0.22;
+  mix-blend-mode: screen;
+  mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 20%, transparent 90%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 20%, transparent 90%);
 }
 
 /* Every child of body sits above the bg */
@@ -181,6 +196,51 @@ body > * { position: relative; z-index: 1; }
   100% { transform: scale(1); }
 }
 .cart-badge-pop { animation: cartBadgePop .4s ease; }
+
+/* Sfondo respiro lento */
+@keyframes bgGlowPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .78; }
+}
+
+/* Orb viola flottante in basso */
+html::before {
+  content: '';
+  position: fixed;
+  width: 380px; height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139,92,246,.09) 0%, transparent 70%);
+  top: 55%; right: -12%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(60px);
+  animation: orbFloat1 22s ease-in-out infinite;
+}
+
+/* Orb verde flottante in alto-sinistra */
+html::after {
+  content: '';
+  position: fixed;
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(61,255,110,.08) 0%, transparent 70%);
+  top: 8%; left: -10%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(55px);
+  animation: orbFloat2 26s ease-in-out infinite;
+}
+
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0, 0); }
+  35%       { transform: translate(-40px, -70px); }
+  65%       { transform: translate(30px, 50px); }
+}
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0, 0); }
+  40%       { transform: translate(50px, 60px); }
+  70%       { transform: translate(-30px, -40px); }
+}
 
 /* Logo float + glow pulse */
 @keyframes logoFloat {
