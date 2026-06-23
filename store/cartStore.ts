@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Variant } from '@/hooks/useProducts'
 
-export type ShipOrigin = 'spain' | 'italy'
+export type ShipOrigin = 'spain' | 'italy' | 'pharma'
 
 export interface CartItem {
   key: string
@@ -95,6 +95,7 @@ export const useCartStore = create<CartState>()(
 )
 
 export const SHIP_META: Record<ShipOrigin, { flag: string; label: string; delivery: string; shipCost: number; color: string }> = {
-  spain: { flag: '🇪🇸', label: 'Spagna', delivery: '3–6 giorni', shipCost: 10, color: '#f5c842' },
-  italy: { flag: '🇮🇹', label: 'Italia',  delivery: '1–3 giorni', shipCost: 10, color: '#3dff6e' },
+  spain:  { flag: '🇪🇸', label: 'Spagna',    delivery: '3–6 giorni',      shipCost: 10, color: '#f5c842' },
+  italy:  { flag: '🇮🇹', label: 'Italia',    delivery: '1–3 giorni',      shipCost: 10, color: '#3dff6e' },
+  pharma: { flag: '💊',  label: 'Pharma EU', delivery: '5–16 gg (UE)',   shipCost: 0,  color: '#818cf8' },
 }

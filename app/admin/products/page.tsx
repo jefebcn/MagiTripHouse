@@ -249,7 +249,7 @@ function AdminProductsInner() {
     }
   }
 
-  async function setBulkShipFrom(shipFrom: 'spain' | 'italy') {
+  async function setBulkShipFrom(shipFrom: 'spain' | 'italy' | 'pharma') {
     setBulkSaving(true)
     try {
       await Promise.all(
@@ -355,9 +355,23 @@ function AdminProductsInner() {
           {bulkMode ? '✕ Annulla' : '☑️ Multi'}
         </button>
         {!bulkMode && (
-          <button onClick={startCreate} style={{ background: comboMode ? 'rgba(255,120,0,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${comboMode ? 'rgba(255,120,0,.4)' : 'rgba(61,255,110,.3)'}`, color: comboMode ? '#ff8c00' : 'var(--green)', borderRadius: 8, padding: '7px 14px', fontFamily: 'inherit', fontSize: '.82rem', fontWeight: 700, cursor: 'pointer' }}>
-            + Nuova {comboMode ? 'Combo' : ''}
-          </button>
+          <>
+            {!comboMode && (
+              <button
+                onClick={async () => {
+                  if (!confirm('Importare 105 prodotti Pharma EU? I duplicati verranno saltati.')) return
+                  const res = await fetch('/api/admin/import-pharma', { method: 'POST' })
+                  const d = await res.json()
+                  alert(`✅ Importati: ${d.created} · Saltati: ${d.skipped}`)
+                  load()
+                }}
+                style={{ background: 'rgba(129,140,248,.12)', border: '1px solid rgba(129,140,248,.4)', color: '#818cf8', borderRadius: 8, padding: '7px 12px', fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer' }}
+              >💊 Import</button>
+            )}
+            <button onClick={startCreate} style={{ background: comboMode ? 'rgba(255,120,0,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${comboMode ? 'rgba(255,120,0,.4)' : 'rgba(61,255,110,.3)'}`, color: comboMode ? '#ff8c00' : 'var(--green)', borderRadius: 8, padding: '7px 14px', fontFamily: 'inherit', fontSize: '.82rem', fontWeight: 700, cursor: 'pointer' }}>
+              + Nuova {comboMode ? 'Combo' : ''}
+            </button>
+          </>
         )}
       </div>
 
@@ -441,8 +455,9 @@ function AdminProductsInner() {
             <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Spedizione da</label>
             <div style={{ display: 'flex', gap: 8 }}>
               {([
-                { id: 'spain', label: '🇪🇸 Spagna', color: '#f5c842' },
-                { id: 'italy', label: '🇮🇹 Italia',  color: '#3dff6e' },
+                { id: 'spain',  label: '🇪🇸 Spagna',    color: '#f5c842' },
+                { id: 'italy',  label: '🇮🇹 Italia',    color: '#3dff6e' },
+                { id: 'pharma', label: '💊 Pharma EU',  color: '#818cf8' },
               ] as const).map(s => (
                 <button
                   key={s.id}
@@ -466,7 +481,16 @@ function AdminProductsInner() {
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value, badge: e.target.value }))}
               style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 14px', color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit', outline: 'none' }}
             >
-              {['premium','frozen','new','hash','cbd','combo','request'].map((c) => <option key={c} value={c}>{c === 'request' ? 'request (Su Richiesta)' : c}</option>)}
+              {['premium','frozen','new','hash','cbd','combo','request','injectable','oral','sarms','peptides','pct'].map((c) => (
+                <option key={c} value={c}>{
+                  c === 'request' ? 'request (Su Richiesta)' :
+                  c === 'injectable' ? '💉 injectable' :
+                  c === 'oral' ? '💊 oral' :
+                  c === 'sarms' ? '🧬 sarms' :
+                  c === 'peptides' ? '🧪 peptides' :
+                  c === 'pct' ? '🔄 pct' : c
+                }</option>
+              ))}
             </select>
           </div>
 
@@ -701,7 +725,7 @@ function AdminProductsInner() {
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  <span style={{ marginRight: 4 }}>{(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹' : '🇪🇸'}</span>{p.name}
+                  <span style={{ marginRight: 4 }}>{(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹' : (p.shipFrom ?? 'spain') === 'pharma' ? '💊' : '🇪🇸'}</span>{p.name}
                 </div>
                 <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
                   {p.category === 'combo' && p.bundleItems?.length
@@ -756,6 +780,11 @@ function AdminProductsInner() {
                 disabled={bulkSaving}
                 style={{ background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.45)', color: 'var(--green)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
               >🇮🇹 Italia</button>
+              <button
+                onClick={() => setBulkShipFrom('pharma')}
+                disabled={bulkSaving}
+                style={{ background: 'rgba(129,140,248,.12)', border: '1px solid rgba(129,140,248,.45)', color: '#818cf8', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+              >💊 Pharma</button>
               <button
                 onClick={openBulkPanel}
                 disabled={bulkSaving}

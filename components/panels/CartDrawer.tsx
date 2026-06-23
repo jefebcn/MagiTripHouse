@@ -10,14 +10,14 @@ function haptic(pattern: number | number[] = 50) {
   try { if (navigator.vibrate) navigator.vibrate(pattern) } catch { /* noop */ }
 }
 
-const ORIGINS: ShipOrigin[] = ['spain', 'italy']
+const ORIGINS: ShipOrigin[] = ['spain', 'italy', 'pharma']
 
 export default function CartDrawer() {
   const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView } = useUIStore()
   const { items, changeQty, clearOrigin, itemsByOrigin, totalByOrigin } = useCartStore()
   const { user: tgUser } = useTelegram()
   const panelRef = useRef<HTMLDivElement>(null)
-  const [note, setNote] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '' })
+  const [note, setNote] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '' })
   const [affBalance, setAffBalance] = useState(0)
   const [creditOrigin, setCreditOrigin] = useState<ShipOrigin | null>(null)
 
@@ -46,6 +46,7 @@ export default function CartDrawer() {
 
     const orderId = `MTH-${Date.now()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`
     const date = new Date().toLocaleDateString('it-IT')
+    const isPharma = origin === 'pharma'
     const lines = [
       `🛒 *NUOVO ORDINE — Magic Trip House*`,
       `🆔 Ordine: ${orderId}`,
@@ -59,8 +60,13 @@ export default function CartDrawer() {
       `Subtotale: €${subtotal.toFixed(2)}`,
     ]
     if (creditApplied > 0) lines.push(`🎁 Credito affiliato: −€${creditApplied.toFixed(2)}`)
-    lines.push(`🚚 Spedizione: €${sm.shipCost.toFixed(2)}`)
-    lines.push(`💰 *TOTALE: €${finalTotal.toFixed(2)}*`)
+    if (isPharma) {
+      lines.push(`🚚 Spedizione: da confermare (5–19€ UE · 12–27€ extra-UE)`)
+      lines.push(`💰 *TOTALE prodotti: €${(subtotal - creditApplied).toFixed(2)}* (+spedizione)`)
+    } else {
+      lines.push(`🚚 Spedizione: €${sm.shipCost.toFixed(2)}`)
+      lines.push(`💰 *TOTALE: €${finalTotal.toFixed(2)}*`)
+    }
     if (note[origin].trim()) lines.push(``, `📝 Note: ${note[origin].trim()}`)
 
     const msg = lines.join('\n')
@@ -144,7 +150,8 @@ export default function CartDrawer() {
               const sm = SHIP_META[origin]
               const subtotal = totalByOrigin(origin)
               const creditApplied = creditOrigin === origin ? Math.min(affBalance, subtotal) : 0
-              const finalTotal = subtotal - creditApplied + sm.shipCost
+              const isPharma = origin === 'pharma'
+              const finalTotal = isPharma ? subtotal - creditApplied : subtotal - creditApplied + sm.shipCost
 
               return (
                 <div key={origin} style={{
@@ -208,6 +215,22 @@ export default function CartDrawer() {
                     </button>
                   )}
 
+                  {/* Pharma TOS */}
+                  {isPharma && (
+                    <div style={{
+                      background: 'rgba(129,140,248,.07)', border: '1px solid rgba(129,140,248,.25)',
+                      borderRadius: 10, padding: '10px 12px', fontSize: '.69rem', color: 'rgba(199,210,254,.75)',
+                      lineHeight: 1.5,
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#a5b4fc', marginBottom: 4 }}>⚠️ Termini spedizione Pharma EU</div>
+                      <div>🚚 UE: 5–19€ · 5–16 gg lavorativi · Extra-UE: 12–27€ · 7–28 gg</div>
+                      <div>📦 Più brand = spedizioni separate per ciascuno</div>
+                      <div>⏱ Segnalare problemi entro 45 giorni</div>
+                      <div>🚫 No rimborsi/resi dopo pagamento</div>
+                      <div>🔁 Sequestro dogana: ri-spedizione con foto 120 dpi + nuovo indirizzo</div>
+                    </div>
+                  )}
+
                   {/* Note */}
                   <textarea
                     placeholder={`📝 Note ordine ${sm.label} (opzionale)…`}
@@ -227,11 +250,17 @@ export default function CartDrawer() {
                         <span>🎁 Credito</span><span>−€{creditApplied.toFixed(2)}</span>
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginBottom: 6 }}>
-                      <span>🚚 Spedizione</span><span>€{sm.shipCost.toFixed(2)}</span>
-                    </div>
+                    {isPharma ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginBottom: 6 }}>
+                        <span>🚚 Spedizione</span><span style={{ fontSize: '.72rem' }}>variabile (da conf.)</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginBottom: 6 }}>
+                        <span>🚚 Spedizione</span><span>€{sm.shipCost.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                      <span style={{ color: 'var(--muted)' }}>Totale</span>
+                      <span style={{ color: 'var(--muted)' }}>{isPharma ? 'Totale prodotti' : 'Totale'}</span>
                       <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', color: 'var(--green)', textShadow: 'var(--led-green)' }}>€{finalTotal.toFixed(2)}</span>
                     </div>
                   </div>

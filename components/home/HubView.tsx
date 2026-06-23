@@ -195,7 +195,7 @@ export default function HubView() {
         <div style={{ fontSize: '.7rem', color: 'rgba(106,138,106,.7)', marginBottom: 10, paddingLeft: 2, lineHeight: 1.4 }}>
           Ogni spedizione ha il suo carrello e i suoi tempi di consegna.
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
           {(['spain', 'italy'] as ShipOrigin[]).map((o) => {
             const sm = SHIP_META[o]
             const n = countByOrigin(o)
@@ -224,6 +224,43 @@ export default function HubView() {
             )
           })}
         </div>
+
+        {/* Pharma card — full width */}
+        {(() => {
+          const sm = SHIP_META['pharma']
+          const n = countByOrigin('pharma')
+          return (
+            <button
+              onClick={() => goToCatalog({ ship: 'pharma' })}
+              style={{
+                width: '100%', position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(135deg, rgba(129,140,248,.14) 0%, var(--card) 65%)',
+                border: '1.5px solid rgba(129,140,248,.4)',
+                borderRadius: 18, padding: '16px 16px 14px',
+                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 16,
+                boxShadow: '0 4px 20px rgba(0,0,0,.3), 0 0 24px rgba(129,140,248,.1)',
+              }}
+            >
+              <div style={{ fontSize: '2.6rem', lineHeight: 1, flexShrink: 0 }}>💊</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color: '#818cf8' }}>
+                  Pharma EU
+                </div>
+                <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.35 }}>
+                  Deus Medical · Astera Labs · Biaxol
+                </div>
+                <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+                  <span style={{ fontSize: '.68rem', color: 'var(--muted)' }}>🚚 {sm.delivery}</span>
+                  <span style={{ fontSize: '.68rem', color: 'var(--text)', fontWeight: 600 }}>{n} {n === 1 ? 'prodotto' : 'prodotti'} ›</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, alignItems: 'flex-end' }}>
+                <span style={{ fontSize: '.62rem', background: 'rgba(129,140,248,.18)', border: '1px solid rgba(129,140,248,.35)', borderRadius: 20, padding: '3px 8px', color: '#a5b4fc', fontWeight: 700 }}>💉 💊 🧬 🧪 🔄</span>
+              </div>
+            </button>
+          )
+        })()}
       </div>
 
       {/* Category shortcuts */}

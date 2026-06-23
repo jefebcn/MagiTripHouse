@@ -9,6 +9,7 @@ const SHIP_TABS: { id: ShipOrigin | null; label: string }[] = [
   { id: null,     label: '🌍 Tutti' },
   { id: 'spain',  label: '🇪🇸 Spagna' },
   { id: 'italy',  label: '🇮🇹 Italia' },
+  { id: 'pharma', label: '💊 Pharma' },
 ]
 
 export default function CatalogView() {

@@ -1,7 +1,7 @@
 'use client'
 import { useUIStore } from '@/store/uiStore'
 
-const CATEGORIES = [
+const CANNABIS_CATS = [
   { id: 'all',     label: '🔥 Tutti' },
   { id: 'premium', label: '💎 Premium' },
   { id: 'frozen',  label: '🧊 Frozen' },
@@ -11,8 +11,18 @@ const CATEGORIES = [
   { id: 'combo',   label: '🔥 Combo' },
 ]
 
+const PHARMA_CATS = [
+  { id: 'all',        label: '🔥 Tutti' },
+  { id: 'injectable', label: '💉 Iniettabili' },
+  { id: 'oral',       label: '💊 Orali' },
+  { id: 'sarms',      label: '🧬 SARMs' },
+  { id: 'peptides',   label: '🧪 Peptidi' },
+  { id: 'pct',        label: '🔄 PCT' },
+]
+
 export default function CategoryFilter() {
-  const { filter, setFilter } = useUIStore()
+  const { filter, setFilter, shipFilter } = useUIStore()
+  const CATEGORIES = shipFilter === 'pharma' ? PHARMA_CATS : CANNABIS_CATS
   return (
     <div style={{
       display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 16px 4px',
