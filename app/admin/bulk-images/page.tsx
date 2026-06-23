@@ -6,16 +6,34 @@ import Image from 'next/image'
 interface Product { id: string; name: string; imageUrl?: string; emoji: string; category: string }
 interface Match { file: File; preview: string; productId: string; score: number }
 
+// Parole rumore da ignorare nel filename
+const NOISE = new Set(['dp','test','report','500x500','2000px','500','x500','1','2','v2','v3','laborat','laboratory','stack','advanced','beginners','cutting','bulking','ripped','combo'])
+
 function normalize(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+function cleanFilename(filename: string): string {
+  return normalize(
+    filename
+      .replace(/\.[^.]+$/, '')           // rimuove estensione
+      .replace(/^prodotto_\d+_/, '')     // rimuove prefisso prodotto_NNN_
+      .replace(/\d{3,4}x\d{3,4}/g, '')  // rimuove dimensioni tipo 500x500
+      .replace(/\d{4}px/g, '')           // rimuove 2000px ecc.
+  ).split(' ').filter(w => w.length > 1 && !NOISE.has(w)).join(' ')
+}
+
+function isGuideOrStack(filename: string): boolean {
+  const low = filename.toLowerCase()
+  return ['report','stack','bulking','cutting','ripped','guide','bundle'].some(k => low.includes(k))
+}
+
 function matchScore(filename: string, productName: string): number {
-  // strip extension + numeric prefix added by our download script
-  const fn = normalize(filename.replace(/\.[^.]+$/, '').replace(/^prodotto_\d+_/, ''))
+  if (isGuideOrStack(filename)) return 0
+  const fn = cleanFilename(filename)
   const pn = normalize(productName)
-  const words = pn.split(' ').filter(w => w.length > 1)
-  if (!words.length) return 0
+  const words = pn.split(' ').filter(w => w.length > 1 && !NOISE.has(w))
+  if (!words.length || !fn) return 0
   const hits = words.filter(w => fn.includes(w))
   return hits.length / words.length
 }
@@ -49,7 +67,9 @@ export default function BulkImagesPage() {
         if (s > bestScore) { bestScore = s; bestId = p.id }
       }
 
-      result.push({ file, preview, productId: bestId, score: bestScore })
+      // Mark guide/stack files with score -1 so they appear at bottom
+    const finalScore = isGuideOrStack(file.name) ? -1 : bestScore
+    result.push({ file, preview, productId: isGuideOrStack(file.name) ? '' : bestId, score: finalScore })
     }
 
     // Sort by match score descending
@@ -192,11 +212,11 @@ export default function BulkImagesPage() {
 
                 {/* Score badge */}
                 <div style={{
-                  flexShrink: 0, width: 38, textAlign: 'center',
-                  fontSize: '.7rem', fontWeight: 700,
+                  flexShrink: 0, width: 42, textAlign: 'center',
+                  fontSize: '.68rem', fontWeight: 700,
                   color: conf === 'green' ? 'var(--green)' : conf === 'gold' ? 'var(--gold)' : 'var(--red)',
                 }}>
-                  {m.score > 0 ? `${Math.round(m.score * 100)}%` : '—'}
+                  {m.score === -1 ? '🗂️ guida' : m.score > 0 ? `${Math.round(m.score * 100)}%` : '—'}
                 </div>
               </div>
             )
