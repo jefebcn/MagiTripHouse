@@ -193,12 +193,12 @@ export default function HubView() {
               onClick={() => goToCatalog({ ship: 'pharma' })}
               style={{
                 width: '100%', position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, rgba(129,140,248,.12) 0%, var(--card) 60%)',
-                border: '1.5px solid rgba(129,140,248,.32)',
-                borderRadius: 20, padding: '18px 18px 16px',
+                background: 'linear-gradient(135deg, rgba(129,140,248,.10) 0%, var(--card) 60%)',
+                border: '1px solid rgba(129,140,248,.26)',
+                borderRadius: 16, padding: '12px 14px',
                 cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                display: 'flex', alignItems: 'center', gap: 18,
-                boxShadow: '0 6px 24px rgba(0,0,0,.35), 0 0 28px rgba(129,140,248,.08)',
+                display: 'flex', alignItems: 'center', gap: 14,
+                boxShadow: '0 4px 16px rgba(0,0,0,.25)',
               }}
             >
               <div style={{
@@ -208,29 +208,19 @@ export default function HubView() {
                 pointerEvents: 'none',
               }} />
 
-              <div style={{ fontSize: '2.8rem', lineHeight: 1, flexShrink: 0 }}>💊</div>
+              <div style={{ fontSize: '2rem', lineHeight: 1, flexShrink: 0 }}>💊</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', color: '#818cf8', letterSpacing: '.3px' }}>
-                  Pharma EU
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', color: '#818cf8' }}>Pharma EU</span>
+                  <span style={{ fontSize: '.62rem', color: 'var(--muted)' }}>· {n} prodotti</span>
                 </div>
-                <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.75)', marginTop: 2, lineHeight: 1.4 }}>
-                  Deus Medical · Astera Labs · Biaxol
-                </div>
-                <div style={{ fontSize: '.65rem', color: 'var(--muted)', marginTop: 3 }}>🚚 {sm.delivery}</div>
-                <div style={{ marginTop: 8 }}>
-                  <span style={{
-                    display: 'inline-block',
-                    background: 'rgba(129,140,248,.16)', border: '1px solid rgba(129,140,248,.35)',
-                    borderRadius: 20, padding: '3px 10px',
-                    fontSize: '.66rem', color: '#a5b4fc', fontWeight: 700,
-                  }}>
-                    {n} prodott{n === 1 ? 'o' : 'i'} ›
-                  </span>
+                <div style={{ fontSize: '.63rem', color: 'rgba(106,138,106,.7)', marginTop: 2 }}>
+                  Deus Medical · Astera Labs · Biaxol · 🚚 {sm.delivery}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
                 {['💉','💊','🧬','🧪','🔄'].map(e => (
-                  <span key={e} style={{ fontSize: '1rem' }}>{e}</span>
+                  <span key={e} style={{ fontSize: '.85rem' }}>{e}</span>
                 ))}
               </div>
             </button>
