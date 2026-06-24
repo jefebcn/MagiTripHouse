@@ -5,6 +5,23 @@ import { useSearchParams } from 'next/navigation'
 
 interface Variant { label: string; price: number }
 interface BundleItem { productId: string; productName: string; emoji: string; qty: number }
+interface PricePreset { name: string; variants: Variant[] }
+
+// Listini di default (modificabili e salvabili dall'admin, persistiti in localStorage)
+const DEFAULT_PRESETS: PricePreset[] = [
+  {
+    name: 'Online std',
+    variants: [
+      { label: '10g', price: 110 },
+      { label: '25g', price: 200 },
+      { label: '50g', price: 350 },
+      { label: '100g', price: 600 },
+      { label: '250g', price: 1350 },
+      { label: '500g', price: 2500 },
+    ],
+  },
+]
+const PRESETS_KEY = 'tp_price_presets'
 interface Product {
   id: string; name: string; description?: string; category: string; tags: string[];
   variants: Variant[]; stock?: number | null; imageUrl?: string; mediaType?: string;
@@ -64,6 +81,59 @@ function AdminProductsInner() {
   const [priceEditId, setPriceEditId] = useState<string | null>(null)
   const [priceEditVariants, setPriceEditVariants] = useState<Variant[]>([])
   const [priceSaving, setPriceSaving] = useState(false)
+
+  // Listini prezzi (presets) — persistiti in localStorage
+  const [presets, setPresets] = useState<PricePreset[]>([])
+  const [presetsLoaded, setPresetsLoaded] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PRESETS_KEY)
+      setPresets(raw ? JSON.parse(raw) : DEFAULT_PRESETS)
+    } catch { setPresets(DEFAULT_PRESETS) }
+    setPresetsLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (!presetsLoaded) return
+    try { localStorage.setItem(PRESETS_KEY, JSON.stringify(presets)) } catch {}
+  }, [presets, presetsLoaded])
+
+  // Applica un listino al form (sostituisce completamente i tagli)
+  function applyPresetToForm(p: PricePreset) {
+    setForm(f => ({ ...f, variants: p.variants.map(v => ({ ...v })) }))
+  }
+
+  // Applica un listino alla modifica inline (riempie solo i prezzi dei tagli già presenti)
+  function applyPresetToInline(p: PricePreset) {
+    setPriceEditVariants(prev => prev.map(v => {
+      const match = p.variants.find(pv => pv.label === v.label)
+      return match ? { ...v, price: match.price } : v
+    }))
+  }
+
+  // Applica un listino al pannello bulk (riempie i prezzi delle etichette condivise)
+  function applyPresetToBulk(p: PricePreset) {
+    setBulkSharedPrices(prev => {
+      const next = { ...prev }
+      p.variants.forEach(v => { if (next[v.label] !== undefined) next[v.label] = v.price })
+      return next
+    })
+  }
+
+  // Salva i tagli correnti del form come nuovo listino
+  function saveFormAsPreset() {
+    const valid = form.variants.filter(v => v.label.trim())
+    if (!valid.length) { alert('Aggiungi almeno un taglio con etichetta prima di salvare il listino.'); return }
+    const name = prompt('Nome del listino (es. "Online std", "Hash", "Pharma"):')?.trim()
+    if (!name) return
+    setPresets(prev => [...prev.filter(p => p.name !== name), { name, variants: valid.map(v => ({ ...v })) }])
+  }
+
+  function deletePreset(name: string) {
+    if (!confirm(`Eliminare il listino "${name}"?`)) return
+    setPresets(prev => prev.filter(p => p.name !== name))
+  }
 
   function startPriceEdit(p: Product) {
     setPriceEditId(p.id)
@@ -647,7 +717,38 @@ function AdminProductsInner() {
 
           {/* Variants */}
           <div>
-            <div style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 8 }}>Tagli & Prezzi</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Tagli & Prezzi</div>
+              <button
+                type="button"
+                onClick={saveFormAsPreset}
+                title="Salva i tagli correnti come listino riutilizzabile"
+                style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 7, padding: '4px 9px', color: 'var(--gold)', fontSize: '.72rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+              >💾 Salva come listino</button>
+            </div>
+
+            {/* Listini rapidi — un click riempie tutti i tagli & prezzi */}
+            {presets.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                {presets.map(p => (
+                  <span key={p.name} style={{ display: 'inline-flex', alignItems: 'stretch', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(61,255,110,.3)' }}>
+                    <button
+                      type="button"
+                      onClick={() => applyPresetToForm(p)}
+                      title={p.variants.map(v => `${v.label} €${v.price}`).join(' · ')}
+                      style={{ background: 'rgba(61,255,110,.08)', border: 'none', padding: '6px 10px', color: 'var(--green)', fontSize: '.74rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >📋 {p.name}</button>
+                    <button
+                      type="button"
+                      onClick={() => deletePreset(p.name)}
+                      title="Elimina listino"
+                      style={{ background: 'rgba(232,59,59,.08)', border: 'none', borderLeft: '1px solid rgba(61,255,110,.2)', padding: '0 7px', color: 'var(--red)', fontSize: '.72rem', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >✕</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
             {form.variants.map((v, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <input
@@ -865,6 +966,18 @@ function AdminProductsInner() {
                 </div>
                 {priceEditId === p.id ? (
                   <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                    {presets.length > 0 && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', width: '100%', marginBottom: 2 }}>
+                        {presets.map(pr => (
+                          <button
+                            key={pr.name}
+                            onClick={(e) => { e.stopPropagation(); applyPresetToInline(pr) }}
+                            title={`Applica listino: ${pr.variants.map(v => `${v.label} €${v.price}`).join(' · ')}`}
+                            style={{ background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.3)', borderRadius: 6, padding: '2px 8px', color: 'var(--green)', fontSize: '.68rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                          >📋 {pr.name}</button>
+                        ))}
+                      </div>
+                    )}
                     {priceEditVariants.map((v, vi) => (
                       <div key={vi} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid rgba(245,200,66,.35)', borderRadius: 8, padding: '3px 6px' }}>
                         <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>{v.label}</span>
@@ -1018,6 +1131,21 @@ function AdminProductsInner() {
             <div style={{ padding: '0 16px 10px', fontSize: '.72rem', color: 'var(--muted)' }}>
               I prezzi qui sotto verranno applicati a tutti i prodotti selezionati.
             </div>
+
+            {/* Listini rapidi nel bulk */}
+            {presets.length > 0 && (
+              <div style={{ padding: '0 16px 12px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '.7rem', color: 'var(--muted)', fontWeight: 600 }}>Listino:</span>
+                {presets.map(pr => (
+                  <button
+                    key={pr.name}
+                    onClick={() => applyPresetToBulk(pr)}
+                    title={pr.variants.map(v => `${v.label} €${v.price}`).join(' · ')}
+                    style={{ background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.3)', borderRadius: 7, padding: '4px 10px', color: 'var(--green)', fontSize: '.72rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >📋 {pr.name}</button>
+                ))}
+              </div>
+            )}
 
             {/* One row per variant label */}
             <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
