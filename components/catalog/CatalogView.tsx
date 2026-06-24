@@ -65,6 +65,33 @@ export default function CatalogView() {
         </div>
       </div>
 
+      {/* Banner "in loco" — visibile sempre quando ci sono prodotti meetup */}
+      {hasMeetup && shipFilter !== 'meetup' && (() => {
+        const n = products.filter(p => p.shipFrom === 'meetup' && p.category !== 'request').length
+        return (
+          <button
+            onClick={() => setShipFilter('meetup')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '10px 16px',
+              background: 'linear-gradient(90deg, rgba(192,132,252,.14) 0%, rgba(192,132,252,.06) 100%)',
+              border: 'none', borderBottom: '1px solid rgba(192,132,252,.22)',
+              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>🤝</span>
+            <span style={{ flex: 1, fontSize: '.78rem', fontWeight: 700, color: '#d8b4fe' }}>
+              {n} prodott{n === 1 ? 'o' : 'i'} disponibil{n === 1 ? 'e' : 'i'} in loco
+            </span>
+            <span style={{
+              fontSize: '.65rem', fontWeight: 700, color: '#c084fc',
+              background: 'rgba(192,132,252,.18)', border: '1px solid rgba(192,132,252,.35)',
+              borderRadius: 20, padding: '2px 9px', flexShrink: 0,
+            }}>Vedi →</span>
+          </button>
+        )
+      })()}
+
       <SearchBar />
       <CategoryFilter />
       <ProductGrid />
