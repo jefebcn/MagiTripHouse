@@ -45,6 +45,13 @@ function AdminProductsInner() {
   const dragIdxRef = useRef<number | null>(null)
   const hoverIdxRef = useRef<number | null>(null)
 
+  // Ricerca + filtri lista
+  const [search, setSearch] = useState('')
+  const [originFilter, setOriginFilter] = useState<'all' | 'spain' | 'italy' | 'pharma' | 'meetup'>('all')
+  const [catFilter, setCatFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'visible' | 'hidden' | 'sale' | 'soon' | 'out'>('all')
+  const q = search.trim().toLowerCase()
+
   // Bulk price edit
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -330,12 +337,27 @@ function AdminProductsInner() {
     </div>
   )
 
-  const displayedProducts = comboMode
-    ? products.filter(p => p.category === 'combo')
-    : products
+  const displayedProducts = products.filter(p => {
+    if (comboMode && p.category !== 'combo') return false
+    if (originFilter !== 'all' && (p.shipFrom ?? 'spain') !== originFilter) return false
+    if (catFilter !== 'all' && p.category !== catFilter) return false
+    if (statusFilter === 'visible' && p.hidden) return false
+    if (statusFilter === 'hidden' && !p.hidden) return false
+    if (statusFilter === 'sale' && !p.isOnSale) return false
+    if (statusFilter === 'soon' && !p.isComingSoon) return false
+    if (statusFilter === 'out' && p.stock !== 0) return false
+    if (q) {
+      const hay = `${p.name} ${p.origin ?? ''} ${(p.tags || []).join(' ')} ${p.category}`.toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    return true
+  })
+
+  // In vista filtrata/ricerca disabilito il drag (l'ordine non avrebbe senso) e mostro griglia multi-colonna
+  const isFiltering = !comboMode && (q !== '' || originFilter !== 'all' || catFilter !== 'all' || statusFilter !== 'all')
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
+    <div style={{ maxWidth: 'min(960px, 100%)', margin: '0 auto', padding: '20px 16px 80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
         <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>
@@ -664,8 +686,89 @@ function AdminProductsInner() {
         </div>
       )}
 
+      {/* Barra ricerca + filtri */}
+      {!bulkMode && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 10,
+          background: 'var(--bg)', paddingTop: 4, paddingBottom: 10, marginBottom: 10,
+          display: 'flex', flexDirection: 'column', gap: 8,
+          borderBottom: '1px solid var(--border)',
+        }}>
+          {/* Search */}
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: '.95rem', opacity: .7 }}>🔍</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cerca per nome, tag, origine…"
+              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 38px 11px 38px', color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit', outline: 'none' }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1rem', cursor: 'pointer', padding: 6 }}
+              >✕</button>
+            )}
+          </div>
+
+          {/* Filtri rapidi */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {([
+              { id: 'all',    label: 'Tutti',  color: 'var(--green)' },
+              { id: 'spain',  label: '🇪🇸',     color: '#f5c842' },
+              { id: 'italy',  label: '🇮🇹',     color: '#3dff6e' },
+              { id: 'pharma', label: '💊',     color: '#818cf8' },
+              { id: 'meetup', label: '🤝',     color: '#c084fc' },
+            ] as const).map(o => {
+              const active = originFilter === o.id
+              return (
+                <button
+                  key={o.id}
+                  onClick={() => setOriginFilter(o.id)}
+                  style={{
+                    flexShrink: 0, borderRadius: 18, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit',
+                    fontSize: '.78rem', fontWeight: 700,
+                    background: active ? `${o.color === 'var(--green)' ? 'rgba(61,255,110,.18)' : o.color + '22'}` : 'var(--bg3)',
+                    color: active ? o.color : 'var(--muted)',
+                    border: `1px solid ${active ? (o.color === 'var(--green)' ? 'rgba(61,255,110,.6)' : o.color + '88') : 'var(--border)'}`,
+                  }}
+                >{o.label}</button>
+              )
+            })}
+
+            <select
+              value={catFilter}
+              onChange={(e) => setCatFilter(e.target.value)}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 18, padding: '6px 10px', color: catFilter === 'all' ? 'var(--muted)' : 'var(--text)', fontSize: '.78rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="all">📂 Categoria</option>
+              {['premium','frozen','new','hash','cbd','combo','injectable','oral','sarms','peptides','pct','request'].map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 18, padding: '6px 10px', color: statusFilter === 'all' ? 'var(--muted)' : 'var(--text)', fontSize: '.78rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="all">🔖 Stato</option>
+              <option value="visible">👁 Visibili</option>
+              <option value="hidden">🙈 Nascosti</option>
+              <option value="sale">🏷 In sconto</option>
+              <option value="soon">🕐 In arrivo</option>
+              <option value="out">⛔ Esauriti</option>
+            </select>
+
+            <span style={{ marginLeft: 'auto', fontSize: '.74rem', color: 'var(--muted)', fontWeight: 600 }}>
+              {displayedProducts.length}{isFiltering ? `/${products.length}` : ''} prodotti
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Drag hint */}
-      {displayedProducts.length > 1 && (
+      {!isFiltering && !bulkMode && displayedProducts.length > 1 && (
         <div style={{ fontSize: '.72rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 8, opacity: .7 }}>
           ☰ Tieni premuto e trascina per riordinare
         </div>
@@ -674,10 +777,12 @@ function AdminProductsInner() {
       {/* Product list */}
       <div
         ref={listRef}
-        style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
-        onTouchMove={onDragTouchMove}
-        onTouchEnd={onDragTouchEnd}
-        onTouchCancel={onDragTouchEnd}
+        style={isFiltering
+          ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 8 }
+          : { display: 'flex', flexDirection: 'column', gap: 8 }}
+        onTouchMove={isFiltering ? undefined : onDragTouchMove}
+        onTouchEnd={isFiltering ? undefined : onDragTouchEnd}
+        onTouchCancel={isFiltering ? undefined : onDragTouchEnd}
       >
         {displayedProducts.map((p, idx) => {
           const isDragging = dragIdx === idx
@@ -703,12 +808,12 @@ function AdminProductsInner() {
                 cursor: bulkMode ? 'pointer' : 'default',
               }}
             >
-              {/* Drag handle OR checkbox */}
+              {/* Drag handle OR checkbox (nessuna maniglia in vista filtrata) */}
               {bulkMode ? (
                 <div style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, border: `2px solid ${isSelected ? 'var(--gold)' : 'var(--border)'}`, background: isSelected ? 'rgba(245,200,66,.2)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', fontSize: '.9rem' }}>
                   {isSelected && '✓'}
                 </div>
-              ) : (
+              ) : isFiltering ? null : (
                 <div
                   onTouchStart={(e) => onDragTouchStart(e, idx)}
                   style={{ flexShrink: 0, cursor: 'grab', touchAction: 'none', display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 4px', alignItems: 'center' }}
