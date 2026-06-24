@@ -283,6 +283,38 @@ export default function HubView() {
             }}>LIVE</span>
           )}
         </div>
+
+        {/* Card prodotti disponibili in loco — solo se esistono */}
+        {countByOrigin('meetup') > 0 && (
+          <button
+            onClick={() => goToCatalog({ ship: 'meetup' })}
+            style={{
+              width: '100%', marginTop: 10, position: 'relative', overflow: 'hidden',
+              background: 'linear-gradient(135deg, rgba(192,132,252,.12) 0%, var(--card) 60%)',
+              border: '1px solid rgba(192,132,252,.3)',
+              borderRadius: 14, padding: '11px 14px',
+              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}
+          >
+            <div style={{
+              position: 'absolute', right: -28, top: -28,
+              width: 110, height: 110, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(192,132,252,.2) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }} />
+            <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🤝</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: '#d8b4fe' }}>
+                Disponibili in loco
+              </div>
+              <div style={{ fontSize: '.63rem', color: 'rgba(216,180,254,.7)', marginTop: 1 }}>
+                {countByOrigin('meetup')} prodott{countByOrigin('meetup') === 1 ? 'o' : 'i'} · solo ritiro a mano
+              </div>
+            </div>
+            <span style={{ fontSize: '.82rem', color: 'rgba(192,132,252,.6)', fontWeight: 700, flexShrink: 0 }}>›</span>
+          </button>
+        )}
       </div>
 
       {/* ═══════════ QUICK LINKS ═══════════ */}

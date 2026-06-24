@@ -1,5 +1,6 @@
 'use client'
 import { useUIStore } from '@/store/uiStore'
+import { useProducts } from '@/hooks/useProducts'
 import { SHIP_META, type ShipOrigin } from '@/store/cartStore'
 import CategoryFilter from './CategoryFilter'
 import SearchBar from './SearchBar'
@@ -14,6 +15,13 @@ const SHIP_TABS: { id: ShipOrigin | null; label: string }[] = [
 
 export default function CatalogView() {
   const { shipFilter, setShipFilter, setView } = useUIStore()
+  const { products } = useProducts()
+
+  // Tab "In loco" mostrata solo se ci sono prodotti meetup
+  const hasMeetup = products.some(p => p.shipFrom === 'meetup' && p.category !== 'request')
+  const tabs = hasMeetup
+    ? [...SHIP_TABS, { id: 'meetup' as ShipOrigin, label: '🤝 In loco' }]
+    : SHIP_TABS
 
   return (
     <>
@@ -36,7 +44,7 @@ export default function CatalogView() {
         >‹</button>
 
         <div style={{ display: 'flex', gap: 6, flex: 1, overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {SHIP_TABS.map((t) => {
+          {tabs.map((t) => {
             const active = shipFilter === t.id
             const color = t.id ? SHIP_META[t.id].color : 'var(--green)'
             return (
