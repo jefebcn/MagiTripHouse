@@ -249,7 +249,7 @@ function AdminProductsInner() {
     }
   }
 
-  async function setBulkShipFrom(shipFrom: 'spain' | 'italy' | 'pharma') {
+  async function setBulkShipFrom(shipFrom: 'spain' | 'italy' | 'pharma' | 'meetup') {
     setBulkSaving(true)
     try {
       await Promise.all(
@@ -458,11 +458,12 @@ function AdminProductsInner() {
           {/* Ship origin */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label style={{ fontSize: '.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Spedizione da</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {([
                 { id: 'spain',  label: '🇪🇸 Spagna',    color: '#f5c842' },
                 { id: 'italy',  label: '🇮🇹 Italia',    color: '#3dff6e' },
                 { id: 'pharma', label: '💊 Pharma EU',  color: '#818cf8' },
+                { id: 'meetup', label: '🤝 In loco',    color: '#c084fc' },
               ] as const).map(s => (
                 <button
                   key={s.id}
@@ -730,7 +731,7 @@ function AdminProductsInner() {
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  <span style={{ marginRight: 4 }}>{(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹' : (p.shipFrom ?? 'spain') === 'pharma' ? '💊' : '🇪🇸'}</span>{p.name}
+                  <span style={{ marginRight: 4 }}>{(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹' : (p.shipFrom ?? 'spain') === 'pharma' ? '💊' : (p.shipFrom ?? 'spain') === 'meetup' ? '🤝' : '🇪🇸'}</span>{p.name}
                 </div>
                 <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
                   {p.category === 'combo' && p.bundleItems?.length
@@ -790,6 +791,11 @@ function AdminProductsInner() {
                 disabled={bulkSaving}
                 style={{ background: 'rgba(129,140,248,.12)', border: '1px solid rgba(129,140,248,.45)', color: '#818cf8', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
               >💊 Pharma</button>
+              <button
+                onClick={() => setBulkShipFrom('meetup')}
+                disabled={bulkSaving}
+                style={{ background: 'rgba(192,132,252,.12)', border: '1px solid rgba(192,132,252,.45)', color: '#c084fc', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+              >🤝 In loco</button>
               <button
                 onClick={openBulkPanel}
                 disabled={bulkSaving}

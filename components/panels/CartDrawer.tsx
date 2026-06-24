@@ -10,14 +10,14 @@ function haptic(pattern: number | number[] = 50) {
   try { if (navigator.vibrate) navigator.vibrate(pattern) } catch { /* noop */ }
 }
 
-const ORIGINS: ShipOrigin[] = ['spain', 'italy', 'pharma']
+const ORIGINS: ShipOrigin[] = ['spain', 'italy', 'pharma', 'meetup']
 
 export default function CartDrawer() {
   const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView } = useUIStore()
   const { items, changeQty, clearOrigin, itemsByOrigin, totalByOrigin } = useCartStore()
   const { user: tgUser } = useTelegram()
   const panelRef = useRef<HTMLDivElement>(null)
-  const [note, setNote] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '' })
+  const [note, setNote] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
   const [affBalance, setAffBalance] = useState(0)
   const [creditOrigin, setCreditOrigin] = useState<ShipOrigin | null>(null)
 
@@ -47,12 +47,15 @@ export default function CartDrawer() {
     const orderId = `MTH-${Date.now()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`
     const date = new Date().toLocaleDateString('it-IT')
     const isPharma = origin === 'pharma'
+    const isMeetup = origin === 'meetup'
     const lines = [
       `🛒 *NUOVO ORDINE — Magic Trip House*`,
       `🆔 Ordine: ${orderId}`,
       `👤 Cliente: ${displayName}`,
       `📅 Data: ${date}`,
-      `${sm.flag} Spedizione: ${sm.label} (${sm.delivery})`,
+      isMeetup
+        ? `${sm.flag} Ritiro: in loco (al meetup)`
+        : `${sm.flag} Spedizione: ${sm.label} (${sm.delivery})`,
       ``,
       `📦 *Prodotti:*`,
       ...oItems.map((x) => `${x.emoji} ${x.productName} [${x.variantLabel}] ×${x.qty} — €${(x.variantPrice * x.qty).toFixed(2)}`),
@@ -60,7 +63,10 @@ export default function CartDrawer() {
       `Subtotale: €${subtotal.toFixed(2)}`,
     ]
     if (creditApplied > 0) lines.push(`🎁 Credito affiliato: −€${creditApplied.toFixed(2)}`)
-    if (isPharma) {
+    if (isMeetup) {
+      lines.push(`🤝 Ritiro in loco · nessuna spedizione`)
+      lines.push(`💰 *TOTALE: €${(subtotal - creditApplied).toFixed(2)}*`)
+    } else if (isPharma) {
       lines.push(`🚚 Spedizione: da confermare (5–19€ UE · 12–27€ extra-UE)`)
       lines.push(`💰 *TOTALE prodotti: €${(subtotal - creditApplied).toFixed(2)}* (+spedizione)`)
     } else {
@@ -151,7 +157,8 @@ export default function CartDrawer() {
               const subtotal = totalByOrigin(origin)
               const creditApplied = creditOrigin === origin ? Math.min(affBalance, subtotal) : 0
               const isPharma = origin === 'pharma'
-              const finalTotal = isPharma ? subtotal - creditApplied : subtotal - creditApplied + sm.shipCost
+              const isMeetup = origin === 'meetup'
+              const finalTotal = (isPharma || isMeetup) ? subtotal - creditApplied : subtotal - creditApplied + sm.shipCost
 
               return (
                 <div key={origin} style={{
@@ -164,9 +171,9 @@ export default function CartDrawer() {
                     <span style={{ fontSize: '1.3rem' }}>{sm.flag}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.98rem', color: sm.color }}>
-                        Spedizione {sm.label}
+                        {isMeetup ? 'Ritiro in loco' : `Spedizione ${sm.label}`}
                       </div>
-                      <div style={{ fontSize: '.66rem', color: 'var(--muted)' }}>🚚 {sm.delivery}</div>
+                      <div style={{ fontSize: '.66rem', color: 'var(--muted)' }}>{isMeetup ? '🤝' : '🚚'} {sm.delivery}</div>
                     </div>
                   </div>
 
@@ -215,6 +222,19 @@ export default function CartDrawer() {
                     </button>
                   )}
 
+                  {/* Meetup info */}
+                  {isMeetup && (
+                    <div style={{
+                      background: 'rgba(192,132,252,.07)', border: '1px solid rgba(192,132,252,.25)',
+                      borderRadius: 10, padding: '10px 12px', fontSize: '.69rem', color: 'rgba(216,180,254,.8)',
+                      lineHeight: 1.5,
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#d8b4fe', marginBottom: 4 }}>🤝 Ritiro in loco</div>
+                      <div>Prodotti disponibili solo di persona al meetup · nessuna spedizione</div>
+                      <div>📍 Luogo e orario verranno concordati in chat dopo la prenotazione</div>
+                    </div>
+                  )}
+
                   {/* Pharma TOS */}
                   {isPharma && (
                     <div style={{
@@ -250,7 +270,11 @@ export default function CartDrawer() {
                         <span>🎁 Credito</span><span>−€{creditApplied.toFixed(2)}</span>
                       </div>
                     )}
-                    {isPharma ? (
+                    {isMeetup ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginBottom: 6 }}>
+                        <span>🤝 Ritiro in loco</span><span style={{ color: '#c084fc', fontWeight: 700 }}>gratis</span>
+                      </div>
+                    ) : isPharma ? (
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginBottom: 6 }}>
                         <span>🚚 Spedizione</span><span style={{ fontSize: '.72rem' }}>variabile (da conf.)</span>
                       </div>
@@ -266,7 +290,7 @@ export default function CartDrawer() {
                   </div>
 
                   <button className="checkout-btn" onClick={() => placeOrder(origin)}>
-                    {sm.flag} Invia ordine {sm.label} →
+                    {isMeetup ? `${sm.flag} Prenota ritiro in loco →` : `${sm.flag} Invia ordine ${sm.label} →`}
                   </button>
                 </div>
               )

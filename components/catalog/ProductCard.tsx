@@ -3,6 +3,7 @@ import React from 'react'
 import Image from 'next/image'
 import type { Product } from '@/hooks/useProducts'
 import { useUIStore } from '@/store/uiStore'
+import { SHIP_META, type ShipOrigin } from '@/store/cartStore'
 
 const BADGE_COLORS: Record<string, { bg: string; color: string; border: string }> = {
   premium: { bg: 'rgba(245,200,66,.15)', color: '#f5c842', border: 'rgba(245,200,66,.45)' },
@@ -207,7 +208,7 @@ export default function ProductCard({ product: p, index }: Props) {
             borderRadius: 20, padding: '2px 8px',
             fontSize: '.62rem', fontWeight: 700, color: '#fff', letterSpacing: '.3px',
           }}>
-            {(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹 Italia' : '🇪🇸 Spagna'}
+            {(() => { const sm = SHIP_META[(p.shipFrom ?? 'spain') as ShipOrigin]; return `${sm.flag} ${sm.label}` })()}
           </div>
         )}
 
