@@ -10,7 +10,7 @@ interface PricePreset { name: string; variants: Variant[] }
 // Listini di default (modificabili e salvabili dall'admin, persistiti in localStorage)
 const DEFAULT_PRESETS: PricePreset[] = [
   {
-    name: 'Online std',
+    name: 'Cali Spain',
     variants: [
       { label: '10g', price: 110 },
       { label: '25g', price: 200 },
@@ -360,6 +360,30 @@ function AdminProductsInner() {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ shipFrom }),
+          })
+        )
+      )
+      setBulkMode(false)
+      setSelectedIds(new Set())
+      load()
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  // Applica un intero listino (tagli + prezzi) a tutti i prodotti selezionati con un click.
+  // Sostituisce i tagli esistenti — pensato per stampare un listino standard su prodotti già in sistema.
+  async function applyPresetToSelected(preset: PricePreset) {
+    const summary = preset.variants.map(v => `${v.label} €${v.price}`).join(' · ')
+    if (!confirm(`Applicare il listino "${preset.name}" a ${selectedIds.size} prodott${selectedIds.size === 1 ? 'o' : 'i'}?\n\n${summary}\n\n⚠️ I tagli/prezzi attuali di questi prodotti verranno sostituiti.`)) return
+    setBulkSaving(true)
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map(id =>
+          fetch(`/api/products/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ variants: preset.variants.map(v => ({ ...v })) }),
           })
         )
       )
@@ -1064,31 +1088,50 @@ function AdminProductsInner() {
           </span>
           {selectedIds.size > 0 && (
             <>
-              <button
-                onClick={() => setBulkShipFrom('spain')}
-                disabled={bulkSaving}
-                style={{ background: 'rgba(245,200,66,.12)', border: '1px solid rgba(245,200,66,.45)', color: '#f5c842', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
-              >🇪🇸 Spagna</button>
-              <button
-                onClick={() => setBulkShipFrom('italy')}
-                disabled={bulkSaving}
-                style={{ background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.45)', color: 'var(--green)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
-              >🇮🇹 Italia</button>
-              <button
-                onClick={() => setBulkShipFrom('pharma')}
-                disabled={bulkSaving}
-                style={{ background: 'rgba(129,140,248,.12)', border: '1px solid rgba(129,140,248,.45)', color: '#818cf8', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
-              >💊 Pharma</button>
-              <button
-                onClick={() => setBulkShipFrom('meetup')}
-                disabled={bulkSaving}
-                style={{ background: 'rgba(192,132,252,.12)', border: '1px solid rgba(192,132,252,.45)', color: '#c084fc', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
-              >🤝 In loco</button>
-              <button
-                onClick={openBulkPanel}
-                disabled={bulkSaving}
-                style={{ background: 'rgba(245,200,66,.15)', border: '1px solid rgba(245,200,66,.5)', color: 'var(--gold)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
-              >💶 Prezzi</button>
+              {/* Gruppo: listino prezzi — un click applica tutto il listino ai selezionati */}
+              <div style={{ width: '100%', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '.68rem', color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', opacity: .8 }}>💶 Listino</span>
+                {presets.map(pr => (
+                  <button
+                    key={pr.name}
+                    onClick={() => applyPresetToSelected(pr)}
+                    disabled={bulkSaving}
+                    title={pr.variants.map(v => `${v.label} €${v.price}`).join(' · ')}
+                    style={{ background: 'rgba(61,255,110,.14)', border: '1px solid rgba(61,255,110,.5)', color: 'var(--green)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: bulkSaving ? 'not-allowed' : 'pointer' }}
+                  >{pr.name}</button>
+                ))}
+                <button
+                  onClick={openBulkPanel}
+                  disabled={bulkSaving}
+                  title="Modifica i prezzi a mano taglio per taglio"
+                  style={{ background: 'rgba(245,200,66,.15)', border: '1px solid rgba(245,200,66,.5)', color: 'var(--gold)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+                >✏️ Manuale</button>
+              </div>
+
+              {/* Gruppo: spedizione */}
+              <div style={{ width: '100%', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '.68rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', opacity: .8 }}>🚚 Spedizione</span>
+                <button
+                  onClick={() => setBulkShipFrom('spain')}
+                  disabled={bulkSaving}
+                  style={{ background: 'rgba(245,200,66,.12)', border: '1px solid rgba(245,200,66,.45)', color: '#f5c842', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+                >🇪🇸 Spagna</button>
+                <button
+                  onClick={() => setBulkShipFrom('italy')}
+                  disabled={bulkSaving}
+                  style={{ background: 'rgba(61,255,110,.12)', border: '1px solid rgba(61,255,110,.45)', color: 'var(--green)', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+                >🇮🇹 Italia</button>
+                <button
+                  onClick={() => setBulkShipFrom('pharma')}
+                  disabled={bulkSaving}
+                  style={{ background: 'rgba(129,140,248,.12)', border: '1px solid rgba(129,140,248,.45)', color: '#818cf8', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+                >💊 Pharma</button>
+                <button
+                  onClick={() => setBulkShipFrom('meetup')}
+                  disabled={bulkSaving}
+                  style={{ background: 'rgba(192,132,252,.12)', border: '1px solid rgba(192,132,252,.45)', color: '#c084fc', borderRadius: 20, padding: '6px 12px', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem', cursor: 'pointer' }}
+                >🤝 In loco</button>
+              </div>
             </>
           )}
         </div>
