@@ -60,6 +60,31 @@ function AdminProductsInner() {
   const [bulkSharedPrices, setBulkSharedPrices] = useState<Record<string, number>>({})
   const [bulkSaving, setBulkSaving] = useState(false)
 
+  // Modifica prezzo inline (dalla riga)
+  const [priceEditId, setPriceEditId] = useState<string | null>(null)
+  const [priceEditVariants, setPriceEditVariants] = useState<Variant[]>([])
+  const [priceSaving, setPriceSaving] = useState(false)
+
+  function startPriceEdit(p: Product) {
+    setPriceEditId(p.id)
+    setPriceEditVariants(p.variants.map(v => ({ ...v })))
+  }
+
+  async function savePriceEdit(id: string) {
+    setPriceSaving(true)
+    try {
+      await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variants: priceEditVariants }),
+      })
+      setPriceEditId(null)
+      await load()
+    } finally {
+      setPriceSaving(false)
+    }
+  }
+
   async function load() {
     const res = await fetch('/api/products?all=true')
     const data = await res.json()
@@ -838,29 +863,74 @@ function AdminProductsInner() {
                 <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   <span style={{ marginRight: 4 }}>{(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹' : (p.shipFrom ?? 'spain') === 'pharma' ? '💊' : (p.shipFrom ?? 'spain') === 'meetup' ? '🤝' : '🇪🇸'}</span>{p.name}
                 </div>
-                <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
-                  {p.category === 'combo' && p.bundleItems?.length
-                    ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
-                    : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
-                  {p.hidden ? ' · 🙈 NASCOSTO' : p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
-                </div>
+                {priceEditId === p.id ? (
+                  <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                    {priceEditVariants.map((v, vi) => (
+                      <div key={vi} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid rgba(245,200,66,.35)', borderRadius: 8, padding: '3px 6px' }}>
+                        <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>{v.label}</span>
+                        <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>€</span>
+                        <input
+                          type="number"
+                          autoFocus={vi === 0}
+                          value={v.price || ''}
+                          onChange={(e) => {
+                            const nv = [...priceEditVariants]
+                            nv[vi] = { ...nv[vi], price: Number(e.target.value) }
+                            setPriceEditVariants(nv)
+                          }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') savePriceEdit(p.id) }}
+                          style={{ width: 56, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', color: 'var(--text)', fontSize: '.78rem', fontFamily: 'inherit', outline: 'none', fontWeight: 700 }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
+                    {p.category === 'combo' && p.bundleItems?.length
+                      ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
+                      : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
+                    {p.hidden ? ' · 🙈 NASCOSTO' : p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
+                  </div>
+                )}
               </div>
 
               {!bulkMode && (
-                <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                  <button
-                    title={p.hidden ? 'Nasconsto — clicca per pubblicare' : 'Visibile — clicca per nascondere'}
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !p.hidden }) })
-                      load()
-                    }}
-                    style={{ background: p.hidden ? 'rgba(106,138,106,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${p.hidden ? 'rgba(106,138,106,.3)' : 'rgba(61,255,110,.35)'}`, borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: p.hidden ? 'var(--muted)' : 'var(--green)', fontSize: '.82rem' }}>
-                    {p.hidden ? '🙈' : '👁'}
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); startEdit(p) }} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
-                  <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
-                </div>
+                priceEditId === p.id ? (
+                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); savePriceEdit(p.id) }}
+                      disabled={priceSaving}
+                      title="Salva prezzi"
+                      style={{ background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.45)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--green)', fontSize: '.82rem' }}>
+                      {priceSaving ? '⏳' : '💾'}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setPriceEditId(null) }}
+                      title="Annulla"
+                      style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--muted)', fontSize: '.82rem' }}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                    {p.category !== 'combo' && (
+                      <button
+                        title="Modifica prezzi rapida"
+                        onClick={(e) => { e.stopPropagation(); startPriceEdit(p) }}
+                        style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>💶</button>
+                    )}
+                    <button
+                      title={p.hidden ? 'Nascosto — clicca per pubblicare' : 'Visibile — clicca per nascondere'}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !p.hidden }) })
+                        load()
+                      }}
+                      style={{ background: p.hidden ? 'rgba(106,138,106,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${p.hidden ? 'rgba(106,138,106,.3)' : 'rgba(61,255,110,.35)'}`, borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: p.hidden ? 'var(--muted)' : 'var(--green)', fontSize: '.82rem' }}>
+                      {p.hidden ? '🙈' : '👁'}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); startEdit(p) }} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
+                  </div>
+                )
               )}
             </div>
           )
