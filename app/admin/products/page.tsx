@@ -45,6 +45,13 @@ function AdminProductsInner() {
   const dragIdxRef = useRef<number | null>(null)
   const hoverIdxRef = useRef<number | null>(null)
 
+  // Ricerca + filtri lista
+  const [search, setSearch] = useState('')
+  const [originFilter, setOriginFilter] = useState<'all' | 'spain' | 'italy' | 'pharma' | 'meetup'>('all')
+  const [catFilter, setCatFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'visible' | 'hidden' | 'sale' | 'soon' | 'out'>('all')
+  const q = search.trim().toLowerCase()
+
   // Bulk price edit
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -52,6 +59,31 @@ function AdminProductsInner() {
   // shared prices: label → price (applies to ALL selected products that have that label)
   const [bulkSharedPrices, setBulkSharedPrices] = useState<Record<string, number>>({})
   const [bulkSaving, setBulkSaving] = useState(false)
+
+  // Modifica prezzo inline (dalla riga)
+  const [priceEditId, setPriceEditId] = useState<string | null>(null)
+  const [priceEditVariants, setPriceEditVariants] = useState<Variant[]>([])
+  const [priceSaving, setPriceSaving] = useState(false)
+
+  function startPriceEdit(p: Product) {
+    setPriceEditId(p.id)
+    setPriceEditVariants(p.variants.map(v => ({ ...v })))
+  }
+
+  async function savePriceEdit(id: string) {
+    setPriceSaving(true)
+    try {
+      await fetch(`/api/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variants: priceEditVariants }),
+      })
+      setPriceEditId(null)
+      await load()
+    } finally {
+      setPriceSaving(false)
+    }
+  }
 
   async function load() {
     const res = await fetch('/api/products?all=true')
@@ -330,12 +362,27 @@ function AdminProductsInner() {
     </div>
   )
 
-  const displayedProducts = comboMode
-    ? products.filter(p => p.category === 'combo')
-    : products
+  const displayedProducts = products.filter(p => {
+    if (comboMode && p.category !== 'combo') return false
+    if (originFilter !== 'all' && (p.shipFrom ?? 'spain') !== originFilter) return false
+    if (catFilter !== 'all' && p.category !== catFilter) return false
+    if (statusFilter === 'visible' && p.hidden) return false
+    if (statusFilter === 'hidden' && !p.hidden) return false
+    if (statusFilter === 'sale' && !p.isOnSale) return false
+    if (statusFilter === 'soon' && !p.isComingSoon) return false
+    if (statusFilter === 'out' && p.stock !== 0) return false
+    if (q) {
+      const hay = `${p.name} ${p.origin ?? ''} ${(p.tags || []).join(' ')} ${p.category}`.toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    return true
+  })
+
+  // In vista filtrata/ricerca disabilito il drag (l'ordine non avrebbe senso) e mostro griglia multi-colonna
+  const isFiltering = !comboMode && (q !== '' || originFilter !== 'all' || catFilter !== 'all' || statusFilter !== 'all')
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
+    <div style={{ maxWidth: 'min(960px, 100%)', margin: '0 auto', padding: '20px 16px 80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
         <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>
@@ -664,8 +711,89 @@ function AdminProductsInner() {
         </div>
       )}
 
+      {/* Barra ricerca + filtri */}
+      {!bulkMode && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 10,
+          background: 'var(--bg)', paddingTop: 4, paddingBottom: 10, marginBottom: 10,
+          display: 'flex', flexDirection: 'column', gap: 8,
+          borderBottom: '1px solid var(--border)',
+        }}>
+          {/* Search */}
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: '.95rem', opacity: .7 }}>🔍</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cerca per nome, tag, origine…"
+              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 38px 11px 38px', color: 'var(--text)', fontSize: '.9rem', fontFamily: 'inherit', outline: 'none' }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1rem', cursor: 'pointer', padding: 6 }}
+              >✕</button>
+            )}
+          </div>
+
+          {/* Filtri rapidi */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {([
+              { id: 'all',    label: 'Tutti',  color: 'var(--green)' },
+              { id: 'spain',  label: '🇪🇸',     color: '#f5c842' },
+              { id: 'italy',  label: '🇮🇹',     color: '#3dff6e' },
+              { id: 'pharma', label: '💊',     color: '#818cf8' },
+              { id: 'meetup', label: '🤝',     color: '#c084fc' },
+            ] as const).map(o => {
+              const active = originFilter === o.id
+              return (
+                <button
+                  key={o.id}
+                  onClick={() => setOriginFilter(o.id)}
+                  style={{
+                    flexShrink: 0, borderRadius: 18, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit',
+                    fontSize: '.78rem', fontWeight: 700,
+                    background: active ? `${o.color === 'var(--green)' ? 'rgba(61,255,110,.18)' : o.color + '22'}` : 'var(--bg3)',
+                    color: active ? o.color : 'var(--muted)',
+                    border: `1px solid ${active ? (o.color === 'var(--green)' ? 'rgba(61,255,110,.6)' : o.color + '88') : 'var(--border)'}`,
+                  }}
+                >{o.label}</button>
+              )
+            })}
+
+            <select
+              value={catFilter}
+              onChange={(e) => setCatFilter(e.target.value)}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 18, padding: '6px 10px', color: catFilter === 'all' ? 'var(--muted)' : 'var(--text)', fontSize: '.78rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="all">📂 Categoria</option>
+              {['premium','frozen','new','hash','cbd','combo','injectable','oral','sarms','peptides','pct','request'].map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 18, padding: '6px 10px', color: statusFilter === 'all' ? 'var(--muted)' : 'var(--text)', fontSize: '.78rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="all">🔖 Stato</option>
+              <option value="visible">👁 Visibili</option>
+              <option value="hidden">🙈 Nascosti</option>
+              <option value="sale">🏷 In sconto</option>
+              <option value="soon">🕐 In arrivo</option>
+              <option value="out">⛔ Esauriti</option>
+            </select>
+
+            <span style={{ marginLeft: 'auto', fontSize: '.74rem', color: 'var(--muted)', fontWeight: 600 }}>
+              {displayedProducts.length}{isFiltering ? `/${products.length}` : ''} prodotti
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Drag hint */}
-      {displayedProducts.length > 1 && (
+      {!isFiltering && !bulkMode && displayedProducts.length > 1 && (
         <div style={{ fontSize: '.72rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 8, opacity: .7 }}>
           ☰ Tieni premuto e trascina per riordinare
         </div>
@@ -674,10 +802,12 @@ function AdminProductsInner() {
       {/* Product list */}
       <div
         ref={listRef}
-        style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
-        onTouchMove={onDragTouchMove}
-        onTouchEnd={onDragTouchEnd}
-        onTouchCancel={onDragTouchEnd}
+        style={isFiltering
+          ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 8 }
+          : { display: 'flex', flexDirection: 'column', gap: 8 }}
+        onTouchMove={isFiltering ? undefined : onDragTouchMove}
+        onTouchEnd={isFiltering ? undefined : onDragTouchEnd}
+        onTouchCancel={isFiltering ? undefined : onDragTouchEnd}
       >
         {displayedProducts.map((p, idx) => {
           const isDragging = dragIdx === idx
@@ -703,12 +833,12 @@ function AdminProductsInner() {
                 cursor: bulkMode ? 'pointer' : 'default',
               }}
             >
-              {/* Drag handle OR checkbox */}
+              {/* Drag handle OR checkbox (nessuna maniglia in vista filtrata) */}
               {bulkMode ? (
                 <div style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, border: `2px solid ${isSelected ? 'var(--gold)' : 'var(--border)'}`, background: isSelected ? 'rgba(245,200,66,.2)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', fontSize: '.9rem' }}>
                   {isSelected && '✓'}
                 </div>
-              ) : (
+              ) : isFiltering ? null : (
                 <div
                   onTouchStart={(e) => onDragTouchStart(e, idx)}
                   style={{ flexShrink: 0, cursor: 'grab', touchAction: 'none', display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 4px', alignItems: 'center' }}
@@ -733,29 +863,74 @@ function AdminProductsInner() {
                 <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   <span style={{ marginRight: 4 }}>{(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹' : (p.shipFrom ?? 'spain') === 'pharma' ? '💊' : (p.shipFrom ?? 'spain') === 'meetup' ? '🤝' : '🇪🇸'}</span>{p.name}
                 </div>
-                <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
-                  {p.category === 'combo' && p.bundleItems?.length
-                    ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
-                    : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
-                  {p.hidden ? ' · 🙈 NASCOSTO' : p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
-                </div>
+                {priceEditId === p.id ? (
+                  <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                    {priceEditVariants.map((v, vi) => (
+                      <div key={vi} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid rgba(245,200,66,.35)', borderRadius: 8, padding: '3px 6px' }}>
+                        <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>{v.label}</span>
+                        <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>€</span>
+                        <input
+                          type="number"
+                          autoFocus={vi === 0}
+                          value={v.price || ''}
+                          onChange={(e) => {
+                            const nv = [...priceEditVariants]
+                            nv[vi] = { ...nv[vi], price: Number(e.target.value) }
+                            setPriceEditVariants(nv)
+                          }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') savePriceEdit(p.id) }}
+                          style={{ width: 56, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', color: 'var(--text)', fontSize: '.78rem', fontFamily: 'inherit', outline: 'none', fontWeight: 700 }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
+                    {p.category === 'combo' && p.bundleItems?.length
+                      ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
+                      : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
+                    {p.hidden ? ' · 🙈 NASCOSTO' : p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
+                  </div>
+                )}
               </div>
 
               {!bulkMode && (
-                <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                  <button
-                    title={p.hidden ? 'Nasconsto — clicca per pubblicare' : 'Visibile — clicca per nascondere'}
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !p.hidden }) })
-                      load()
-                    }}
-                    style={{ background: p.hidden ? 'rgba(106,138,106,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${p.hidden ? 'rgba(106,138,106,.3)' : 'rgba(61,255,110,.35)'}`, borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: p.hidden ? 'var(--muted)' : 'var(--green)', fontSize: '.82rem' }}>
-                    {p.hidden ? '🙈' : '👁'}
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); startEdit(p) }} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
-                  <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
-                </div>
+                priceEditId === p.id ? (
+                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); savePriceEdit(p.id) }}
+                      disabled={priceSaving}
+                      title="Salva prezzi"
+                      style={{ background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.45)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--green)', fontSize: '.82rem' }}>
+                      {priceSaving ? '⏳' : '💾'}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setPriceEditId(null) }}
+                      title="Annulla"
+                      style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--muted)', fontSize: '.82rem' }}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                    {p.category !== 'combo' && (
+                      <button
+                        title="Modifica prezzi rapida"
+                        onClick={(e) => { e.stopPropagation(); startPriceEdit(p) }}
+                        style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>💶</button>
+                    )}
+                    <button
+                      title={p.hidden ? 'Nascosto — clicca per pubblicare' : 'Visibile — clicca per nascondere'}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !p.hidden }) })
+                        load()
+                      }}
+                      style={{ background: p.hidden ? 'rgba(106,138,106,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${p.hidden ? 'rgba(106,138,106,.3)' : 'rgba(61,255,110,.35)'}`, borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: p.hidden ? 'var(--muted)' : 'var(--green)', fontSize: '.82rem' }}>
+                      {p.hidden ? '🙈' : '👁'}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); startEdit(p) }} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
+                  </div>
+                )
               )}
             </div>
           )
