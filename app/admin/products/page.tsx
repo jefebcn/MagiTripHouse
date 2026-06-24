@@ -20,8 +20,25 @@ const DEFAULT_PRESETS: PricePreset[] = [
       { label: '500g', price: 2500 },
     ],
   },
+  {
+    name: 'Dry',
+    variants: [
+      { label: '10g', price: 75 },
+      { label: '25g', price: 160 },
+      { label: '50g', price: 290 },
+      { label: '100g', price: 490 },
+      { label: '200g', price: 850 },
+      { label: '300g', price: 1200 },
+      { label: '500g', price: 1850 },
+      { label: '1kg', price: 3300 },
+      { label: '2kg', price: 6200 },
+      { label: '3kg', price: 9200 },
+      { label: '5kg', price: 14900 },
+    ],
+  },
 ]
 const PRESETS_KEY = 'tp_price_presets'
+const PRESETS_SEED_KEY = 'tp_price_presets_seeded'
 interface Product {
   id: string; name: string; description?: string; category: string; tags: string[];
   variants: Variant[]; stock?: number | null; imageUrl?: string; mediaType?: string;
@@ -89,8 +106,20 @@ function AdminProductsInner() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(PRESETS_KEY)
-      setPresets(raw ? JSON.parse(raw) : DEFAULT_PRESETS)
-    } catch { setPresets(DEFAULT_PRESETS) }
+      if (!raw) {
+        // Primo avvio: semina tutti i default
+        setPresets(DEFAULT_PRESETS.map(d => ({ ...d })))
+        localStorage.setItem(PRESETS_SEED_KEY, JSON.stringify(DEFAULT_PRESETS.map(d => d.name)))
+      } else {
+        const stored: PricePreset[] = JSON.parse(raw)
+        const seeded: string[] = JSON.parse(localStorage.getItem(PRESETS_SEED_KEY) ?? '[]')
+        // Aggiungi i default mai seminati prima (così i nuovi listini compaiono una volta sola,
+        // senza ricomparire se l'admin li ha già eliminati)
+        const toAdd = DEFAULT_PRESETS.filter(d => !seeded.includes(d.name) && !stored.some(s => s.name === d.name))
+        setPresets([...stored, ...toAdd.map(d => ({ ...d }))])
+        localStorage.setItem(PRESETS_SEED_KEY, JSON.stringify(Array.from(new Set([...seeded, ...DEFAULT_PRESETS.map(d => d.name)]))))
+      }
+    } catch { setPresets(DEFAULT_PRESETS.map(d => ({ ...d }))) }
     setPresetsLoaded(true)
   }, [])
 
