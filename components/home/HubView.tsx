@@ -320,22 +320,6 @@ export default function HubView() {
       {/* ═══════════ QUICK LINKS ═══════════ */}
       <div style={{ margin: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button
-          onClick={() => setView('request')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.2)',
-            borderRadius: 14, padding: '13px 16px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-          }}
-        >
-          <span style={{ fontSize: '1.3rem' }}>📦</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--text)' }}>Su Richiesta</div>
-            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 1 }}>Ordina prodotti non in catalogo</div>
-          </div>
-          <span style={{ fontSize: '.82rem', color: 'rgba(59,130,246,.5)', fontWeight: 700 }}>›</span>
-        </button>
-
-        <button
           onClick={() => setView('affiliates')}
           style={{
             display: 'flex', alignItems: 'center', gap: 12,
