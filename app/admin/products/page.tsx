@@ -80,6 +80,9 @@ function AdminProductsInner() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const quickUploadRef = useRef<HTMLInputElement>(null)
+  const [quickUploadId, setQuickUploadId] = useState<string | null>(null)
+  const [quickUploadProgress, setQuickUploadProgress] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -290,6 +293,59 @@ function AdminProductsInner() {
       setSaveError(`⚠ Upload fallito: ${err.message}`)
     }
     setUploading(false)
+  }
+
+  // Upload rapido dalla card — carica e salva imageUrl direttamente sul prodotto
+  async function handleQuickUpload(e: React.ChangeEvent<HTMLInputElement>, productId: string) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setQuickUploadProgress(5)
+    const workerUrl = process.env.NEXT_PUBLIC_UPLOAD_WORKER_URL
+    try {
+      let publicUrl: string
+      const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
+      if (workerUrl) {
+        publicUrl = await new Promise<string>((resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+          xhr.open('POST', workerUrl)
+          xhr.setRequestHeader('X-Filename', file.name)
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+          xhr.timeout = 600_000
+          xhr.upload.onprogress = ev => {
+            if (ev.lengthComputable) setQuickUploadProgress(5 + Math.round((ev.loaded / ev.total) * 85))
+          }
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try { resolve(JSON.parse(xhr.responseText).publicUrl) }
+              catch { reject(new Error('Risposta Worker non valida')) }
+            } else { reject(new Error(`Worker errore ${xhr.status}`)) }
+          }
+          xhr.onerror = () => reject(new Error('Errore di rete'))
+          xhr.ontimeout = () => reject(new Error('Timeout upload'))
+          xhr.send(file)
+        })
+      } else {
+        if (file.size > 4 * 1024 * 1024) throw new Error(`File troppo grande (max 4MB senza Worker)`)
+        setQuickUploadProgress(30)
+        const fd = new FormData()
+        fd.append('file', file)
+        const res = await fetch('/api/upload', { method: 'POST', body: fd })
+        if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? `Errore ${res.status}`) }
+        publicUrl = (await res.json()).publicUrl
+      }
+      setQuickUploadProgress(95)
+      await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: publicUrl, mediaType }),
+      })
+      setQuickUploadProgress(100)
+      await load()
+    } catch (err: any) {
+      alert(`⚠️ Upload fallito: ${err.message}`)
+    }
+    setTimeout(() => { setQuickUploadId(null); setQuickUploadProgress(0) }, 600)
   }
 
   async function handleSave() {
@@ -587,9 +643,14 @@ function AdminProductsInner() {
             </div>
           )}
 
-          {/* Thumbnail */}
-          <div style={{ width: 36, height: 36, borderRadius: 7, overflow: 'hidden', background: 'var(--bg3)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {p.imageUrl
+          {/* Thumbnail — con progress ring durante upload rapido */}
+          <div style={{ width: 36, height: 36, borderRadius: 7, overflow: 'hidden', background: 'var(--bg3)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            {quickUploadId === p.id && quickUploadProgress > 0 && quickUploadProgress < 100 ? (
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2 }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2.5px solid rgba(61,255,110,.25)', borderTopColor: 'var(--green)', animation: 'spin 0.7s linear infinite' }} />
+                <span style={{ fontSize: '.55rem', color: 'var(--green)', fontWeight: 700 }}>{quickUploadProgress}%</span>
+              </div>
+            ) : p.imageUrl
               ? p.mediaType === 'video'
                 ? <span style={{ fontSize: '1rem' }}>▶</span>
                 // eslint-disable-next-line @next/next/no-img-element
@@ -697,6 +758,11 @@ function AdminProductsInner() {
           <div onClick={(e) => e.stopPropagation()}
             style={{ marginTop: 8, paddingLeft: 45, display: 'flex', gap: 6, flexWrap: 'wrap' }}
           >
+            {/* Foto/Video — upload rapido senza aprire il form */}
+            <button
+              onClick={() => { setQuickUploadId(p.id); setQuickMenuId(null); quickUploadRef.current?.click() }}
+              style={{ background: 'rgba(56,189,248,.1)', border: '1px solid rgba(56,189,248,.35)', borderRadius: 8, padding: '7px 11px', color: '#7dd3fc', fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer' }}
+            >📸 Foto/Video</button>
             {p.category !== 'combo' && (
               <button onClick={() => { startPriceEdit(p); setQuickMenuId(null) }}
                 style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 8, padding: '7px 11px', color: 'var(--gold)', fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer' }}
@@ -802,6 +868,15 @@ function AdminProductsInner() {
               {uploading ? `⏳ Upload ${uploadProgress}%` : '📸 Carica nuovo file'}
             </div>
             <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={handleUpload} />
+            {/* Input nascosto per upload rapido dalla card */}
+            <input
+              ref={quickUploadRef}
+              type="file"
+              accept="image/*,video/*"
+              style={{ display: 'none' }}
+              onChange={(e) => quickUploadId ? handleQuickUpload(e, quickUploadId) : undefined}
+            />
+            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted)', fontSize: '.75rem' }}>
               <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
