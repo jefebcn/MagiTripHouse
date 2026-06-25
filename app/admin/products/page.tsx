@@ -39,6 +39,13 @@ const DEFAULT_PRESETS: PricePreset[] = [
 ]
 const PRESETS_KEY = 'tp_price_presets'
 const PRESETS_SEED_KEY = 'tp_price_presets_seeded'
+
+const ORIGIN_GROUPS: { key: string; label: string; color: string }[] = [
+  { key: 'spain',  label: '🇪🇸 Spagna',   color: '#f5c842' },
+  { key: 'italy',  label: '🇮🇹 Italia',    color: '#3dff6e' },
+  { key: 'pharma', label: '💊 Pharma EU',  color: '#818cf8' },
+  { key: 'meetup', label: '🤝 In loco',    color: '#c084fc' },
+]
 interface Product {
   id: string; name: string; description?: string; category: string; tags: string[];
   variants: Variant[]; stock?: number | null; imageUrl?: string; mediaType?: string;
@@ -85,6 +92,11 @@ function AdminProductsInner() {
   const [catFilter, setCatFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'visible' | 'hidden' | 'sale' | 'soon' | 'out'>('all')
   const q = search.trim().toLowerCase()
+
+  // Gruppi collassabili (persistiti in localStorage)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  // Menu azioni rapide per prodotto
+  const [quickMenuId, setQuickMenuId] = useState<string | null>(null)
 
   // Bulk price edit
   const [bulkMode, setBulkMode] = useState(false)
@@ -319,6 +331,42 @@ function AdminProductsInner() {
     load()
   }
 
+  // Duplica un prodotto — copia tutto, aggiunge "(copia)", nascosto di default
+  async function duplicateProduct(p: Product) {
+    await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: p.name + ' (copia)',
+        description: p.description ?? '',
+        category: p.category,
+        tags: p.tags,
+        variants: p.variants,
+        stock: p.stock ?? null,
+        imageUrl: p.imageUrl ?? '',
+        mediaType: p.mediaType ?? 'image',
+        emoji: p.emoji,
+        badge: p.badge ?? '',
+        origin: p.origin ?? '',
+        isOnSale: false,
+        isComingSoon: false,
+        hidden: true,
+        shipFrom: p.shipFrom ?? 'spain',
+        bundleItems: p.bundleItems ?? null,
+      }),
+    })
+    await load()
+  }
+
+  // Seleziona tutti i prodotti di un gruppo ed entra in modalità bulk
+  function selectAllGroup(shipFrom: string) {
+    const ids = displayedProducts
+      .filter(p => (p.shipFrom ?? 'spain') === shipFrom)
+      .map(p => p.id)
+    setBulkMode(true)
+    setSelectedIds(new Set(ids))
+  }
+
   function toggleBulkMode() {
     setBulkMode(m => !m)
     setSelectedIds(new Set())
@@ -503,6 +551,171 @@ function AdminProductsInner() {
 
   // In vista filtrata/ricerca disabilito il drag (l'ordine non avrebbe senso) e mostro griglia multi-colonna
   const isFiltering = !comboMode && (q !== '' || originFilter !== 'all' || catFilter !== 'all' || statusFilter !== 'all')
+
+  // Card compatta per ogni prodotto — usata sia nella vista gruppi che in quella flat
+  function renderCard(p: Product) {
+    const isSelected = selectedIds.has(p.id)
+    const isEditingPrice = priceEditId === p.id
+    const showMenu = quickMenuId === p.id && !bulkMode
+
+    return (
+      <div
+        key={p.id}
+        onClick={bulkMode ? () => toggleSelect(p.id) : undefined}
+        style={{
+          padding: '9px 12px',
+          background: isSelected ? 'rgba(245,200,66,.07)' : 'var(--card)',
+          borderBottom: '1px solid rgba(255,255,255,.04)',
+          opacity: p.hidden && !isSelected && !isEditingPrice ? 0.48 : 1,
+          cursor: bulkMode ? 'pointer' : 'default',
+          transition: 'opacity .15s, background .1s',
+          userSelect: 'none',
+        }}
+      >
+        {/* Riga principale */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          {/* Checkbox bulk */}
+          {bulkMode && (
+            <div style={{
+              flexShrink: 0, width: 22, height: 22, borderRadius: 6,
+              border: `2px solid ${isSelected ? 'var(--gold)' : 'var(--border)'}`,
+              background: isSelected ? 'rgba(245,200,66,.2)' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--gold)', fontSize: '.85rem',
+            }}>
+              {isSelected && '✓'}
+            </div>
+          )}
+
+          {/* Thumbnail */}
+          <div style={{ width: 36, height: 36, borderRadius: 7, overflow: 'hidden', background: 'var(--bg3)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {p.imageUrl
+              ? p.mediaType === 'video'
+                ? <span style={{ fontSize: '1rem' }}>▶</span>
+                // eslint-disable-next-line @next/next/no-img-element
+                : <img src={p.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ fontSize: '1rem' }}>{p.emoji}</span>
+            }
+          </div>
+
+          {/* Nome + badge */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: p.hidden ? 'var(--muted)' : 'var(--text)' }}>
+              {p.name}
+            </div>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 1, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '.62rem', color: 'var(--muted)', background: 'var(--bg3)', borderRadius: 4, padding: '1px 5px' }}>{p.category}</span>
+              {p.isOnSale && <span style={{ fontSize: '.65rem' }}>🏷</span>}
+              {p.isComingSoon && <span style={{ fontSize: '.65rem' }}>🕐</span>}
+              {p.stock === 0 && <span style={{ fontSize: '.65rem' }}>⛔</span>}
+              {p.stock != null && p.stock > 0 && <span style={{ fontSize: '.62rem', color: 'var(--muted)' }}>📦{p.stock}</span>}
+            </div>
+          </div>
+
+          {/* Azioni rapide (non in bulk) */}
+          {!bulkMode && (
+            <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+              {/* Toggle visibilità */}
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !p.hidden }) })
+                  load()
+                }}
+                title={p.hidden ? 'Pubblica' : 'Nascondi'}
+                style={{
+                  width: 30, height: 30, borderRadius: 6, border: '1px solid', cursor: 'pointer',
+                  background: p.hidden ? 'rgba(106,138,106,.1)' : 'rgba(61,255,110,.1)',
+                  borderColor: p.hidden ? 'rgba(106,138,106,.3)' : 'rgba(61,255,110,.3)',
+                  color: p.hidden ? 'var(--muted)' : 'var(--green)', fontSize: '.82rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >{p.hidden ? '🙈' : '👁'}</button>
+
+              {/* Menu ⋯ */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setQuickMenuId(showMenu ? null : p.id) }}
+                style={{
+                  width: 30, height: 30, borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer',
+                  background: showMenu ? 'var(--bg2)' : 'var(--bg3)',
+                  color: showMenu ? 'var(--text)' : 'var(--muted)', fontSize: '1.1rem', fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >⋯</button>
+            </div>
+          )}
+        </div>
+
+        {/* Prezzi (riga secondaria, non in modalità edit) */}
+        {!isEditingPrice && (
+          <div style={{ marginTop: 4, paddingLeft: bulkMode ? 31 : 45, fontSize: '.68rem', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {p.category === 'combo' && p.bundleItems?.length
+              ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
+              : p.variants.map(v => `${v.label} €${v.price}`).join(' · ')}
+          </div>
+        )}
+
+        {/* Modifica prezzi inline */}
+        {isEditingPrice && (
+          <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {presets.length > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {presets.map(pr => (
+                  <button key={pr.name} onClick={() => applyPresetToInline(pr)}
+                    style={{ background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.3)', borderRadius: 6, padding: '3px 8px', color: 'var(--green)', fontSize: '.7rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >📋 {pr.name}</button>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {priceEditVariants.map((v, vi) => (
+                <div key={vi} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid rgba(245,200,66,.35)', borderRadius: 8, padding: '3px 6px' }}>
+                  <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>{v.label}</span>
+                  <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>€</span>
+                  <input
+                    type="number" autoFocus={vi === 0} value={v.price || ''}
+                    onChange={(e) => { const nv = [...priceEditVariants]; nv[vi] = { ...nv[vi], price: Number(e.target.value) }; setPriceEditVariants(nv) }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') savePriceEdit(p.id) }}
+                    style={{ width: 56, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', color: 'var(--text)', fontSize: '.78rem', fontFamily: 'inherit', outline: 'none', fontWeight: 700 }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => savePriceEdit(p.id)} disabled={priceSaving}
+                style={{ flex: 1, background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.45)', borderRadius: 8, padding: '8px', cursor: 'pointer', color: 'var(--green)', fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem' }}
+              >{priceSaving ? '⏳ Salvataggio...' : '💾 Salva prezzi'}</button>
+              <button onClick={() => setPriceEditId(null)}
+                style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', color: 'var(--muted)', fontFamily: 'inherit' }}
+              >✕</button>
+            </div>
+          </div>
+        )}
+
+        {/* Menu azioni rapide (dropdown inline) */}
+        {showMenu && (
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ marginTop: 8, paddingLeft: 45, display: 'flex', gap: 6, flexWrap: 'wrap' }}
+          >
+            {p.category !== 'combo' && (
+              <button onClick={() => { startPriceEdit(p); setQuickMenuId(null) }}
+                style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 8, padding: '7px 11px', color: 'var(--gold)', fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer' }}
+              >💶 Prezzi</button>
+            )}
+            <button onClick={() => { startEdit(p); setQuickMenuId(null) }}
+              style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 8, padding: '7px 11px', color: 'var(--gold)', fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer' }}
+            >✏️ Modifica</button>
+            <button onClick={() => { duplicateProduct(p); setQuickMenuId(null) }}
+              style={{ background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.3)', borderRadius: 8, padding: '7px 11px', color: 'var(--green)', fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer' }}
+            >📋 Duplica</button>
+            <button onClick={() => { handleDelete(p.id); setQuickMenuId(null) }}
+              style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 8, padding: '7px 11px', color: 'var(--red)', fontFamily: 'inherit', fontSize: '.78rem', fontWeight: 700, cursor: 'pointer' }}
+            >🗑 Elimina</button>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{ maxWidth: 'min(960px, 100%)', margin: '0 auto', padding: '20px 16px 80px' }}>
@@ -946,162 +1159,113 @@ function AdminProductsInner() {
         </div>
       )}
 
-      {/* Drag hint */}
-      {!isFiltering && !bulkMode && displayedProducts.length > 1 && (
+      {/* Espandi / collassa tutti i gruppi */}
+      {!isFiltering && !comboMode && !bulkMode && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 6, justifyContent: 'flex-end' }}>
+          <button onClick={() => setCollapsedGroups(new Set())}
+            style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '.7rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+            ▼ Espandi tutti
+          </button>
+          <button onClick={() => setCollapsedGroups(new Set(ORIGIN_GROUPS.map(g => g.key)))}
+            style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '.7rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+            ▶ Collassa tutti
+          </button>
+        </div>
+      )}
+
+      {/* Drag hint — solo in flat ordinata */}
+      {(isFiltering || comboMode) && !bulkMode && displayedProducts.length > 1 && (
         <div style={{ fontSize: '.72rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 8, opacity: .7 }}>
           ☰ Tieni premuto e trascina per riordinare
         </div>
       )}
 
-      {/* Product list */}
-      <div
-        ref={listRef}
-        style={isFiltering
-          ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 8 }
-          : { display: 'flex', flexDirection: 'column', gap: 8 }}
-        onTouchMove={isFiltering ? undefined : onDragTouchMove}
-        onTouchEnd={isFiltering ? undefined : onDragTouchEnd}
-        onTouchCancel={isFiltering ? undefined : onDragTouchEnd}
-      >
-        {displayedProducts.map((p, idx) => {
-          const isDragging = dragIdx === idx
-          const isHover = hoverIdx === idx && dragIdx !== null && dragIdx !== idx
-          const isSelected = selectedIds.has(p.id)
-          return (
-            <div
-              key={p.id}
-              onClick={bulkMode ? () => toggleSelect(p.id) : undefined}
-              style={{
-                background: isSelected ? 'rgba(245,200,66,.07)' : 'var(--card)',
-                border: isSelected
-                  ? '2px solid rgba(245,200,66,.6)'
-                  : isHover
-                    ? '2px solid var(--green)'
-                    : `1px solid ${p.category === 'combo' ? 'rgba(255,120,0,.3)' : 'var(--border)'}`,
-                borderRadius: 12, padding: '10px 12px',
-                display: 'flex', alignItems: 'center', gap: 10,
-                opacity: isDragging ? 0.4 : 1,
-                transform: isDragging ? 'scale(.97)' : 'scale(1)',
-                transition: 'opacity .15s, transform .15s, border-color .1s, background .1s',
-                userSelect: 'none',
-                cursor: bulkMode ? 'pointer' : 'default',
-              }}
-            >
-              {/* Drag handle OR checkbox (nessuna maniglia in vista filtrata) */}
-              {bulkMode ? (
-                <div style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, border: `2px solid ${isSelected ? 'var(--gold)' : 'var(--border)'}`, background: isSelected ? 'rgba(245,200,66,.2)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', fontSize: '.9rem' }}>
-                  {isSelected && '✓'}
-                </div>
-              ) : isFiltering ? null : (
+      {/* VISTA GRUPPI (default) — oppure FLAT (filtri attivi o combo mode) */}
+      {isFiltering || comboMode ? (
+        /* ── FLAT: griglia quando filtri attivi, lista in combo mode ── */
+        <div
+          ref={listRef}
+          style={isFiltering
+            ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 1, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }
+            : { display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}
+          onTouchMove={onDragTouchMove}
+          onTouchEnd={onDragTouchEnd}
+          onTouchCancel={onDragTouchEnd}
+        >
+          {displayedProducts.map(p => renderCard(p))}
+        </div>
+      ) : (
+        /* ── GRUPPI per origine ── */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {ORIGIN_GROUPS.map(group => {
+            const groupItems = displayedProducts.filter(p => (p.shipFrom ?? 'spain') === group.key)
+            if (groupItems.length === 0) return null
+            const collapsed = collapsedGroups.has(group.key)
+            const hiddenCount = groupItems.filter(p => p.hidden).length
+            const visibleCount = groupItems.length - hiddenCount
+            // Visibili prima, nascosti in fondo
+            const sorted = [...groupItems.filter(p => !p.hidden), ...groupItems.filter(p => p.hidden)]
+
+            return (
+              <div key={group.key}>
+                {/* Header gruppo */}
                 <div
-                  onTouchStart={(e) => onDragTouchStart(e, idx)}
-                  style={{ flexShrink: 0, cursor: 'grab', touchAction: 'none', display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 4px', alignItems: 'center' }}
+                  onClick={() => setCollapsedGroups(prev => {
+                    const next = new Set(prev)
+                    if (next.has(group.key)) next.delete(group.key)
+                    else next.add(group.key)
+                    return next
+                  })}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '10px 14px',
+                    background: `${group.color}0e`,
+                    border: `1px solid ${group.color}35`,
+                    borderRadius: collapsed ? 12 : '12px 12px 0 0',
+                    cursor: 'pointer', userSelect: 'none',
+                  }}
                 >
-                  {[0,1,2].map(i => (
-                    <div key={i} style={{ width: 16, height: 2, borderRadius: 1, background: 'var(--muted)', opacity: .6 }} />
-                  ))}
+                  <span style={{ fontSize: '.75rem', color: group.color, flexShrink: 0, width: 10 }}>
+                    {collapsed ? '▶' : '▼'}
+                  </span>
+                  <span style={{ fontWeight: 700, color: group.color, fontSize: '.88rem', flex: 1 }}>
+                    {group.label}
+                  </span>
+                  {/* Badge: N visibili [+ M nascosti] */}
+                  <span style={{
+                    fontSize: '.7rem', fontWeight: 700, flexShrink: 0,
+                    background: `${group.color}20`, border: `1px solid ${group.color}44`,
+                    color: group.color, borderRadius: 20, padding: '2px 9px',
+                  }}>
+                    {visibleCount} {hiddenCount > 0 ? <span style={{ opacity: .65 }}>+{hiddenCount}🙈</span> : null}
+                  </span>
+                  {/* Seleziona tutto il gruppo */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); selectAllGroup(group.key) }}
+                    style={{
+                      background: `${group.color}18`, border: `1px solid ${group.color}55`,
+                      color: group.color, borderRadius: 10, padding: '4px 9px',
+                      fontFamily: 'inherit', fontSize: '.7rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >☑ Tutti</button>
                 </div>
-              )}
 
-              <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', background: 'var(--bg3)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {p.imageUrl
-                  ? p.mediaType === 'video'
-                    ? <span style={{ fontSize: '1.1rem' }}>▶</span>
-                    // eslint-disable-next-line @next/next/no-img-element
-                    : <img src={p.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <span style={{ fontSize: '1.1rem' }}>{p.emoji}</span>
-                }
-              </div>
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: '.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  <span style={{ marginRight: 4 }}>{(p.shipFrom ?? 'spain') === 'italy' ? '🇮🇹' : (p.shipFrom ?? 'spain') === 'pharma' ? '💊' : (p.shipFrom ?? 'spain') === 'meetup' ? '🤝' : '🇪🇸'}</span>{p.name}
-                </div>
-                {priceEditId === p.id ? (
-                  <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                    {presets.length > 0 && (
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', width: '100%', marginBottom: 2 }}>
-                        {presets.map(pr => (
-                          <button
-                            key={pr.name}
-                            onClick={(e) => { e.stopPropagation(); applyPresetToInline(pr) }}
-                            title={`Applica listino: ${pr.variants.map(v => `${v.label} €${v.price}`).join(' · ')}`}
-                            style={{ background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.3)', borderRadius: 6, padding: '2px 8px', color: 'var(--green)', fontSize: '.68rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                          >📋 {pr.name}</button>
-                        ))}
-                      </div>
-                    )}
-                    {priceEditVariants.map((v, vi) => (
-                      <div key={vi} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg3)', border: '1px solid rgba(245,200,66,.35)', borderRadius: 8, padding: '3px 6px' }}>
-                        <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>{v.label}</span>
-                        <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>€</span>
-                        <input
-                          type="number"
-                          autoFocus={vi === 0}
-                          value={v.price || ''}
-                          onChange={(e) => {
-                            const nv = [...priceEditVariants]
-                            nv[vi] = { ...nv[vi], price: Number(e.target.value) }
-                            setPriceEditVariants(nv)
-                          }}
-                          onKeyDown={(e) => { if (e.key === 'Enter') savePriceEdit(p.id) }}
-                          style={{ width: 56, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', color: 'var(--text)', fontSize: '.78rem', fontFamily: 'inherit', outline: 'none', fontWeight: 700 }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
-                    {p.category === 'combo' && p.bundleItems?.length
-                      ? p.bundleItems.map(b => `${b.qty}× ${b.productName}`).join(' + ')
-                      : p.variants.map((v) => `${v.label} €${v.price}`).join(' · ')}
-                    {p.hidden ? ' · 🙈 NASCOSTO' : p.isComingSoon ? ' · 🕐 In arrivo' : p.isOnSale ? ' · 🏷 Sconto' : p.stock === 0 ? ' · ESAURITO' : p.stock != null ? ` · 📦 ${p.stock}` : ''}
+                {/* Prodotti del gruppo */}
+                {!collapsed && (
+                  <div style={{
+                    border: `1px solid ${group.color}22`,
+                    borderTop: 'none',
+                    borderRadius: '0 0 12px 12px',
+                    overflow: 'hidden',
+                  }}>
+                    {sorted.map(p => renderCard(p))}
                   </div>
                 )}
               </div>
-
-              {!bulkMode && (
-                priceEditId === p.id ? (
-                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); savePriceEdit(p.id) }}
-                      disabled={priceSaving}
-                      title="Salva prezzi"
-                      style={{ background: 'rgba(61,255,110,.15)', border: '1px solid rgba(61,255,110,.45)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--green)', fontSize: '.82rem' }}>
-                      {priceSaving ? '⏳' : '💾'}
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setPriceEditId(null) }}
-                      title="Annulla"
-                      style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--muted)', fontSize: '.82rem' }}>✕</button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                    {p.category !== 'combo' && (
-                      <button
-                        title="Modifica prezzi rapida"
-                        onClick={(e) => { e.stopPropagation(); startPriceEdit(p) }}
-                        style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>💶</button>
-                    )}
-                    <button
-                      title={p.hidden ? 'Nascosto — clicca per pubblicare' : 'Visibile — clicca per nascondere'}
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: !p.hidden }) })
-                        load()
-                      }}
-                      style={{ background: p.hidden ? 'rgba(106,138,106,.12)' : 'rgba(61,255,110,.1)', border: `1px solid ${p.hidden ? 'rgba(106,138,106,.3)' : 'rgba(61,255,110,.35)'}`, borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: p.hidden ? 'var(--muted)' : 'var(--green)', fontSize: '.82rem' }}>
-                      {p.hidden ? '🙈' : '👁'}
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); startEdit(p) }} style={{ background: 'rgba(245,200,66,.1)', border: '1px solid rgba(245,200,66,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--gold)', fontSize: '.82rem' }}>✏️</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }} style={{ background: 'rgba(232,59,59,.1)', border: '1px solid rgba(232,59,59,.3)', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', color: 'var(--red)', fontSize: '.82rem' }}>🗑</button>
-                  </div>
-                )
-              )}
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
       {/* Bulk mode: floating action bar */}
       {bulkMode && (
         <div style={{
