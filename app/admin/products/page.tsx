@@ -36,6 +36,19 @@ const DEFAULT_PRESETS: PricePreset[] = [
       { label: '5kg', price: 14900 },
     ],
   },
+  {
+    name: 'Dry x3',
+    variants: [
+      { label: '10g',  price: 105 },
+      { label: '25g',  price: 200 },
+      { label: '50g',  price: 340 },
+      { label: '100g', price: 590 },
+      { label: '200g', price: 1050 },
+      { label: '300g', price: 1450 },
+      { label: '500g', price: 2200 },
+      { label: '1kg',  price: 4000 },
+    ],
+  },
 ]
 const PRESETS_KEY = 'tp_price_presets'
 const PRESETS_SEED_KEY = 'tp_price_presets_seeded'
