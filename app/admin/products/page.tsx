@@ -75,6 +75,20 @@ const DEFAULT_PRESETS: PricePreset[] = [
       { label: '1kg',  price: 4000 },
     ],
   },
+  {
+    name: 'Plasma Static',
+    variants: [
+      { label: '3g',   price: 95 },
+      { label: '5g',   price: 120 },
+      { label: '10g',  price: 180 },
+      { label: '25g',  price: 400 },
+      { label: '50g',  price: 650 },
+      { label: '100g', price: 1100 },
+      { label: '200g', price: 2000 },
+      { label: '500g', price: 4600 },
+      { label: '1kg',  price: 8500 },
+    ],
+  },
 ]
 const PRESETS_KEY = 'tp_price_presets'
 const PRESETS_SEED_KEY = 'tp_price_presets_seeded'
