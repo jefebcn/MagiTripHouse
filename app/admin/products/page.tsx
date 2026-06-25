@@ -21,6 +21,18 @@ const DEFAULT_PRESETS: PricePreset[] = [
     ],
   },
   {
+    name: 'Cali Bag',
+    variants: [
+      { label: '3.5g', price: 55 },
+      { label: '7g',   price: 90 },
+      { label: '14g',  price: 160 },
+      { label: '28g',  price: 280 },
+      { label: '56g',  price: 510 },
+      { label: '112g', price: 950 },
+      { label: '224g', price: 1750 },
+    ],
+  },
+  {
     name: 'Dry',
     variants: [
       { label: '10g', price: 75 },
