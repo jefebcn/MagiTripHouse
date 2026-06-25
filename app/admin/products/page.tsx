@@ -21,6 +21,20 @@ const DEFAULT_PRESETS: PricePreset[] = [
     ],
   },
   {
+    name: 'Frozen',
+    variants: [
+      { label: '5g',   price: 70 },
+      { label: '10g',  price: 110 },
+      { label: '25g',  price: 240 },
+      { label: '50g',  price: 390 },
+      { label: '100g', price: 680 },
+      { label: '200g', price: 1250 },
+      { label: '300g', price: 1750 },
+      { label: '500g', price: 2800 },
+      { label: '1kg',  price: 5100 },
+    ],
+  },
+  {
     name: 'Cali Bag',
     variants: [
       { label: '3.5g', price: 60 },
