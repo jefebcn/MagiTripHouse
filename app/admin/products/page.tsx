@@ -100,6 +100,19 @@ const DEFAULT_PRESETS: PricePreset[] = [
       { label: '500pcs', price: 1100 },
     ],
   },
+  {
+    name: 'LVT',
+    variants: [
+      { label: '5pcs',    price: 42 },
+      { label: '10pcs',   price: 58 },
+      { label: '25pcs',   price: 88 },
+      { label: '50pcs',   price: 125 },
+      { label: '100pcs',  price: 205 },
+      { label: '250pcs',  price: 450 },
+      { label: '500pcs',  price: 830 },
+      { label: '1000pcs', price: 1420 },
+    ],
+  },
 ]
 const PRESETS_KEY = 'tp_price_presets'
 const PRESETS_SEED_KEY = 'tp_price_presets_seeded'
