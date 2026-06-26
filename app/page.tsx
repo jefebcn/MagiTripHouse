@@ -25,6 +25,41 @@ function LedLine() {
   )
 }
 
+const BANNER_KEY = 'mth_banner_update_2706_dismissed'
+
+function UpdateBanner() {
+  const [visible, setVisible] = React.useState(false)
+  React.useEffect(() => {
+    setVisible(sessionStorage.getItem(BANNER_KEY) !== '1')
+  }, [])
+  if (!visible) return null
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(245,200,66,.18), rgba(245,160,0,.12))',
+      border: '1px solid rgba(245,200,66,.5)',
+      borderRadius: 0,
+      padding: '10px 14px',
+      display: 'flex', alignItems: 'center', gap: 10,
+      boxShadow: '0 2px 12px rgba(245,200,66,.15)',
+    }}>
+      <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>⚙️</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 800, fontSize: '.88rem', color: '#f5c842', letterSpacing: '.3px' }}>
+          Aggiornamento piattaforma
+        </div>
+        <div style={{ fontSize: '.78rem', color: 'rgba(245,200,66,.75)', marginTop: 1 }}>
+          Sabato 27/06 — possibili interruzioni temporanee
+        </div>
+      </div>
+      <button
+        onClick={() => { sessionStorage.setItem(BANNER_KEY, '1'); setVisible(false) }}
+        style={{ background: 'none', border: 'none', color: 'rgba(245,200,66,.6)', fontSize: '1.1rem', cursor: 'pointer', padding: 4, flexShrink: 0 }}
+        aria-label="Chiudi"
+      >✕</button>
+    </div>
+  )
+}
+
 export default function Home() {
   const { view, isLoggedIn, setView, sessionToken, setLastReadNewsAt, setLatestNewsAt } = useUIStore()
   useTelegram()
@@ -69,6 +104,7 @@ export default function Home() {
   return (
     <main style={{ minHeight: '100dvh', maxWidth: 480, margin: '0 auto', position: 'relative' }}>
       <LedLine />
+      <UpdateBanner />
 
       {view === 'game' && <GameView />}
 
