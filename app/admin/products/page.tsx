@@ -89,6 +89,17 @@ const DEFAULT_PRESETS: PricePreset[] = [
       { label: '1kg',  price: 8500 },
     ],
   },
+  {
+    name: 'Pokemon',
+    variants: [
+      { label: '10pcs',  price: 85 },
+      { label: '25pcs',  price: 150 },
+      { label: '50pcs',  price: 250 },
+      { label: '100pcs', price: 380 },
+      { label: '250pcs', price: 640 },
+      { label: '500pcs', price: 1100 },
+    ],
+  },
 ]
 const PRESETS_KEY = 'tp_price_presets'
 const PRESETS_SEED_KEY = 'tp_price_presets_seeded'
