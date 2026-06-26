@@ -327,6 +327,16 @@ export default function ProductDetail() {
               🛒 Aggiungi al Carrello
             </button>
           )}
+
+          {(product.shipFrom === 'spain' || product.shipFrom === 'italy' || !product.shipFrom) && (
+            <div style={{
+              textAlign: 'center', fontSize: '.73rem',
+              color: 'var(--muted)', marginTop: 4,
+              lineHeight: 1.5,
+            }}>
+              🚚 Spedizione non inclusa nel prezzo · <strong style={{ color: 'rgba(255,255,255,.45)' }}>+€10</strong> calcolata al carrello
+            </div>
+          )}
         </div>
       </div>
     </div>
