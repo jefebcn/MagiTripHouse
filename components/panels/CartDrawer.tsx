@@ -18,6 +18,7 @@ export default function CartDrawer() {
   const { user: tgUser } = useTelegram()
   const panelRef = useRef<HTMLDivElement>(null)
   const [note, setNote] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
+  const [payMethod, setPayMethod] = useState<Record<ShipOrigin, 'crypto' | 'iban' | null>>({ spain: null, italy: null, pharma: null, meetup: null })
   const [affBalance, setAffBalance] = useState(0)
   const [creditOrigin, setCreditOrigin] = useState<ShipOrigin | null>(null)
 
@@ -35,6 +36,12 @@ export default function CartDrawer() {
   function placeOrder(origin: ShipOrigin) {
     const oItems = itemsByOrigin(origin)
     if (!oItems.length || !isLoggedIn) return
+
+    const isMeetupGuard = origin === 'meetup'
+    if (!isMeetupGuard && !payMethod[origin]) {
+      alert('Seleziona il metodo di pagamento (Crypto o IBAN) prima di inviare l’ordine.')
+      return
+    }
 
     const sm = SHIP_META[origin]
     const displayName = userName || tgUser || 'Sconosciuto'
@@ -73,6 +80,15 @@ export default function CartDrawer() {
       lines.push(`🚚 Spedizione: €${sm.shipCost.toFixed(2)}`)
       lines.push(`💰 *TOTALE: €${finalTotal.toFixed(2)}*`)
     }
+    if (!isMeetup) {
+      const pm = payMethod[origin]
+      lines.push(``)
+      lines.push(`💳 Pagamento: ${pm === 'crypto' ? '🪙 Crypto' : '🏦 Bonifico/IBAN'}`)
+      lines.push(`📦 L'ordine verrà spedito una volta ricevuto il pagamento`)
+      if (origin === 'spain' || origin === 'italy') {
+        lines.push(`📅 Spedizioni dal Lunedì al Mercoledì`)
+      }
+    }
     if (note[origin].trim()) lines.push(``, `📝 Note: ${note[origin].trim()}`)
 
     const msg = lines.join('\n')
@@ -86,7 +102,7 @@ export default function CartDrawer() {
         userId,
         total: finalTotal,
         items: oItems.map((x) => ({ id: x.id, name: x.productName, emoji: x.emoji, label: x.variantLabel, price: x.variantPrice, qty: x.qty })),
-        note: `[${sm.label}] ${note[origin].trim()}`.trim() || null,
+        note: `[${sm.label}]${!isMeetup && payMethod[origin] ? ` [${payMethod[origin] === 'crypto' ? 'Crypto' : 'IBAN'}]` : ''} ${note[origin].trim()}`.trim() || null,
         referredBy: typeof localStorage !== 'undefined' ? localStorage.getItem('tp_ref') : null,
         affiliateCredit: creditApplied > 0 ? creditApplied : undefined,
         affiliateUsername: creditApplied > 0 ? userHandle : undefined,
@@ -97,6 +113,7 @@ export default function CartDrawer() {
     clearOrigin(origin)
     if (creditOrigin === origin) { setCreditOrigin(null); setAffBalance(b => Math.max(0, b - creditApplied)) }
     setNote(n => ({ ...n, [origin]: '' }))
+    setPayMethod(p => ({ ...p, [origin]: null }))
 
     const allRemaining = useCartStore.getState().items.length
     if (allRemaining === 0) close()
@@ -248,6 +265,47 @@ export default function CartDrawer() {
                       <div>⏱ Segnalare problemi entro 45 giorni</div>
                       <div>🚫 No rimborsi/resi dopo pagamento</div>
                       <div>🔁 Sequestro dogana: ri-spedizione con foto 120 dpi + nuovo indirizzo</div>
+                    </div>
+                  )}
+
+                  {/* Info giorni spedizione (Spagna/Italia) */}
+                  {(origin === 'spain' || origin === 'italy') && (
+                    <div style={{
+                      background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.22)',
+                      borderRadius: 10, padding: '9px 12px', fontSize: '.72rem', color: 'rgba(245,200,66,.85)',
+                      lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 7,
+                    }}>
+                      <span style={{ fontSize: '.95rem' }}>📅</span>
+                      <span>Le spedizioni partono <strong>dal Lunedì al Mercoledì</strong> · l’ordine parte una volta ricevuto il pagamento</span>
+                    </div>
+                  )}
+
+                  {/* Metodo di pagamento (no meetup) */}
+                  {!isMeetup && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      <label style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.4px', fontWeight: 700 }}>💳 Metodo di pagamento</label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {([
+                          { id: 'crypto' as const, label: '🪙 Crypto' },
+                          { id: 'iban' as const,   label: '🏦 IBAN' },
+                        ]).map((m) => {
+                          const active = payMethod[origin] === m.id
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setPayMethod(p => ({ ...p, [origin]: m.id }))}
+                              style={{
+                                flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                                fontSize: '.85rem', fontWeight: 700, border: '1px solid',
+                                background: active ? `${sm.color}22` : 'var(--bg3)',
+                                color: active ? sm.color : 'var(--muted)',
+                                borderColor: active ? `${sm.color}88` : 'var(--border)',
+                              }}
+                            >{m.label}</button>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
 
