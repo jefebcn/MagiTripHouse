@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { signOut } from 'next-auth/react'
 
 interface Stats {
   revenue: { today: number; week: number; month: number; total: number }
@@ -19,13 +18,11 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   delivered: { label: 'Consegnato', color: 'var(--green)',  bg: 'rgba(61,255,110,.12)'  },
 }
 
-const SECTIONS = [
-  { href: '/admin/products',              icon: '📦', label: 'Prodotti'  },
-  { href: '/admin/orders',                icon: '📋', label: 'Ordini'    },
-  { href: '/admin/products?category=combo', icon: '🔥', label: 'Combo'  },
-  { href: '/admin/news',                  icon: '📢', label: 'Novità'    },
-  { href: '/admin/members',               icon: '👥', label: 'Membri'    },
-  { href: '/admin/affiliates',            icon: '🤝', label: 'Affiliati' },
+const QUICK_ACTIONS = [
+  { href: '/admin/products',                icon: '➕', label: 'Nuovo prodotto' },
+  { href: '/admin/products?category=combo', icon: '🔥', label: 'Crea combo'     },
+  { href: '/admin/news',                    icon: '📢', label: 'Pubblica novità' },
+  { href: '/admin/orders',                  icon: '📋', label: 'Gestisci ordini' },
 ]
 
 function fmt(n: number) {
@@ -66,75 +63,77 @@ export default function AdminDashboard() {
   const today = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem' }}>⚙️ Admin</div>
-        <button
-          onClick={() => signOut({ callbackUrl: '/admin/login' })}
-          style={{
-            background: 'var(--bg3)', border: '1px solid var(--border)',
-            color: 'var(--muted)', borderRadius: 8, padding: '6px 14px',
-            fontSize: '.78rem', cursor: 'pointer', fontFamily: 'inherit',
-          }}
-        >Esci</button>
+      {/* Page header */}
+      <div>
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem' }}>📊 Dashboard</div>
+        <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 4, textTransform: 'capitalize' }}>{today}</div>
       </div>
-      <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginBottom: 20, textTransform: 'capitalize' }}>{today}</div>
 
-      {/* Revenue KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+      {/* Revenue KPIs — 4 tiles responsive */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {([
-          { label: 'Oggi',      value: stats ? fmt(stats.revenue.today) : '—' },
-          { label: 'Settimana', value: stats ? fmt(stats.revenue.week)  : '—' },
-          { label: 'Mese',      value: stats ? fmt(stats.revenue.month) : '—' },
+          { label: 'Oggi',      value: stats ? fmt(stats.revenue.today) : '—', accent: 'var(--green)' },
+          { label: 'Settimana', value: stats ? fmt(stats.revenue.week)  : '—', accent: 'var(--green)' },
+          { label: 'Mese',      value: stats ? fmt(stats.revenue.month) : '—', accent: 'var(--green)' },
+          { label: 'Fatturato totale', value: stats ? fmt(stats.revenue.total) : '—', accent: 'var(--gold)' },
         ] as const).map(k => (
           <div key={k.label} style={{
             background: 'var(--card)', border: '1px solid var(--border)',
-            borderRadius: 12, padding: '12px 8px', textAlign: 'center',
+            borderRadius: 14, padding: '16px 18px',
           }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--green)', fontFamily: "'Fredoka One', cursive" }}>{k.value}</div>
-            <div style={{ fontSize: '.6rem', color: 'var(--muted)', marginTop: 2 }}>{k.label}</div>
+            <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.4px' }}>{k.label}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: k.accent, fontFamily: "'Fredoka One', cursive" }}>{k.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Total revenue banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(61,255,110,.06), rgba(245,200,66,.06))',
-        border: '1px solid rgba(245,200,66,.2)', borderRadius: 12,
-        padding: '10px 14px', marginBottom: 8,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Fatturato totale</span>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', color: 'var(--gold)' }}>
-          {stats ? fmt(stats.revenue.total) : '—'}
-        </span>
-      </div>
-
-      {/* Quick stats: orders + users */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
+      {/* Operational stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
         {([
-          { icon: '🟡', value: stats?.orders.pending,   label: 'In attesa', color: 'var(--orange)', bg: 'rgba(255,107,53,.08)', border: 'rgba(255,107,53,.2)' },
-          { icon: '🔵', value: stats?.orders.shipped,   label: 'Spediti',   color: 'var(--blue)',   bg: 'rgba(59,130,246,.08)', border: 'rgba(59,130,246,.2)' },
-          { icon: '👤', value: stats?.users.week,       label: 'Nuovi (7g)',color: 'var(--blue)',   bg: 'rgba(59,130,246,.08)', border: 'rgba(59,130,246,.2)' },
+          { icon: '🟡', value: stats?.orders.pending, label: 'Ordini in attesa', color: 'var(--orange)', bg: 'rgba(255,107,53,.08)', border: 'rgba(255,107,53,.22)' },
+          { icon: '🔵', value: stats?.orders.shipped, label: 'Spediti',          color: 'var(--blue)',   bg: 'rgba(59,130,246,.08)', border: 'rgba(59,130,246,.22)' },
+          { icon: '🟢', value: stats?.orders.delivered, label: 'Consegnati',     color: 'var(--green)',  bg: 'rgba(61,255,110,.08)', border: 'rgba(61,255,110,.22)' },
+          { icon: '👤', value: stats?.users.week,     label: 'Nuovi utenti (7g)', color: 'var(--text)',   bg: 'var(--bg3)',           border: 'var(--border)' },
         ] as const).map(s => (
           <div key={s.label} style={{
             background: s.bg, border: `1px solid ${s.border}`,
-            borderRadius: 12, padding: '10px 8px', textAlign: 'center',
+            borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
           }}>
-            <div style={{ fontSize: '.9rem', marginBottom: 3 }}>{s.icon}</div>
-            <div style={{ fontWeight: 800, fontSize: '1rem', color: s.color }}>{s.value ?? '—'}</div>
-            <div style={{ fontSize: '.58rem', color: 'var(--muted)', marginTop: 1 }}>{s.label}</div>
+            <span style={{ fontSize: '1.4rem' }}>{s.icon}</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '1.3rem', color: s.color, lineHeight: 1 }}>{s.value ?? '—'}</div>
+              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginTop: 3 }}>{s.label}</div>
+            </div>
           </div>
         ))}
       </div>
 
+      {/* Quick actions */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
+        {QUICK_ACTIONS.map(a => (
+          <Link key={a.label} href={a.href} style={{ textDecoration: 'none' }}>
+            <div style={{
+              background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.25)',
+              borderRadius: 12, padding: '13px 15px', display: 'flex', alignItems: 'center', gap: 10,
+              cursor: 'pointer', color: 'var(--text)',
+            }}>
+              <span style={{ fontSize: '1.15rem' }}>{a.icon}</span>
+              <span style={{ fontSize: '.84rem', fontWeight: 700 }}>{a.label}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Two-column analytics on desktop */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18, alignItems: 'start' }}>
+
       {/* Recent orders */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px' }}>ULTIMI ORDINI</div>
-          <Link href="/admin/orders" style={{ fontSize: '.7rem', color: 'var(--green)', textDecoration: 'none' }}>Tutti →</Link>
+      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', letterSpacing: '.3px' }}>📋 Ultimi ordini</div>
+          <Link href="/admin/orders" style={{ fontSize: '.74rem', color: 'var(--green)', textDecoration: 'none', fontWeight: 700 }}>Tutti →</Link>
         </div>
         {!stats ? (
           <div style={{ color: 'var(--muted)', fontSize: '.8rem' }}>Caricamento...</div>
@@ -146,7 +145,7 @@ export default function AdminDashboard() {
               const meta = STATUS_META[o.status] ?? STATUS_META.pending
               return (
                 <div key={o.id} style={{
-                  background: 'var(--card)', border: '1px solid var(--border)',
+                  background: 'var(--bg3)', border: '1px solid var(--border)',
                   borderRadius: 10, padding: '10px 12px',
                   display: 'flex', alignItems: 'center', gap: 10,
                 }}>
@@ -172,9 +171,9 @@ export default function AdminDashboard() {
 
       {/* Top products */}
       {stats && stats.topProducts.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px', marginBottom: 8 }}>TOP PRODOTTI</div>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px' }}>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', letterSpacing: '.3px', marginBottom: 12 }}>🏆 Top prodotti</div>
+          <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
             {stats.topProducts.map((p, i) => (
               <div key={p.name} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -190,9 +189,11 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      </div>{/* /two-column analytics */}
+
       {/* Grams & Revenue per product */}
       {stats && (
-        <div style={{ marginBottom: 16 }}>
+        <div>
 
           {/* Header + totals */}
           <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px', marginBottom: 8 }}>⚖️ PRODOTTI VENDUTI</div>
@@ -305,31 +306,13 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Navigation grid */}
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px', marginBottom: 8 }}>SEZIONI</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-        {SECTIONS.map(s => (
-          <Link key={s.href} href={s.href} style={{ textDecoration: 'none' }}>
-            <div style={{
-              background: 'var(--card)', border: '1px solid var(--border)',
-              borderRadius: 12, padding: '14px 16px',
-              display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-            }}>
-              <span style={{ fontSize: '1.2rem' }}>{s.icon}</span>
-              <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.9rem' }}>{s.label}</span>
-              <span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: '.8rem' }}>›</span>
-            </div>
-          </Link>
-        ))}
-      </div>
-
       {/* Import catalog */}
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px', marginBottom: 8 }}>STRUMENTI</div>
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px' }}>🛠️ STRUMENTI</div>
       <div style={{
         background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: 12, padding: '14px 16px',
+        borderRadius: 14, padding: '16px 18px', maxWidth: 480,
       }}>
-        <div style={{ fontSize: '.8rem', fontWeight: 700, marginBottom: 4 }}>📥 Importa catalogo GFZ</div>
+        <div style={{ fontSize: '.85rem', fontWeight: 700, marginBottom: 4 }}>📥 Importa catalogo GFZ</div>
         <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: 10 }}>
           Aggiunge ~45 prodotti dal catalogo fornitore come bozze nascoste. Sicuro da rieseguire (salta i duplicati).
         </div>

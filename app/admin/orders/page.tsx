@@ -128,7 +128,7 @@ export default function AdminOrders() {
   const totalRevenue = filtered.reduce((sum, o) => sum + o.total, 0)
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
+    <div style={{ maxWidth: 880, margin: '0 auto' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>

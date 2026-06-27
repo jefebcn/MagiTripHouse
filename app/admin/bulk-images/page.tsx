@@ -134,7 +134,7 @@ export default function BulkImagesPage() {
   const lowConf    = assigned.filter(m => m.score > 0 && m.score < 0.6)
 
   return (
-    <div style={{ maxWidth: 560, margin: '0 auto', padding: '20px 16px 80px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text)' }}>
+    <div style={{ maxWidth: 620, margin: '0 auto', fontFamily: 'DM Sans, sans-serif', color: 'var(--text)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
         <Link href="/admin/products" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>

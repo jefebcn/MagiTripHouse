@@ -65,7 +65,7 @@ export default function AdminAffiliates() {
   const topAffiliate = affiliates.reduce((best, a) => a.referralCount > (best?.referralCount ?? -1) ? a : best, null as AffiliateRow | null)
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
+    <div style={{ maxWidth: 880, margin: '0 auto' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
