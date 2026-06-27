@@ -167,7 +167,7 @@ export default function HubView() {
               <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: '#d8b4fe' }}>
                 Disponibili solo per meetup
               </div>
-              <div style={{ fontSize: '.63rem', color: 'rgba(216,180,254,.7)', marginTop: 1 }}>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, color: 'rgba(216,180,254,.95)', marginTop: 3 }}>
                 {countByOrigin('meetup')} prodott{countByOrigin('meetup') === 1 ? 'o' : 'i'} · ritiro a mano di persona
               </div>
             </div>
