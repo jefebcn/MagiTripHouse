@@ -87,6 +87,7 @@ export default function CartDrawer() {
       lines.push(`📦 L'ordine verrà spedito una volta ricevuto il pagamento`)
       if (origin === 'spain' || origin === 'italy') {
         lines.push(`📅 Spedizioni dal Lunedì al Mercoledì`)
+        lines.push(`📍 Tracking disponibile in ${origin === 'italy' ? '24–48 ore' : '48–72 ore'}`)
       }
     }
     if (note[origin].trim()) lines.push(``, `📝 Note: ${note[origin].trim()}`)
@@ -268,15 +269,25 @@ export default function CartDrawer() {
                     </div>
                   )}
 
-                  {/* Info giorni spedizione (Spagna/Italia) */}
+                  {/* Info giorni spedizione + tracking (Spagna/Italia) */}
                   {(origin === 'spain' || origin === 'italy') && (
                     <div style={{
                       background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.22)',
-                      borderRadius: 10, padding: '9px 12px', fontSize: '.72rem', color: 'rgba(245,200,66,.85)',
-                      lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 7,
+                      borderRadius: 10, padding: '10px 12px', fontSize: '.72rem', color: 'rgba(245,200,66,.85)',
+                      lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: 5,
                     }}>
-                      <span style={{ fontSize: '.95rem' }}>📅</span>
-                      <span>Le spedizioni partono <strong>dal Lunedì al Mercoledì</strong> · l’ordine parte una volta ricevuto il pagamento</span>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                        <span style={{ fontSize: '.95rem' }}>💳</span>
+                        <span><strong>Pagamento anticipato</strong> · l’ordine viene spedito una volta ricevuto il pagamento</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                        <span style={{ fontSize: '.95rem' }}>📅</span>
+                        <span>Le spedizioni partono <strong>dal Lunedì al Mercoledì</strong></span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                        <span style={{ fontSize: '.95rem' }}>📍</span>
+                        <span>Numero di tracciamento disponibile in <strong>{origin === 'italy' ? '24–48 ore' : '48–72 ore'}</strong></span>
+                      </div>
                     </div>
                   )}
 

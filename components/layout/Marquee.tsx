@@ -1,14 +1,14 @@
 'use client'
 
 const ITEMS = [
-  { text: '🚀 Spedizioni in tutta Italia', gold: false },
+  { text: '🚀 Spedizioni in tutta Italia ed Europa', gold: false },
   { text: '📦 Packaging discreto garantito', gold: false },
   { text: '💎 Qualità premium certificata', gold: true },
-  { text: '🇮🇹 100% Made for Italy', gold: false },
-  { text: '✅ Affidabili dal 2020', gold: false },
-  { text: '🔒 Ordini sicuri al 100%', gold: true },
+  { text: '💳 Pagamento anticipato · Crypto o IBAN', gold: false },
+  { text: '📅 Spedizioni dal Lunedì al Mercoledì', gold: true },
+  { text: '🔒 Ordini sicuri al 100%', gold: false },
   { text: '🌿 Prodotti testati in laboratorio', gold: false },
-  { text: '⚡ Consegna rapida 24/48h', gold: true },
+  { text: '📍 Tracking ITA 24–48h · ESP 48–72h', gold: true },
 ]
 
 const SEP = <span style={{ color: 'rgba(61,255,110,.25)', margin: '0 6px' }}>✦</span>
