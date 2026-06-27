@@ -310,7 +310,7 @@ export default function CartDrawer() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
                         <span style={{ fontSize: '.95rem' }}>💳</span>
-                        <span><strong>Pagamento anticipato</strong> · l’ordine viene spedito una volta ricevuto il pagamento</span>
+                        <span>L’ordine viene <strong>spedito una volta ricevuto il pagamento</strong></span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
                         <span style={{ fontSize: '.95rem' }}>📅</span>

@@ -4,7 +4,7 @@ const ITEMS = [
   { text: '🚀 Spedizioni in tutta Italia ed Europa', gold: false },
   { text: '📦 Packaging discreto garantito', gold: false },
   { text: '💎 Qualità premium certificata', gold: true },
-  { text: '💳 Pagamento anticipato · Crypto o IBAN', gold: false },
+  { text: '💳 Pagamenti Crypto o IBAN', gold: false },
   { text: '📅 Spedizioni dal Lunedì al Mercoledì', gold: true },
   { text: '🔒 Ordini sicuri al 100%', gold: false },
   { text: '🌿 Prodotti testati in laboratorio', gold: false },

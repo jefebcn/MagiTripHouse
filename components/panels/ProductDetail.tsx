@@ -335,7 +335,7 @@ export default function ProductDetail() {
               lineHeight: 1.55,
             }}>
               🚚 Spedizione non inclusa · <strong style={{ color: 'rgba(255,255,255,.45)' }}>+€10</strong> al carrello<br />
-              💳 Pagamento anticipato · 📅 spedizioni Lun–Mer
+              📅 Spedizioni Lun–Mer · spedito a pagamento ricevuto
             </div>
           )}
         </div>

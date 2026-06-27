@@ -3,13 +3,13 @@ import { useUIStore } from '@/store/uiStore'
 
 const STEPS = [
   { icon: '🛒', title: '1 · Scegli e ordina', text: 'Aggiungi i prodotti al carrello, seleziona il metodo di pagamento (Crypto o IBAN) e invia l’ordine. Ti si apre Telegram con il riepilogo.' },
-  { icon: '💳', title: '2 · Paga in anticipo', text: 'Ti inviamo su Telegram i dati per il pagamento (wallet crypto o IBAN). Gli ordini partono dopo aver ricevuto il pagamento — è il modello che ci permette di offrirti prezzi competitivi senza magazzino.' },
+  { icon: '💳', title: '2 · Pagamento', text: 'Ti inviamo su Telegram i dati per il pagamento (wallet crypto o IBAN) in base al metodo che hai scelto. L’ordine viene spedito una volta ricevuto il pagamento.' },
   { icon: '📦', title: '3 · Spedizione', text: 'Una volta ricevuto il pagamento, prepariamo il pacco con packaging discreto. Le spedizioni partono dal Lunedì al Mercoledì.' },
   { icon: '📍', title: '4 · Tracking', text: 'Ricevi il numero di tracciamento: entro 24–48 ore per l’Italia, 48–72 ore per la Spagna. Lo trovi anche nella sezione “I miei ordini”.' },
 ]
 
 const FAQS = [
-  { q: 'Perché il pagamento è anticipato?', a: 'Lavoriamo senza magazzino: ordiniamo su misura per te. Il pagamento anticipato ci permette di tenere i prezzi bassi e garantire sempre prodotto fresco.' },
+  { q: 'Come avviene il pagamento?', a: 'Scegli il metodo nel carrello (Crypto o IBAN); ti inviamo i dati su Telegram. L’ordine viene spedito una volta ricevuto il pagamento.' },
   { q: 'Quali metodi di pagamento accettate?', a: 'Crypto (consigliato, più veloce e discreto) oppure bonifico/IBAN. Scegli il metodo direttamente nel carrello.' },
   { q: 'Quanto costa la spedizione?', a: 'La spedizione per Spagna e Italia è €10, calcolata al carrello. Se ordini più prodotti dalla stessa provenienza, viaggiano in un unico pacco.' },
   { q: 'Quando parte il mio ordine?', a: 'Le spedizioni partono dal Lunedì al Mercoledì, una volta ricevuto il pagamento. Riceverai il tracking appena spedito.' },
@@ -43,7 +43,7 @@ export default function FaqView() {
             Ordinare è semplice
           </div>
           <div style={{ fontSize: '.84rem', color: 'var(--muted)', lineHeight: 1.65 }}>
-            Magic Trip House lavora <strong style={{ color: 'var(--text)' }}>online, su ordinazione e con pagamento anticipato</strong>. Ecco come funziona, passo per passo.
+            Magic Trip House spedisce <strong style={{ color: 'var(--text)' }}>in tutta Italia ed Europa</strong>. Ecco come funziona, passo per passo.
           </div>
         </div>
 
@@ -69,7 +69,7 @@ export default function FaqView() {
           border: '1px solid rgba(245,200,66,.35)', borderRadius: 14, padding: '14px 16px',
           fontSize: '.82rem', color: 'rgba(245,200,66,.9)', lineHeight: 1.6,
         }}>
-          ⚡ <strong>In breve:</strong> paghi → confermiamo → spediamo Lun–Mer → tracking in 24–72h. Niente magazzino, prezzi sempre competitivi, prodotto fresco.
+          ⚡ <strong>In breve:</strong> ordini → ricevi i dati di pagamento → spediamo Lun–Mer una volta ricevuto il pagamento → tracking in 24–72h.
         </div>
 
         {/* FAQ */}
