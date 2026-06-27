@@ -132,28 +132,6 @@ export default function HubView() {
         </button>
       </div>
 
-      {/* ═══════════ LEGENDA CONSEGNA ═══════════ */}
-      <div style={{ padding: '16px 16px 0' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(61,255,110,.06), rgba(192,132,252,.05))',
-          border: '1px solid rgba(61,255,110,.22)', borderRadius: 14, padding: '12px 14px',
-          display: 'flex', flexDirection: 'column', gap: 8,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-            <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>📦</span>
-            <span style={{ fontSize: '.78rem', color: 'rgba(237,250,238,.88)', lineHeight: 1.5 }}>
-              <strong style={{ color: 'var(--green)' }}>Quasi tutto arriva a casa tua o in un locker</strong>, in tutta Italia ed Europa.
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-            <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>🤝</span>
-            <span style={{ fontSize: '.78rem', color: 'rgba(237,250,238,.88)', lineHeight: 1.5 }}>
-              Solo i prodotti contrassegnati <strong style={{ color: '#c084fc' }}>“Solo di persona”</strong> si ritirano a mano.
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* ═══════════ SEZIONE CATALOGO ═══════════ */}
       <div style={{ padding: '22px 16px 0' }}>
 
@@ -339,10 +317,10 @@ export default function HubView() {
             <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🤝</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: '#d8b4fe' }}>
-                Disponibili in loco
+                Disponibili solo per meetup
               </div>
               <div style={{ fontSize: '.63rem', color: 'rgba(216,180,254,.7)', marginTop: 1 }}>
-                {countByOrigin('meetup')} prodott{countByOrigin('meetup') === 1 ? 'o' : 'i'} · solo ritiro a mano
+                {countByOrigin('meetup')} prodott{countByOrigin('meetup') === 1 ? 'o' : 'i'} · ritiro a mano di persona
               </div>
             </div>
             <span style={{ fontSize: '.82rem', color: 'rgba(192,132,252,.6)', fontWeight: 700, flexShrink: 0 }}>›</span>
