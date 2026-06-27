@@ -91,6 +91,16 @@ export default function HubView() {
               </span>
             ))}
           </div>
+
+          {/* Link "Come funziona" */}
+          <button
+            onClick={() => setView('faq')}
+            style={{
+              marginTop: 12, background: 'none', border: 'none', cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: '.74rem', color: 'rgba(245,200,66,.85)',
+              fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3,
+            }}
+          >❓ Come funziona? Pagamento, spedizioni e tracking</button>
         </div>
 
         {/* Separatore sfumato */}

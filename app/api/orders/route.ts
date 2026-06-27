@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { notifyAdminOrder } from '@/lib/telegram'
+import { sendPushToUser } from '@/lib/push'
 
 export async function GET() {
   const session = await auth()
@@ -63,7 +64,26 @@ export async function PATCH(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id, status } = await req.json()
-  const order = await prisma.order.update({ where: { id }, data: { status } })
+  const { id, status, tracking } = await req.json()
+
+  const prev = await prisma.order.findUnique({ where: { id } })
+  const data: { status?: string; tracking?: string | null } = {}
+  if (typeof status === 'string') data.status = status
+  if (tracking !== undefined) data.tracking = tracking || null
+
+  const order = await prisma.order.update({ where: { id }, data })
+
+  // Notifica push al cliente quando l'ordine passa a "spedito"
+  if (prev && order.userId && status === 'shipped' && prev.status !== 'shipped') {
+    sendPushToUser(order.userId, {
+      title: '📦 Ordine spedito!',
+      body: order.tracking
+        ? `Il tuo ordine ${order.id} è partito · Tracking: ${order.tracking}`
+        : `Il tuo ordine ${order.id} è stato spedito 🚚`,
+      url: '/',
+      emoji: '📦',
+    }).catch(() => {})
+  }
+
   return NextResponse.json(order)
 }

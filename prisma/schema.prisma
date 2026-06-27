@@ -37,6 +37,7 @@ model Order {
   total      Float
   items      Json
   note       String?
+  tracking   String?
   referredBy String?
   createdAt  DateTime @default(now())
 }
@@ -89,6 +90,7 @@ model PushSubscription {
   endpoint  String   @unique
   p256dh    String
   auth      String
+  userId    String?
   createdAt DateTime @default(now())
 }
 

@@ -9,13 +9,25 @@ export interface PushPayload {
 }
 
 export async function sendPushToAll(payload: PushPayload) {
+  return sendPushToSubs(await prisma.pushSubscription.findMany(), payload)
+}
+
+export async function sendPushToUser(userId: string, payload: PushPayload) {
+  if (!userId) return { sent: 0, removed: 0 }
+  const subs = await prisma.pushSubscription.findMany({ where: { userId } })
+  return sendPushToSubs(subs, payload)
+}
+
+type Sub = { endpoint: string; p256dh: string; auth: string }
+
+async function sendPushToSubs(subs: Sub[], payload: PushPayload) {
+  if (!subs.length) return { sent: 0, removed: 0 }
   const email = process.env.VAPID_EMAIL ?? ''
   webpush.setVapidDetails(
     email.startsWith('mailto:') ? email : `mailto:${email}`,
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
     process.env.VAPID_PRIVATE_KEY!,
   )
-  const subs = await prisma.pushSubscription.findMany()
   const results = await Promise.allSettled(
     subs.map((sub) =>
       webpush.sendNotification(

@@ -18,21 +18,56 @@ interface Order {
   total: number
   items: OrderItem[]
   note?: string
+  tracking?: string | null
   createdAt: string
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending:   { label: '🟡 In attesa',  color: 'var(--orange)' },
-  shipped:   { label: '🔵 Spedito',    color: 'var(--blue)'   },
-  delivered: { label: '🟢 Consegnato', color: 'var(--green)'  },
+  pending:   { label: '🟡 In attesa pag.', color: 'var(--orange)' },
+  paid:      { label: '💚 Pagato',         color: 'var(--green)'  },
+  shipped:   { label: '🔵 Spedito',        color: 'var(--blue)'   },
+  delivered: { label: '🟢 Consegnato',     color: 'var(--green)'  },
 }
 
 const TABS = [
   { key: 'all',       label: 'Tutti'      },
   { key: 'pending',   label: 'In attesa'  },
+  { key: 'paid',      label: 'Pagati'     },
   { key: 'shipped',   label: 'Spediti'    },
   { key: 'delivered', label: 'Consegnati' },
 ]
+
+function TrackingInput({ initial, onSave }: { initial: string; onSave: (v: string) => Promise<void> }) {
+  const [val, setVal] = useState(initial)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const dirty = val.trim() !== (initial ?? '').trim()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ fontSize: '.7rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px' }}>📍 Numero di tracciamento</label>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          value={val}
+          onChange={e => { setVal(e.target.value); setSaved(false) }}
+          placeholder="Inserisci tracking…"
+          style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', color: 'var(--text)', fontSize: '.8rem', fontFamily: 'monospace', outline: 'none' }}
+        />
+        <button
+          disabled={!dirty || saving}
+          onClick={async () => { setSaving(true); await onSave(val.trim()); setSaving(false); setSaved(true) }}
+          style={{
+            borderRadius: 8, padding: '8px 14px', fontSize: '.74rem', fontWeight: 700, fontFamily: 'inherit',
+            cursor: dirty && !saving ? 'pointer' : 'default', border: '1px solid',
+            background: saved ? 'rgba(61,255,110,.15)' : dirty ? 'rgba(59,130,246,.15)' : 'var(--bg)',
+            color: saved ? 'var(--green)' : dirty ? 'var(--blue)' : 'var(--muted)',
+            borderColor: saved ? 'rgba(61,255,110,.4)' : dirty ? 'rgba(59,130,246,.4)' : 'var(--border)',
+            opacity: !dirty && !saved ? .5 : 1,
+          }}
+        >{saving ? '…' : saved ? '✓' : '💾'}</button>
+      </div>
+    </div>
+  )
+}
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -64,9 +99,19 @@ export default function AdminOrders() {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
   }
 
+  async function saveTracking(id: string, tracking: string) {
+    await fetch('/api/orders', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, tracking }),
+    })
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, tracking } : o))
+  }
+
   const counts: Record<string, number> = {
     all:       orders.length,
     pending:   orders.filter(o => o.status === 'pending').length,
+    paid:      orders.filter(o => o.status === 'paid').length,
     shipped:   orders.filter(o => o.status === 'shipped').length,
     delivered: orders.filter(o => o.status === 'delivered').length,
   }
@@ -226,6 +271,9 @@ export default function AdminOrders() {
                         📝 {o.note}
                       </div>
                     )}
+
+                    {/* Tracking */}
+                    <TrackingInput initial={o.tracking ?? ''} onSave={(v) => saveTracking(o.id, v)} />
 
                     {/* Actions */}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

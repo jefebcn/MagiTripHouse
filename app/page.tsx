@@ -3,6 +3,7 @@ import React from 'react'
 import { useUIStore } from '@/store/uiStore'
 import BottomNav from '@/components/layout/BottomNav'
 import HubView from '@/components/home/HubView'
+import FaqView from '@/components/home/FaqView'
 import CatalogView from '@/components/catalog/CatalogView'
 import CartDrawer from '@/components/panels/CartDrawer'
 import ProductDetail from '@/components/panels/ProductDetail'
@@ -140,6 +141,10 @@ export default function Home() {
         {gated(<RequestView />)}
       </div>
 
+      <div style={{ display: view === 'faq' ? 'block' : 'none' }}>
+        <FaqView />
+      </div>
+
       <CartDrawer />
       <ProductDetail />
       <Lightbox />
@@ -156,7 +161,7 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
 })
 
 function NewsView() {
-  const { sessionToken, channelJoined, setChannelJoined, setView } = useUIStore()
+  const { sessionToken, channelJoined, setChannelJoined, setView, userHandle } = useUIStore()
 
   const [subscribed, setSubscribed] = React.useState(false)
   const [memberCount, setMemberCount] = React.useState<number | null>(null)
@@ -216,7 +221,7 @@ function NewsView() {
           const raw = atob(b64); const arr = new Uint8Array(raw.length)
           for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i)
           const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr })
-          await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
+          await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub.toJSON(), userId: userHandle }) })
           setSubscribed(true)
         } catch { /* permission denied or unsupported */ }
       }).catch(() => {})
@@ -361,7 +366,14 @@ function ChannelFeed() {
 interface NewsItem { id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string }
 interface StuckItem { id: number; relAngle: number; emoji: string; isObstacle: boolean; isBonus: boolean; pts: number }
 interface LeaderEntry { id: string; handle: string; name: string; score: number; month: string }
-interface OrderItem { id: string; total: number; date: string }
+interface OrderItem { id: string; total: number; date: string; status?: string; tracking?: string | null; createdAt?: string }
+
+const ORDER_STATUS: Record<string, { label: string; color: string; bg: string }> = {
+  pending:   { label: '⏳ In attesa di pagamento', color: '#f5c842', bg: 'rgba(245,200,66,.12)' },
+  paid:      { label: '✅ Pagamento ricevuto',      color: '#3dff6e', bg: 'rgba(61,255,110,.12)' },
+  shipped:   { label: '📦 Spedito',                 color: '#7ec8f8', bg: 'rgba(59,130,246,.14)' },
+  delivered: { label: '🎉 Consegnato',              color: '#3dff6e', bg: 'rgba(61,255,110,.12)' },
+}
 
 // ─── Bud Strike constants ───
 const WHEEL_R = 100
@@ -473,13 +485,32 @@ function AccountView() {
     if (typeof Notification !== 'undefined' && Notification.permission === 'denied') setPermissionDenied(true)
     const saved = localStorage.getItem('tp_orders')
     if (saved) { try { const parsed = JSON.parse(saved); setOrders(parsed); setOrderCount(parsed.length) } catch { /* */ } }
+    // Ordini reali dal server (con stato + tracking aggiornati dall'admin)
+    if (userHandle) {
+      fetch(`/api/orders/mine?userId=${encodeURIComponent(userHandle)}`)
+        .then(r => r.ok ? r.json() : [])
+        .then((data: Array<{ id: string; total: number; status: string; tracking: string | null; createdAt: string }>) => {
+          if (!Array.isArray(data) || data.length === 0) return
+          const mapped: OrderItem[] = data.map(o => ({
+            id: o.id,
+            total: o.total,
+            date: new Date(o.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }),
+            status: o.status,
+            tracking: o.tracking,
+            createdAt: o.createdAt,
+          }))
+          setOrders(mapped)
+          setOrderCount(mapped.length)
+        })
+        .catch(() => {})
+    }
     if (sessionToken) {
       fetch('/api/me', { headers: { Authorization: `Bearer ${sessionToken}` } })
         .then(r => r.json())
         .then((d: MeData) => { setMeData(d); if (d.avatarUrl && d.avatarUrl !== userAvatar) setUserAvatar(d.avatarUrl) })
         .catch(() => {})
     }
-  }, [userName, sessionToken]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userName, sessionToken, userHandle]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -520,7 +551,7 @@ function AccountView() {
         setPermissionDenied(false)
         const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) })
-        await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
+        await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub.toJSON(), userId: userHandle }) })
         setPushEnabled(true); setPushMsg({ ok: true, text: '🔔 Notifiche attivate!' })
         setTimeout(() => setPushMsg(null), 3000)
       }
@@ -611,15 +642,40 @@ function AccountView() {
           </button>
           {showOrders && (
             <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {orders.map(o => (
-                <div key={o.id} style={{ background: 'var(--bg3)', borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem' }}>{o.id}</div>
-                    <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{o.date}</div>
+              {orders.map(o => {
+                const st = o.status ? ORDER_STATUS[o.status] : null
+                return (
+                  <div key={o.id} style={{ background: 'var(--bg3)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem' }}>{o.id}</div>
+                        <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{o.date}</div>
+                      </div>
+                      <div style={{ fontFamily: "'Fredoka One', cursive", color: 'var(--green)', fontSize: '.92rem' }}>€{typeof o.total === 'number' ? o.total.toFixed(2) : o.total}</div>
+                    </div>
+                    {st && (
+                      <div style={{
+                        display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center',
+                        background: st.bg, border: `1px solid ${st.color}55`, color: st.color,
+                        borderRadius: 20, padding: '3px 11px', fontSize: '.72rem', fontWeight: 700,
+                      }}>{st.label}</div>
+                    )}
+                    {o.tracking && (
+                      <button
+                        onClick={() => navigator.clipboard?.writeText(o.tracking!).catch(() => {})}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                          background: 'var(--bg)', border: '1px solid rgba(59,130,246,.3)', borderRadius: 8,
+                          padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>📍 Tracking: <strong style={{ color: '#7ec8f8', fontFamily: 'monospace' }}>{o.tracking}</strong></span>
+                        <span style={{ fontSize: '.66rem', color: 'var(--muted)' }}>📋 copia</span>
+                      </button>
+                    )}
                   </div>
-                  <div style={{ fontFamily: "'Fredoka One', cursive", color: 'var(--green)', fontSize: '.92rem' }}>€{o.total}</div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -641,6 +697,15 @@ function AccountView() {
           </button>
         </div>
       )}
+
+      <button onClick={() => setView('faq')} style={{ ...rowStyle, width: '100%', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+        {iconCircle('rgba(245,200,66,.1)', '❓')}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--text)' }}>Come funziona</div>
+          <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>Pagamento, spedizioni e tracking</div>
+        </div>
+        <span style={{ color: 'var(--muted)' }}>›</span>
+      </button>
 
       <div style={{ ...rowStyle, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

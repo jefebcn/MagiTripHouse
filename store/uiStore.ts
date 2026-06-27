@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Product } from '@/hooks/useProducts'
 import type { ShipOrigin } from '@/store/cartStore'
 
-type View = 'hub' | 'catalog' | 'news' | 'orders' | 'affiliates' | 'account' | 'game' | 'request'
+type View = 'hub' | 'catalog' | 'news' | 'orders' | 'affiliates' | 'account' | 'game' | 'request' | 'faq'
 export type { ShipOrigin }
 
 interface UIState {

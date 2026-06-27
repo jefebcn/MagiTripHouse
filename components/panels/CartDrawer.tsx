@@ -238,6 +238,20 @@ export default function CartDrawer() {
                     </div>
                   ))}
 
+                  {/* Nudge volume — spinge ordini più grandi (spedizione fissa più conveniente) */}
+                  {(origin === 'spain' || origin === 'italy') && subtotal > 0 && subtotal < 250 && (
+                    <div style={{
+                      background: 'rgba(61,255,110,.06)', border: '1px dashed rgba(61,255,110,.35)',
+                      borderRadius: 10, padding: '10px 12px', fontSize: '.74rem',
+                      color: 'rgba(237,250,238,.85)', lineHeight: 1.55, display: 'flex', gap: 8,
+                    }}>
+                      <span style={{ fontSize: '1rem', flexShrink: 0 }}>💡</span>
+                      <span>
+                        La spedizione è <strong>€{sm.shipCost.toFixed(0)} fissa</strong>: su questo ordine pesa <strong style={{ color: 'var(--green)' }}>{Math.round((sm.shipCost / subtotal) * 100)}%</strong>. Aggiungendo prodotti incide molto meno per grammo — <strong>conviene ordinare di più</strong>.
+                      </span>
+                    </div>
+                  )}
+
                   {/* Affiliate credit toggle */}
                   {affBalance > 0 && (
                     <button
