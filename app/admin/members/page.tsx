@@ -30,6 +30,10 @@ function formatLastSeen(iso: string): string {
   return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })
 }
 
+function isOnline(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() < 5 * 60 * 1000
+}
+
 function formatTime(minutes: number): string {
   if (minutes < 60) return `${minutes}m`
   const h = Math.floor(minutes / 60)
@@ -73,6 +77,7 @@ export default function AdminMembers() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'lastSeen' | 'created'>('lastSeen')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   // Reset state
@@ -112,6 +117,17 @@ export default function AdminMembers() {
     !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.handle.toLowerCase().includes(search.toLowerCase())
   )
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'lastSeen') {
+      const av = a.activity ? new Date(a.activity.lastSeen).getTime() : 0
+      const bv = b.activity ? new Date(b.activity.lastSeen).getTime() : 0
+      if (av !== bv) return bv - av
+    }
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+
+  const onlineCount = users.filter(u => u.activity && isOnline(u.activity.lastSeen)).length
+
   const iStyle: React.CSSProperties = {
     background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10,
     padding: '10px 12px', color: 'var(--text)', fontSize: '.88rem', fontFamily: 'inherit',
@@ -130,8 +146,8 @@ export default function AdminMembers() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
         {[
           { label: 'Registrati', value: total, color: '#3b82f6' },
-          { label: 'Nel canale', value: channelCount, color: 'var(--green)' },
-          { label: 'Con attività', value: users.filter(u => u.activity).length, color: 'var(--gold)' },
+          { label: 'Online ora', value: onlineCount, color: 'var(--green)' },
+          { label: 'Nel canale', value: channelCount, color: 'var(--gold)' },
         ].map(s => (
           <div key={s.label} style={{
             background: 'var(--card)', border: '1px solid var(--border)',
@@ -158,6 +174,27 @@ export default function AdminMembers() {
         />
       </div>
 
+      {/* Sort toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Ordina per:</span>
+        {([
+          { key: 'lastSeen', label: '🕐 Ultimo accesso' },
+          { key: 'created',  label: '📅 Registrazione'  },
+        ] as const).map(o => (
+          <button
+            key={o.key}
+            onClick={() => setSortBy(o.key)}
+            style={{
+              borderRadius: 20, padding: '5px 12px', fontSize: '.74rem', fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit', border: '1px solid',
+              background: sortBy === o.key ? 'rgba(61,255,110,.12)' : 'var(--bg3)',
+              color: sortBy === o.key ? 'var(--green)' : 'var(--muted)',
+              borderColor: sortBy === o.key ? 'rgba(61,255,110,.35)' : 'var(--border)',
+            }}
+          >{o.label}</button>
+        ))}
+      </div>
+
       {loading ? (
         <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 40 }}>Caricamento...</div>
       ) : filtered.length === 0 ? (
@@ -167,7 +204,7 @@ export default function AdminMembers() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map(u => (
+          {sorted.map(u => (
             <div key={u.id} style={{
               background: 'var(--card)', border: '1px solid var(--border)',
               borderRadius: 14, overflow: 'hidden',
@@ -192,12 +229,17 @@ export default function AdminMembers() {
                       }}>ADMIN</span>
                     )}
                   </div>
-                  <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 1 }}>
-                    @{u.handle}
+                  <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span>@{u.handle}</span>
                     {u.activity && (
-                      <span style={{ color: 'rgba(106,138,106,.7)', marginLeft: 6 }}>
-                        · {formatLastSeen(u.activity.lastSeen)}
-                      </span>
+                      isOnline(u.activity.lastSeen) ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--green)', fontWeight: 700 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px rgba(61,255,110,.8)' }} />
+                          online
+                        </span>
+                      ) : (
+                        <span style={{ color: 'rgba(106,138,106,.7)' }}>· {formatLastSeen(u.activity.lastSeen)}</span>
+                      )
                     )}
                   </div>
                 </div>
