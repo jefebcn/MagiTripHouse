@@ -20,7 +20,7 @@ export default function CatalogView() {
   // Tab "In loco" mostrata solo se ci sono prodotti meetup
   const hasMeetup = products.some(p => p.shipFrom === 'meetup' && p.category !== 'request')
   const tabs = hasMeetup
-    ? [...SHIP_TABS, { id: 'meetup' as ShipOrigin, label: '🤝 In loco' }]
+    ? [...SHIP_TABS, { id: 'meetup' as ShipOrigin, label: '🤝 Solo di persona' }]
     : SHIP_TABS
 
   return (
@@ -81,7 +81,7 @@ export default function CatalogView() {
           >
             <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>🤝</span>
             <span style={{ flex: 1, fontSize: '.78rem', fontWeight: 700, color: '#d8b4fe' }}>
-              {n} prodott{n === 1 ? 'o' : 'i'} disponibil{n === 1 ? 'e' : 'i'} in loco
+              {n} prodott{n === 1 ? 'o' : 'i'} solo di persona (ritiro a mano)
             </span>
             <span style={{
               fontSize: '.65rem', fontWeight: 700, color: '#c084fc',

@@ -309,6 +309,10 @@ export default function CartDrawer() {
                       lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: 5,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                        <span style={{ fontSize: '.95rem' }}>📦</span>
+                        <span>Ti arriva <strong>a casa tua o in un locker</strong> a tua scelta</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
                         <span style={{ fontSize: '.95rem' }}>💳</span>
                         <span>L’ordine viene <strong>spedito una volta ricevuto il pagamento</strong></span>
                       </div>

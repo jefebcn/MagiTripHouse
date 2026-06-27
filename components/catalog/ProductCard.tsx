@@ -199,18 +199,24 @@ export default function ProductCard({ product: p, index }: Props) {
           }}>SCONTO</div>
         )}
 
-        {/* Ship origin flag — bottom left */}
-        {!unavailable && (
-          <div style={{
-            position: 'absolute', bottom: 8, left: 8,
-            background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)',
-            border: '1px solid rgba(255,255,255,.15)',
-            borderRadius: 20, padding: '2px 8px',
-            fontSize: '.62rem', fontWeight: 700, color: '#fff', letterSpacing: '.3px',
-          }}>
-            {(() => { const sm = SHIP_META[(p.shipFrom ?? 'spain') as ShipOrigin]; return `${sm.flag} ${sm.label}` })()}
-          </div>
-        )}
+        {/* Delivery mode badge — bottom left */}
+        {!unavailable && (() => {
+          const origin = (p.shipFrom ?? 'spain') as ShipOrigin
+          const sm = SHIP_META[origin]
+          const isMeetup = origin === 'meetup'
+          return (
+            <div style={{
+              position: 'absolute', bottom: 8, left: 8,
+              background: isMeetup ? 'rgba(192,132,252,.82)' : 'rgba(0,0,0,.62)',
+              backdropFilter: 'blur(6px)',
+              border: `1px solid ${isMeetup ? 'rgba(192,132,252,.5)' : 'rgba(255,255,255,.15)'}`,
+              borderRadius: 20, padding: '2px 8px',
+              fontSize: '.62rem', fontWeight: 700, color: '#fff', letterSpacing: '.2px',
+            }}>
+              {isMeetup ? '🤝 Solo di persona' : `📦 ${sm.flag} A casa o locker`}
+            </div>
+          )
+        })()}
 
         {/* ESAURITO overlay */}
         {isExhausted && (

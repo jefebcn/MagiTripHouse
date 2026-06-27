@@ -98,5 +98,5 @@ export const SHIP_META: Record<ShipOrigin, { flag: string; label: string; delive
   spain:  { flag: '🇪🇸', label: 'Spagna',    delivery: '3–6 giorni',      shipCost: 10, color: '#f5c842' },
   italy:  { flag: '🇮🇹', label: 'Italia',    delivery: '1–3 giorni',      shipCost: 10, color: '#3dff6e' },
   pharma: { flag: '💊',  label: 'Pharma EU', delivery: '5–16 gg (UE)',   shipCost: 0,  color: '#818cf8' },
-  meetup: { flag: '🤝',  label: 'In loco',   delivery: 'ritiro a mano',  shipCost: 0,  color: '#c084fc' },
+  meetup: { flag: '🤝',  label: 'Solo di persona',   delivery: 'ritiro a mano',  shipCost: 0,  color: '#c084fc' },
 }

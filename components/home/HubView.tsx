@@ -74,7 +74,7 @@ export default function HubView() {
             }
           </div>
           <div style={{ fontSize: '.73rem', color: 'rgba(106,138,106,.8)', marginTop: 4, letterSpacing: '.3px' }}>
-            Premium quality · spedizione discreta · tutta Europa
+            📦 Consegna a casa tua o in un locker · Italia ed Europa
           </div>
 
           {/* Trust chips */}
@@ -130,6 +130,28 @@ export default function HubView() {
           <span style={{ flex: 1, color: 'rgba(106,138,106,.8)', fontSize: '.92rem' }}>Cerca un prodotto…</span>
           <span style={{ fontSize: '.82rem', color: 'rgba(61,255,110,.5)', fontWeight: 700 }}>›</span>
         </button>
+      </div>
+
+      {/* ═══════════ LEGENDA CONSEGNA ═══════════ */}
+      <div style={{ padding: '16px 16px 0' }}>
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(61,255,110,.06), rgba(192,132,252,.05))',
+          border: '1px solid rgba(61,255,110,.22)', borderRadius: 14, padding: '12px 14px',
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+            <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>📦</span>
+            <span style={{ fontSize: '.78rem', color: 'rgba(237,250,238,.88)', lineHeight: 1.5 }}>
+              <strong style={{ color: 'var(--green)' }}>Quasi tutto arriva a casa tua o in un locker</strong>, in tutta Italia ed Europa.
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+            <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>🤝</span>
+            <span style={{ fontSize: '.78rem', color: 'rgba(237,250,238,.88)', lineHeight: 1.5 }}>
+              Solo i prodotti contrassegnati <strong style={{ color: '#c084fc' }}>“Solo di persona”</strong> si ritirano a mano.
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* ═══════════ SEZIONE CATALOGO ═══════════ */}

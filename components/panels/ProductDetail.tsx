@@ -176,12 +176,15 @@ export default function ProductDetail() {
             return (
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8,
-                background: 'var(--bg3)', border: `1px solid ${sm.color}44`,
-                borderRadius: 20, padding: '4px 12px',
+                background: isMeetup ? 'rgba(192,132,252,.12)' : 'rgba(61,255,110,.1)',
+                border: `1px solid ${isMeetup ? 'rgba(192,132,252,.4)' : 'rgba(61,255,110,.3)'}`,
+                borderRadius: 20, padding: '5px 13px',
               }}>
-                <span>{sm.flag}</span>
-                <span style={{ fontSize: '.74rem', color: 'var(--text)', fontWeight: 600 }}>{isMeetup ? 'Ritiro in loco' : `Spedizione ${sm.label}`}</span>
-                <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>· {isMeetup ? '🤝' : '🚚'} {sm.delivery}</span>
+                <span>{isMeetup ? '🤝' : '📦'}</span>
+                <span style={{ fontSize: '.76rem', color: 'var(--text)', fontWeight: 700 }}>
+                  {isMeetup ? 'Solo ritiro di persona' : 'Arriva a casa o in un locker'}
+                </span>
+                {!isMeetup && <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>· {sm.flag} {sm.delivery}</span>}
               </div>
             )
           })()}
@@ -329,14 +332,23 @@ export default function ProductDetail() {
           )}
 
           {(product.shipFrom === 'spain' || product.shipFrom === 'italy' || !product.shipFrom) && (
-            <div style={{
-              textAlign: 'center', fontSize: '.73rem',
-              color: 'var(--muted)', marginTop: 4,
-              lineHeight: 1.55,
-            }}>
-              🚚 Spedizione non inclusa · <strong style={{ color: 'rgba(255,255,255,.45)' }}>+€10</strong> al carrello<br />
-              📅 Spedizioni Lun–Mer · spedito a pagamento ricevuto
-            </div>
+            <>
+              <div style={{
+                background: 'rgba(61,255,110,.07)', border: '1px solid rgba(61,255,110,.25)',
+                borderRadius: 10, padding: '9px 12px', marginTop: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                fontSize: '.8rem', fontWeight: 700, color: 'var(--green)',
+              }}>
+                📦 Spedizione a casa tua o in un locker
+              </div>
+              <div style={{
+                textAlign: 'center', fontSize: '.72rem',
+                color: 'var(--muted)', marginTop: 4, lineHeight: 1.55,
+              }}>
+                🚚 Spedizione non inclusa · <strong style={{ color: 'rgba(255,255,255,.45)' }}>+€10</strong> al carrello<br />
+                📅 Spedizioni Lun–Mer · spedito a pagamento ricevuto
+              </div>
+            </>
           )}
         </div>
       </div>
