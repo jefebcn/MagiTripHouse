@@ -169,6 +169,7 @@ export default function HubView() {
                   {SHIP_DESC[o]}
                 </div>
                 <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>🚚 {sm.delivery}</div>
+                <div style={{ fontSize: '.64rem', color: 'rgba(245,200,66,.8)', marginTop: 1 }}>📅 Spedizioni Lun–Mer</div>
                 <div style={{ marginTop: 6 }}>
                   <span style={{
                     display: 'inline-block',
