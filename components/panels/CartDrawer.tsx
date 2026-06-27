@@ -19,6 +19,7 @@ export default function CartDrawer() {
   const panelRef = useRef<HTMLDivElement>(null)
   const [note, setNote] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
   const [payMethod, setPayMethod] = useState<Record<ShipOrigin, 'crypto' | 'iban' | null>>({ spain: null, italy: null, pharma: null, meetup: null })
+  const [confirmingOrigin, setConfirmingOrigin] = useState<ShipOrigin | null>(null)
   const [affBalance, setAffBalance] = useState(0)
   const [creditOrigin, setCreditOrigin] = useState<ShipOrigin | null>(null)
 
@@ -32,6 +33,22 @@ export default function CartDrawer() {
       .then(d => { if (d?.balance > 0) setAffBalance(d.balance) })
       .catch(() => {})
   }, [cartOpen, isLoggedIn, userHandle])
+
+  function handleCheckout(origin: ShipOrigin) {
+    const needsConfirm = origin === 'spain' || origin === 'italy'
+    if (needsConfirm) {
+      if (!payMethod[origin]) {
+        alert('Seleziona il metodo di pagamento (Crypto o IBAN) prima di inviare l’ordine.')
+        return
+      }
+      if (confirmingOrigin !== origin) {
+        setConfirmingOrigin(origin)
+        haptic(40)
+        return
+      }
+    }
+    placeOrder(origin)
+  }
 
   function placeOrder(origin: ShipOrigin) {
     const oItems = itemsByOrigin(origin)
@@ -115,6 +132,7 @@ export default function CartDrawer() {
     if (creditOrigin === origin) { setCreditOrigin(null); setAffBalance(b => Math.max(0, b - creditApplied)) }
     setNote(n => ({ ...n, [origin]: '' }))
     setPayMethod(p => ({ ...p, [origin]: null }))
+    setConfirmingOrigin(c => c === origin ? null : c)
 
     const allRemaining = useCartStore.getState().items.length
     if (allRemaining === 0) close()
@@ -305,7 +323,7 @@ export default function CartDrawer() {
                             <button
                               key={m.id}
                               type="button"
-                              onClick={() => setPayMethod(p => ({ ...p, [origin]: m.id }))}
+                              onClick={() => { setPayMethod(p => ({ ...p, [origin]: m.id })); setConfirmingOrigin(c => c === origin ? null : c) }}
                               style={{
                                 flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
                                 fontSize: '.85rem', fontWeight: 700, border: '1px solid',
@@ -358,8 +376,34 @@ export default function CartDrawer() {
                     </div>
                   </div>
 
-                  <button className="checkout-btn" onClick={() => placeOrder(origin)}>
-                    {isMeetup ? `${sm.flag} Prenota ritiro in loco →` : `${sm.flag} Invia ordine ${sm.label} →`}
+                  {/* Banner di avviso pre-invio (Spagna/Italia) */}
+                  {confirmingOrigin === origin && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(61,255,110,.12), rgba(245,200,66,.08))',
+                      border: '1.5px solid rgba(61,255,110,.45)',
+                      borderRadius: 12, padding: '12px 14px',
+                      fontSize: '.78rem', color: 'rgba(237,250,238,.9)', lineHeight: 1.6,
+                      display: 'flex', flexDirection: 'column', gap: 5,
+                      boxShadow: '0 0 18px rgba(61,255,110,.12)',
+                    }}>
+                      <div style={{ fontWeight: 800, color: 'var(--green)', fontSize: '.85rem' }}>
+                        ⚡ Quasi fatto!
+                      </div>
+                      <div>
+                        Prepara il metodo <strong style={{ color: sm.color }}>{payMethod[origin] === 'crypto' ? '🪙 Crypto' : '🏦 IBAN'}</strong> per velocizzare il pagamento.
+                      </div>
+                      <div style={{ color: 'var(--muted)' }}>
+                        I dati per il pagamento ti verranno inviati <strong style={{ color: 'var(--text)' }}>direttamente su Telegram</strong> dopo l’invio dell’ordine.
+                      </div>
+                    </div>
+                  )}
+
+                  <button className="checkout-btn" onClick={() => handleCheckout(origin)}>
+                    {isMeetup
+                      ? `${sm.flag} Prenota ritiro in loco →`
+                      : confirmingOrigin === origin
+                        ? `✅ Conferma e invia su Telegram →`
+                        : `${sm.flag} Invia ordine ${sm.label} →`}
                   </button>
                 </div>
               )
