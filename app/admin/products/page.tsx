@@ -65,52 +65,52 @@ const DEFAULT_PRESETS: PricePreset[] = [
   {
     name: 'Dry x3',
     variants: [
-      { label: '10g',  price: 105 },
-      { label: '25g',  price: 200 },
-      { label: '50g',  price: 340 },
-      { label: '100g', price: 590 },
-      { label: '200g', price: 1050 },
-      { label: '300g', price: 1450 },
-      { label: '500g', price: 2200 },
-      { label: '1kg',  price: 4000 },
+      { label: '10g',  price: 105,  cost: 60 },
+      { label: '25g',  price: 200,  cost: 125 },
+      { label: '50g',  price: 340,  cost: 210 },
+      { label: '100g', price: 590,  cost: 380 },
+      { label: '200g', price: 1050, cost: 710 },
+      { label: '300g', price: 1450, cost: 1035 },
+      { label: '500g', price: 2200, cost: 1590 },
+      { label: '1kg',  price: 4000, cost: 2975 },
     ],
   },
   {
     name: 'Plasma Static',
     variants: [
-      { label: '3g',   price: 95 },
-      { label: '5g',   price: 120 },
-      { label: '10g',  price: 180 },
-      { label: '25g',  price: 400 },
-      { label: '50g',  price: 650 },
-      { label: '100g', price: 1100 },
-      { label: '200g', price: 2000 },
-      { label: '500g', price: 4600 },
-      { label: '1kg',  price: 8500 },
+      { label: '3g',   price: 95,   cost: 50 },
+      { label: '5g',   price: 120,  cost: 70 },
+      { label: '10g',  price: 180,  cost: 120 },
+      { label: '25g',  price: 400,  cost: 270 },
+      { label: '50g',  price: 650,  cost: 450 },
+      { label: '100g', price: 1100, cost: 800 },
+      { label: '200g', price: 2000, cost: 1550 },
+      { label: '500g', price: 4600, cost: 3650 },
+      { label: '1kg',  price: 8500, cost: 7000 },
     ],
   },
   {
     name: 'Pokemon',
     variants: [
-      { label: '10pcs',  price: 85 },
-      { label: '25pcs',  price: 150 },
-      { label: '50pcs',  price: 250 },
-      { label: '100pcs', price: 380 },
-      { label: '250pcs', price: 640 },
-      { label: '500pcs', price: 1100 },
+      { label: '10pcs',  price: 85,   cost: 45 },
+      { label: '25pcs',  price: 150,  cost: 90 },
+      { label: '50pcs',  price: 250,  cost: 160 },
+      { label: '100pcs', price: 380,  cost: 250 },
+      { label: '250pcs', price: 640,  cost: 450 },
+      { label: '500pcs', price: 1100, cost: 800 },
     ],
   },
   {
     name: 'LVT',
     variants: [
-      { label: '5pcs',    price: 42 },
-      { label: '10pcs',   price: 58 },
-      { label: '25pcs',   price: 88 },
-      { label: '50pcs',   price: 125 },
-      { label: '100pcs',  price: 205 },
-      { label: '250pcs',  price: 450 },
-      { label: '500pcs',  price: 830 },
-      { label: '1000pcs', price: 1420 },
+      { label: '5pcs',    price: 42,   cost: 20 },
+      { label: '10pcs',   price: 58,   cost: 30 },
+      { label: '25pcs',   price: 88,   cost: 50 },
+      { label: '50pcs',   price: 125,  cost: 75 },
+      { label: '100pcs',  price: 205,  cost: 130 },
+      { label: '250pcs',  price: 450,  cost: 300 },
+      { label: '500pcs',  price: 830,  cost: 575 },
+      { label: '1000pcs', price: 1420, cost: 1000 },
     ],
   },
 ]
@@ -205,10 +205,24 @@ function AdminProductsInner() {
       } else {
         const stored: PricePreset[] = JSON.parse(raw)
         const seeded: string[] = JSON.parse(localStorage.getItem(PRESETS_SEED_KEY) ?? '[]')
+        // Backfill dei costi d'acquisto dai default per i listini già salvati senza costo
+        // (aggiunge solo dove manca, non sovrascrive eventuali costi già impostati dall'admin)
+        const healed = stored.map(s => {
+          const def = DEFAULT_PRESETS.find(d => d.name === s.name)
+          if (!def) return s
+          return {
+            ...s,
+            variants: s.variants.map(v => {
+              if (v.cost != null) return v
+              const dv = def.variants.find(x => x.label === v.label)
+              return dv?.cost != null ? { ...v, cost: dv.cost } : v
+            }),
+          }
+        })
         // Aggiungi i default mai seminati prima (così i nuovi listini compaiono una volta sola,
         // senza ricomparire se l'admin li ha già eliminati)
-        const toAdd = DEFAULT_PRESETS.filter(d => !seeded.includes(d.name) && !stored.some(s => s.name === d.name))
-        setPresets([...stored, ...toAdd.map(d => ({ ...d }))])
+        const toAdd = DEFAULT_PRESETS.filter(d => !seeded.includes(d.name) && !healed.some(s => s.name === d.name))
+        setPresets([...healed, ...toAdd.map(d => ({ ...d }))])
         localStorage.setItem(PRESETS_SEED_KEY, JSON.stringify(Array.from(new Set([...seeded, ...DEFAULT_PRESETS.map(d => d.name)]))))
       }
     } catch { setPresets(DEFAULT_PRESETS.map(d => ({ ...d }))) }
@@ -229,7 +243,7 @@ function AdminProductsInner() {
   function applyPresetToInline(p: PricePreset) {
     setPriceEditVariants(prev => prev.map(v => {
       const match = p.variants.find(pv => pv.label === v.label)
-      return match ? { ...v, price: match.price } : v
+      return match ? { ...v, price: match.price, ...(match.cost != null ? { cost: match.cost } : {}) } : v
     }))
   }
 
