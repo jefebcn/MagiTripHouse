@@ -22,8 +22,9 @@ export default function CartDrawer() {
   const [confirmingOrigin, setConfirmingOrigin] = useState<ShipOrigin | null>(null)
   const [affBalance, setAffBalance] = useState(0)
   const [creditOrigin, setCreditOrigin] = useState<ShipOrigin | null>(null)
+  const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; total: number; method: string | null; isMeetup: boolean } | null>(null)
 
-  const close = useCallback(() => setCartOpen(false), [setCartOpen])
+  const close = useCallback(() => { setConfirmedOrder(null); setCartOpen(false) }, [setCartOpen])
   useSwipeToClose(panelRef, close, cartOpen)
 
   useEffect(() => {
@@ -128,14 +129,18 @@ export default function CartDrawer() {
     }).catch(() => {})
 
     haptic([80, 40, 80])
+    const pmChosen = payMethod[origin]
     clearOrigin(origin)
     if (creditOrigin === origin) { setCreditOrigin(null); setAffBalance(b => Math.max(0, b - creditApplied)) }
     setNote(n => ({ ...n, [origin]: '' }))
     setPayMethod(p => ({ ...p, [origin]: null }))
     setConfirmingOrigin(c => c === origin ? null : c)
-
-    const allRemaining = useCartStore.getState().items.length
-    if (allRemaining === 0) close()
+    setConfirmedOrder({
+      id: orderId,
+      total: isMeetup ? subtotal - creditApplied : finalTotal,
+      method: isMeetup ? null : (pmChosen === 'crypto' ? 'Crypto' : 'IBAN'),
+      isMeetup,
+    })
 
     const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
     if (tg?.openTelegramLink) tg.openTelegramLink(tgUrl)
@@ -145,6 +150,55 @@ export default function CartDrawer() {
   if (!cartOpen) return null
 
   const totalCount = items.reduce((s, x) => s + x.qty, 0)
+
+  if (confirmedOrder) {
+    return (
+      <div className="panel open">
+        <div className="panel-overlay" onClick={close} />
+        <div ref={panelRef} className="panel-content">
+          <div className="panel-handle" />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '14px 6px 8px', textAlign: 'center' }}>
+            <div style={{
+              width: 76, height: 76, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(61,255,110,.25), rgba(61,255,110,.06))',
+              border: '2px solid rgba(61,255,110,.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.4rem',
+              boxShadow: '0 0 28px rgba(61,255,110,.3)',
+            }}>✅</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem' }}>Ordine ricevuto!</div>
+            <div style={{ fontSize: '.84rem', color: 'var(--muted)', lineHeight: 1.6, maxWidth: 320 }}>
+              {confirmedOrder.isMeetup
+                ? 'Ti contattiamo su Telegram per concordare luogo e orario del ritiro.'
+                : <>Ti abbiamo aperto Telegram con il riepilogo. <strong style={{ color: 'var(--text)' }}>Ti inviamo lì i dati per il pagamento{confirmedOrder.method ? ` (${confirmedOrder.method})` : ''}</strong>; l’ordine viene spedito una volta ricevuto il pagamento.</>}
+            </div>
+
+            <div style={{ width: '100%', background: 'var(--bg3)', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Numero ordine</span>
+                <span style={{ fontFamily: 'monospace', fontSize: '.8rem', fontWeight: 700, color: 'var(--green)' }}>{confirmedOrder.id}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Totale</span>
+                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.25rem', color: 'var(--green)' }}>€{confirmedOrder.total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {!confirmedOrder.isMeetup && (
+              <div style={{ fontSize: '.72rem', color: 'rgba(245,200,66,.85)', background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.2)', borderRadius: 10, padding: '9px 12px', lineHeight: 1.5 }}>
+                📍 Trovi lo stato e il tracking in <strong>Account → I miei ordini</strong>
+              </div>
+            )}
+
+            <button
+              className="checkout-btn"
+              onClick={() => { setConfirmedOrder(null); setView('hub'); close() }}
+              style={{ marginTop: 4 }}
+            >🛍️ Continua lo shopping</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="panel open">

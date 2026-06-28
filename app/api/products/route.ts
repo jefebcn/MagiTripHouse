@@ -18,6 +18,17 @@ export async function GET(req: Request) {
     if (aOut !== bOut) return aOut - bOut
     return (a.sortOrder ?? 99) - (b.sortOrder ?? 99)
   })
+
+  // Il costo d'acquisto è riservato all'admin: rimuovilo dalle varianti per il pubblico
+  if (!showAll) {
+    for (const p of products) {
+      if (Array.isArray(p.variants)) {
+        p.variants = (p.variants as { label: string; price: number; cost?: number }[])
+          .map(({ label, price }) => ({ label, price }))
+      }
+    }
+  }
+
   return NextResponse.json(products)
 }
 

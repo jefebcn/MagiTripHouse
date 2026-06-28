@@ -14,12 +14,33 @@ export async function GET() {
   const monthStart = new Date(todayStart); monthStart.setDate(todayStart.getDate() - 30)
   const yearStart = new Date(todayStart); yearStart.setFullYear(todayStart.getFullYear() - 1)
 
-  const [orders, users, affiliates, payouts] = await Promise.all([
+  const [orders, users, affiliates, payouts, products] = await Promise.all([
     prisma.order.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.user.findMany({ select: { createdAt: true } }),
     prisma.affiliate.findMany({ orderBy: { joinedAt: 'desc' } }),
     prisma.commissionPayout.findMany({ orderBy: { requestedAt: 'desc' } }),
+    prisma.product.findMany({ select: { id: true, name: true, variants: true } }),
   ])
+
+  // Lookup costo d'acquisto per prodotto+taglio (per id e per nome, come fallback)
+  const costByIdLabel = new Map<string, number>()
+  const costByNameLabel = new Map<string, number>()
+  for (const p of products) {
+    const variants = Array.isArray(p.variants)
+      ? (p.variants as { label?: string; price?: number; cost?: number }[])
+      : []
+    for (const v of variants) {
+      if (v.cost != null && v.label) {
+        costByIdLabel.set(`${p.id}__${v.label}`, v.cost)
+        costByNameLabel.set(`${p.name}__${v.label}`, v.cost)
+      }
+    }
+  }
+  const lookupCost = (id?: string, name?: string, label?: string): number | null => {
+    if (label && id && costByIdLabel.has(`${id}__${label}`)) return costByIdLabel.get(`${id}__${label}`)!
+    if (label && name && costByNameLabel.has(`${name}__${label}`)) return costByNameLabel.get(`${name}__${label}`)!
+    return null
+  }
 
   const revenue = (from?: Date) =>
     orders
@@ -30,11 +51,12 @@ export async function GET() {
     return parseFloat(label.replace(/[^0-9.]/g, '')) || 0
   }
 
-  // Per-product aggregation: grams, revenue, qty, orders count
-  type ProductStat = { grams: number; revenue: number; qty: number; ordersCount: number }
+  // Per-product aggregation: grams, revenue, qty, orders count, cost, profit
+  type ProductStat = { grams: number; revenue: number; qty: number; ordersCount: number; cost: number; profit: number; costKnown: boolean }
   const productStats: Record<string, ProductStat> = {}
   const productCounts: Record<string, number> = {}
   let gramsTotal = 0, gramsToday = 0, gramsWeek = 0, gramsMonth = 0, gramsYear = 0
+  let costTotal = 0, profitTotal = 0, revenueWithKnownCost = 0
 
   for (const order of orders) {
     const items = Array.isArray(order.items)
@@ -50,11 +72,21 @@ export async function GET() {
       const productName = item.name ?? item.label ?? item.id ?? '?'
       const g = parseGrams(item.label ?? '') * qty
       const rev = (item.price ?? 0) * qty
+      const unitCost = lookupCost(item.id, item.name, item.label)
+      const lineCost = unitCost != null ? unitCost * qty : 0
 
-      if (!productStats[productName]) productStats[productName] = { grams: 0, revenue: 0, qty: 0, ordersCount: 0 }
+      if (!productStats[productName]) productStats[productName] = { grams: 0, revenue: 0, qty: 0, ordersCount: 0, cost: 0, profit: 0, costKnown: false }
       productStats[productName].grams   += g
       productStats[productName].revenue += rev
       productStats[productName].qty     += qty
+      if (unitCost != null) {
+        productStats[productName].cost   += lineCost
+        productStats[productName].profit += rev - lineCost
+        productStats[productName].costKnown = true
+        costTotal += lineCost
+        profitTotal += rev - lineCost
+        revenueWithKnownCost += rev
+      }
       if (!seenProducts.has(productName)) {
         productStats[productName].ordersCount += 1
         seenProducts.add(productName)
@@ -83,6 +115,10 @@ export async function GET() {
       qty: s.qty,
       ordersCount: s.ordersCount,
       avgPricePerGram: s.grams > 0 ? s.revenue / s.grams : 0,
+      cost: s.cost,
+      profit: s.profit,
+      costKnown: s.costKnown,
+      margin: s.costKnown && s.revenue > 0 ? (s.profit / s.revenue) * 100 : null,
     }))
 
   // Referral counts per affiliate code
@@ -135,6 +171,13 @@ export async function GET() {
       year: gramsYear,
     },
     productStats: productStatsList,
+    profit: {
+      cost: costTotal,
+      profit: profitTotal,
+      revenueWithKnownCost,
+      margin: revenueWithKnownCost > 0 ? (profitTotal / revenueWithKnownCost) * 100 : null,
+      coverage: productStatsList.length > 0 ? productStatsList.filter(p => p.costKnown).length / productStatsList.length : 0,
+    },
     affiliates: affiliates.map(a => ({
       ...a,
       referralCount: refCounts[a.code] ?? 0,

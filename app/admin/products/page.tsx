@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
-interface Variant { label: string; price: number }
+interface Variant { label: string; price: number; cost?: number }
 interface BundleItem { productId: string; productName: string; emoji: string; qty: number }
 interface PricePreset { name: string; variants: Variant[] }
 
@@ -1181,14 +1181,26 @@ function AdminProductsInner() {
                 />
                 <input
                   type="number"
-                  placeholder="€"
+                  placeholder="€ vendita"
                   value={v.price || ''}
                   onChange={(e) => {
                     const variants = [...form.variants]
                     variants[i] = { ...variants[i], price: Number(e.target.value) }
                     setForm((f) => ({ ...f, variants }))
                   }}
-                  style={{ width: 80, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
+                  style={{ width: 78, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 8px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
+                />
+                <input
+                  type="number"
+                  placeholder="€ costo"
+                  title="Costo d'acquisto (riservato, non visibile ai clienti)"
+                  value={v.cost || ''}
+                  onChange={(e) => {
+                    const variants = [...form.variants]
+                    variants[i] = { ...variants[i], cost: e.target.value === '' ? undefined : Number(e.target.value) }
+                    setForm((f) => ({ ...f, variants }))
+                  }}
+                  style={{ width: 72, background: 'rgba(245,200,66,.05)', border: '1px solid rgba(245,200,66,.25)', borderRadius: 8, padding: '9px 8px', color: 'var(--gold)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none' }}
                 />
                 {form.variants.length > 1 && (
                   <button

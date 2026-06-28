@@ -9,7 +9,8 @@ interface Stats {
   recentOrders: Array<{ id: string; userId: string; total: number; status: string; createdAt: string }>
   topProducts: Array<{ name: string; count: number }>
   grams: { total: number; today: number; week: number; month: number; year: number }
-  productStats: Array<{ name: string; grams: number; revenue: number; qty: number; ordersCount: number; avgPricePerGram: number }>
+  productStats: Array<{ name: string; grams: number; revenue: number; qty: number; ordersCount: number; avgPricePerGram: number; cost: number; profit: number; costKnown: boolean; margin: number | null }>
+  profit: { cost: number; profit: number; revenueWithKnownCost: number; margin: number | null; coverage: number }
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -39,10 +40,33 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [importState, setImportState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [importResult, setImportResult] = useState<{ created: number; skipped: number } | null>(null)
+  const [pushTitle, setPushTitle] = useState('')
+  const [pushBody, setPushBody] = useState('')
+  const [pushState, setPushState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
+  const [pushResult, setPushResult] = useState<{ sent: number } | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/stats').then(r => r.json()).then(setStats).catch(() => {})
   }, [])
+
+  async function sendBroadcast() {
+    if (!pushTitle.trim() || !pushBody.trim()) return
+    setPushState('sending')
+    try {
+      const res = await fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: pushTitle.trim(), body: pushBody.trim(), url: '/', emoji: '📢' }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPushResult({ sent: data.sent ?? 0 })
+        setPushState('done')
+        setPushTitle(''); setPushBody('')
+        setTimeout(() => setPushState('idle'), 4000)
+      } else { setPushState('error') }
+    } catch { setPushState('error') }
+  }
 
   async function runImport() {
     setImportState('loading')
@@ -109,6 +133,42 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      {/* Profitto stimato */}
+      {stats && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(61,255,110,.08), rgba(245,200,66,.05))',
+          border: '1px solid rgba(61,255,110,.28)', borderRadius: 16, padding: '18px 20px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem' }}>💰 Profitto stimato</div>
+            <div style={{ fontSize: '.66rem', color: 'var(--muted)' }}>
+              su prodotti con costo impostato{stats.profit.coverage < 1 ? ` · ${Math.round(stats.profit.coverage * 100)}% dei prodotti` : ''}
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
+            <div>
+              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Profitto netto</div>
+              <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--green)', fontFamily: "'Fredoka One', cursive" }}>{fmt(stats.profit.profit)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Margine</div>
+              <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--gold)', fontFamily: "'Fredoka One', cursive" }}>
+                {stats.profit.margin != null ? `${stats.profit.margin.toFixed(1)}%` : '—'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Costo merce</div>
+              <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--text)', fontFamily: "'Fredoka One', cursive" }}>{fmt(stats.profit.cost)}</div>
+            </div>
+          </div>
+          {stats.profit.coverage < 1 && (
+            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
+              💡 Imposta il <strong>costo d&apos;acquisto</strong> nei prodotti (campo accanto al prezzo) per un calcolo completo del profitto.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Quick actions */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
@@ -283,6 +343,20 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
+                    {/* Profitto / margine se costo impostato */}
+                    {p.costKnown && (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        background: 'rgba(61,255,110,.06)', border: '1px solid rgba(61,255,110,.2)',
+                        borderRadius: 8, padding: '6px 10px', marginBottom: 8,
+                      }}>
+                        <span style={{ fontSize: '.62rem', color: 'var(--muted)' }}>💰 Profitto</span>
+                        <span style={{ fontSize: '.78rem', fontWeight: 800, color: 'var(--green)' }}>
+                          {fmt(p.profit)} {p.margin != null && <span style={{ fontSize: '.62rem', color: 'var(--gold)', fontWeight: 700 }}>· {p.margin.toFixed(0)}%</span>}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Dual progress bars */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -306,11 +380,58 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Import catalog */}
+      {/* Strumenti */}
       <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px' }}>🛠️ STRUMENTI</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: 14, alignItems: 'start' }}>
+
+      {/* Push broadcast */}
       <div style={{
         background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: 14, padding: '16px 18px', maxWidth: 480,
+        borderRadius: 14, padding: '16px 18px',
+      }}>
+        <div style={{ fontSize: '.85rem', fontWeight: 700, marginBottom: 4 }}>📢 Invia notifica push</div>
+        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: 12 }}>
+          Notifica a tutti gli utenti con le notifiche attive (nuovi arrivi, offerte, annunci).
+        </div>
+        <input
+          value={pushTitle}
+          onChange={e => setPushTitle(e.target.value)}
+          placeholder="Titolo (es. 🔥 Nuovo arrivo)"
+          maxLength={50}
+          style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none', marginBottom: 8, boxSizing: 'border-box' }}
+        />
+        <textarea
+          value={pushBody}
+          onChange={e => setPushBody(e.target.value)}
+          placeholder="Messaggio…"
+          rows={2}
+          maxLength={140}
+          style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none', marginBottom: 10, resize: 'none', boxSizing: 'border-box' }}
+        />
+        <button
+          onClick={sendBroadcast}
+          disabled={pushState === 'sending' || !pushTitle.trim() || !pushBody.trim()}
+          style={{
+            width: '100%', padding: '10px', borderRadius: 10,
+            fontFamily: 'inherit', fontWeight: 700, fontSize: '.85rem',
+            cursor: pushState === 'sending' || !pushTitle.trim() || !pushBody.trim() ? 'not-allowed' : 'pointer',
+            background: pushState === 'done' ? 'rgba(61,255,110,.12)' : pushState === 'error' ? 'rgba(255,80,80,.12)' : 'rgba(59,130,246,.12)',
+            border: pushState === 'done' ? '1.5px solid rgba(61,255,110,.5)' : pushState === 'error' ? '1.5px solid rgba(255,80,80,.5)' : '1.5px solid rgba(59,130,246,.4)',
+            color: pushState === 'done' ? 'var(--green)' : pushState === 'error' ? '#ff5050' : 'var(--blue)',
+            opacity: !pushTitle.trim() || !pushBody.trim() ? .6 : 1,
+          }}
+        >
+          {pushState === 'sending' ? '⏳ Invio…' :
+           pushState === 'done' ? `✅ Inviata a ${pushResult?.sent ?? 0} utenti` :
+           pushState === 'error' ? '❌ Errore — riprova' :
+           '📢 Invia a tutti'}
+        </button>
+      </div>
+
+      {/* Import catalog */}
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--border)',
+        borderRadius: 14, padding: '16px 18px',
       }}>
         <div style={{ fontSize: '.85rem', fontWeight: 700, marginBottom: 4 }}>📥 Importa catalogo GFZ</div>
         <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: 10 }}>
@@ -333,6 +454,8 @@ export default function AdminDashboard() {
            '📥 Avvia importazione'}
         </button>
       </div>
+
+      </div>{/* /strumenti grid */}
     </div>
   )
 }

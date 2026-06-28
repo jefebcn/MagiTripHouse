@@ -1,7 +1,7 @@
 'use client'
 import useSWR from 'swr'
 
-export interface Variant { label: string; price: number }
+export interface Variant { label: string; price: number; cost?: number }
 export interface BundleItem { productId: string; productName: string; emoji: string; qty: number }
 
 export interface Product {
