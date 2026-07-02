@@ -672,6 +672,23 @@ function AccountView() {
         <span style={{ color: 'var(--muted)' }}>›</span>
       </button>
 
+      <button
+        onClick={() => {
+          const url = 'https://t.me/+sOAYXTsv7qRmMTQ0'
+          const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
+          if (tg?.openTelegramLink) tg.openTelegramLink(url)
+          else window.open(url, '_blank')
+        }}
+        style={{ ...rowStyle, width: '100%', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', border: '1px solid rgba(34,158,217,.35)', background: 'linear-gradient(135deg, rgba(34,158,217,.1), var(--card))' }}
+      >
+        {iconCircle('rgba(34,158,217,.15)', '📢')}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: '.88rem', color: '#4db8e8' }}>Accedi al canale Telegram</div>
+          <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>Info, aggiornamenti e novità in tempo reale</div>
+        </div>
+        <span style={{ color: '#4db8e8', fontWeight: 700 }}>→</span>
+      </button>
+
       <div style={{ ...rowStyle, flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
