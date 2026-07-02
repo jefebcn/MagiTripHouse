@@ -132,6 +132,36 @@ export default function HubView() {
         </button>
       </div>
 
+      {/* ═══════════ BANNER CANALE TELEGRAM ═══════════ */}
+      <div style={{ padding: '12px 16px 0' }}>
+        <button
+          onClick={() => {
+            const url = 'https://t.me/+sOAYXTsv7qRmMTQ0'
+            const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
+            if (tg?.openTelegramLink) tg.openTelegramLink(url)
+            else window.open(url, '_blank')
+          }}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+            background: 'linear-gradient(135deg, rgba(34,158,217,.18), rgba(34,158,217,.07))',
+            border: '1.5px solid rgba(34,158,217,.45)',
+            borderRadius: 16, padding: '13px 16px',
+            cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            boxShadow: '0 0 18px rgba(34,158,217,.12)',
+          }}
+        >
+          <span style={{ fontSize: '1.6rem', flexShrink: 0 }}>📢</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: '.92rem', color: '#4db8e8' }}>Accedi al canale Telegram</div>
+            <div style={{ fontSize: '.72rem', color: 'rgba(150,200,230,.8)', marginTop: 2 }}>Info, aggiornamenti e novità in tempo reale</div>
+          </div>
+          <span style={{
+            flexShrink: 0, background: 'rgba(34,158,217,.2)', border: '1px solid rgba(34,158,217,.45)',
+            borderRadius: 20, padding: '5px 13px', fontSize: '.76rem', fontWeight: 700, color: '#4db8e8',
+          }}>Apri →</span>
+        </button>
+      </div>
+
       {/* ═══════════ SEZIONE CATALOGO ═══════════ */}
       <div style={{ padding: '22px 16px 0' }}>
 
