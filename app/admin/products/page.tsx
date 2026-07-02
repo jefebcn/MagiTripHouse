@@ -113,6 +113,14 @@ const DEFAULT_PRESETS: PricePreset[] = [
       { label: '1000pcs', price: 1420, cost: 1000 },
     ],
   },
+  {
+    name: 'DMT',
+    variants: [
+      { label: '1pz', price: 120, cost: 110 },
+      { label: '3pz', price: 330, cost: 270 },
+      { label: '5pz', price: 450, cost: 370 },
+    ],
+  },
 ]
 const PRESETS_KEY = 'tp_price_presets'
 const PRESETS_SEED_KEY = 'tp_price_presets_seeded'
