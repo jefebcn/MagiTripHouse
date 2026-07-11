@@ -232,14 +232,21 @@ export default function ProductCard({ product: p, index }: Props) {
           </div>
         )}
 
-        {/* IN ARRIVO overlay */}
+        {/* IN ARRIVO overlay — cliccabile per prenotare */}
         {isComingSoon && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <div style={{
-              background: 'rgba(59,130,246,.85)', backdropFilter: 'blur(2px)',
+              background: 'rgba(59,130,246,.9)', backdropFilter: 'blur(2px)',
               borderRadius: 8, padding: '5px 14px',
               fontSize: '.7rem', fontWeight: 800, color: '#fff', letterSpacing: '1.5px',
             }}>IN ARRIVO</div>
+            <div style={{
+              background: 'rgba(59,130,246,.22)', border: '1px solid rgba(120,180,255,.7)',
+              borderRadius: 20, padding: '4px 12px',
+              fontSize: '.64rem', fontWeight: 800, color: '#bfe0ff', letterSpacing: '.3px',
+              display: 'flex', alignItems: 'center', gap: 5,
+              boxShadow: '0 0 12px rgba(59,130,246,.35)',
+            }}>👆 Tocca per prenotare</div>
           </div>
         )}
 
