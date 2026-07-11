@@ -74,15 +74,17 @@ export default function CartDrawer() {
     const isPharma = origin === 'pharma'
     const isMeetup = origin === 'meetup'
     const lines = [
-      `🛒 *NUOVO ORDINE — Magic Trip House*`,
-      `🆔 Ordine: ${orderId}`,
+      isMeetup
+        ? `📋 *PRENOTAZIONE — Magic Trip House*`
+        : `🛒 *NUOVO ORDINE — Magic Trip House*`,
+      isMeetup ? `🆔 Prenotazione: ${orderId}` : `🆔 Ordine: ${orderId}`,
       `👤 Cliente: ${displayName}`,
       `📅 Data: ${date}`,
       isMeetup
-        ? `${sm.flag} Ritiro: in loco (al meetup)`
+        ? `${sm.flag} Ritiro a mano di persona (al meetup)`
         : `${sm.flag} Spedizione: ${sm.label} (${sm.delivery})`,
       ``,
-      `📦 *Prodotti:*`,
+      isMeetup ? `📦 *Prodotti prenotati:*` : `📦 *Prodotti:*`,
       ...oItems.map((x) => `${x.emoji} ${x.productName} [${x.variantLabel}] ×${x.qty} — €${(x.variantPrice * x.qty).toFixed(2)}`),
       ``,
       `Subtotale: €${subtotal.toFixed(2)}`,
@@ -90,7 +92,9 @@ export default function CartDrawer() {
     if (creditApplied > 0) lines.push(`🎁 Credito affiliato: −€${creditApplied.toFixed(2)}`)
     if (isMeetup) {
       lines.push(`🤝 Ritiro in loco · nessuna spedizione`)
-      lines.push(`💰 *TOTALE: €${(subtotal - creditApplied).toFixed(2)}*`)
+      lines.push(`💰 *TOTALE prenotato: €${(subtotal - creditApplied).toFixed(2)}*`)
+      lines.push(``)
+      lines.push(`🔔 Prenotazione: avvisare il cliente appena il prodotto è disponibile in loco`)
     } else if (isPharma) {
       lines.push(`🚚 Spedizione: da confermare (5–19€ UE · 12–27€ extra-UE)`)
       lines.push(`💰 *TOTALE prodotti: €${(subtotal - creditApplied).toFixed(2)}* (+spedizione)`)
@@ -121,7 +125,7 @@ export default function CartDrawer() {
         userId,
         total: finalTotal,
         items: oItems.map((x) => ({ id: x.id, name: x.productName, emoji: x.emoji, label: x.variantLabel, price: x.variantPrice, qty: x.qty })),
-        note: `[${sm.label}]${!isMeetup && payMethod[origin] ? ` [${payMethod[origin] === 'crypto' ? 'Crypto' : 'IBAN'}]` : ''} ${note[origin].trim()}`.trim() || null,
+        note: `${isMeetup ? '[PRENOTAZIONE] ' : ''}[${sm.label}]${!isMeetup && payMethod[origin] ? ` [${payMethod[origin] === 'crypto' ? 'Crypto' : 'IBAN'}]` : ''} ${note[origin].trim()}`.trim() || null,
         referredBy: typeof localStorage !== 'undefined' ? localStorage.getItem('tp_ref') : null,
         affiliateCredit: creditApplied > 0 ? creditApplied : undefined,
         affiliateUsername: creditApplied > 0 ? userHandle : undefined,
@@ -165,10 +169,12 @@ export default function CartDrawer() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.4rem',
               boxShadow: '0 0 28px rgba(61,255,110,.3)',
             }}>✅</div>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem' }}>Ordine ricevuto!</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem' }}>
+              {confirmedOrder.isMeetup ? 'Prenotazione inviata!' : 'Ordine ricevuto!'}
+            </div>
             <div style={{ fontSize: '.84rem', color: 'var(--muted)', lineHeight: 1.6, maxWidth: 320 }}>
               {confirmedOrder.isMeetup
-                ? 'Ti contattiamo su Telegram per concordare luogo e orario del ritiro.'
+                ? <>Abbiamo registrato la tua <strong style={{ color: 'var(--text)' }}>prenotazione</strong>. Ti avvisiamo su Telegram <strong style={{ color: 'var(--text)' }}>appena il prodotto è disponibile in loco</strong> e concordiamo luogo e orario del ritiro.</>
                 : <>Ti abbiamo aperto Telegram con il riepilogo. <strong style={{ color: 'var(--text)' }}>Ti inviamo lì i dati per il pagamento{confirmedOrder.method ? ` (${confirmedOrder.method})` : ''}</strong>; l’ordine viene spedito una volta ricevuto il pagamento.</>}
             </div>
 
@@ -333,9 +339,10 @@ export default function CartDrawer() {
                       borderRadius: 10, padding: '10px 12px', fontSize: '.69rem', color: 'rgba(216,180,254,.8)',
                       lineHeight: 1.5,
                     }}>
-                      <div style={{ fontWeight: 700, color: '#d8b4fe', marginBottom: 4 }}>🤝 Ritiro in loco</div>
-                      <div>Prodotti disponibili solo di persona al meetup · nessuna spedizione</div>
-                      <div>📍 Luogo e orario verranno concordati in chat dopo la prenotazione</div>
+                      <div style={{ fontWeight: 700, color: '#d8b4fe', marginBottom: 4 }}>📋 Prenotazione ritiro in loco</div>
+                      <div>Prenoti ora — <strong style={{ color: '#e9d5ff' }}>ti avvisiamo appena il prodotto è disponibile</strong> in loco.</div>
+                      <div>🤝 Solo di persona · nessuna spedizione · nessun pagamento anticipato</div>
+                      <div>📍 Luogo e orario si concordano in chat quando arriva lo stock</div>
                     </div>
                   )}
 
@@ -472,7 +479,7 @@ export default function CartDrawer() {
 
                   <button className="checkout-btn" onClick={() => handleCheckout(origin)}>
                     {isMeetup
-                      ? `${sm.flag} Prenota ritiro in loco →`
+                      ? `📋 Invia prenotazione →`
                       : confirmingOrigin === origin
                         ? `✅ Conferma e invia su Telegram →`
                         : `${sm.flag} Invia ordine ${sm.label} →`}

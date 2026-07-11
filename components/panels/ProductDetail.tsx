@@ -327,8 +327,27 @@ export default function ProductDetail() {
             </button>
           ) : (
             <button className="checkout-btn" onClick={handleAdd}>
-              🛒 Aggiungi al Carrello
+              {product.shipFrom === 'meetup' ? '📋 Prenota / Preordina' : '🛒 Aggiungi al Carrello'}
             </button>
+          )}
+
+          {product.shipFrom === 'meetup' && (
+            <>
+              <div style={{
+                background: 'rgba(192,132,252,.1)', border: '1px solid rgba(192,132,252,.35)',
+                borderRadius: 10, padding: '9px 12px', marginTop: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                fontSize: '.8rem', fontWeight: 700, color: '#d8b4fe', textAlign: 'center',
+              }}>
+                📋 Prenoti ora — ti avvisiamo quando è disponibile
+              </div>
+              <div style={{
+                textAlign: 'center', fontSize: '.72rem',
+                color: 'var(--muted)', marginTop: 4, lineHeight: 1.55,
+              }}>
+                🤝 Ritiro a mano di persona · nessun pagamento anticipato
+              </div>
+            </>
           )}
 
           {(product.shipFrom === 'spain' || product.shipFrom === 'italy' || !product.shipFrom) && (

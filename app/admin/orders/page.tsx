@@ -30,11 +30,12 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 }
 
 const TABS = [
-  { key: 'all',       label: 'Tutti'      },
-  { key: 'pending',   label: 'In attesa'  },
-  { key: 'paid',      label: 'Pagati'     },
-  { key: 'shipped',   label: 'Spediti'    },
-  { key: 'delivered', label: 'Consegnati' },
+  { key: 'all',          label: 'Tutti'          },
+  { key: 'reservations', label: '📋 Prenotazioni' },
+  { key: 'pending',      label: 'In attesa'      },
+  { key: 'paid',         label: 'Pagati'         },
+  { key: 'shipped',      label: 'Spediti'        },
+  { key: 'delivered',    label: 'Consegnati'     },
 ]
 
 function TrackingInput({ initial, onSave }: { initial: string; onSave: (v: string) => Promise<void> }) {
@@ -108,16 +109,20 @@ export default function AdminOrders() {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, tracking } : o))
   }
 
+  const isReservation = (o: Order) => !!o.note?.includes('[PRENOTAZIONE]')
+
   const counts: Record<string, number> = {
-    all:       orders.length,
-    pending:   orders.filter(o => o.status === 'pending').length,
-    paid:      orders.filter(o => o.status === 'paid').length,
-    shipped:   orders.filter(o => o.status === 'shipped').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
+    all:          orders.length,
+    reservations: orders.filter(isReservation).length,
+    pending:      orders.filter(o => o.status === 'pending').length,
+    paid:         orders.filter(o => o.status === 'paid').length,
+    shipped:      orders.filter(o => o.status === 'shipped').length,
+    delivered:    orders.filter(o => o.status === 'delivered').length,
   }
 
   const filtered = orders.filter(o => {
-    if (tab !== 'all' && o.status !== tab) return false
+    if (tab === 'reservations') { if (!isReservation(o)) return false }
+    else if (tab !== 'all' && o.status !== tab) return false
     if (search) {
       const q = search.toLowerCase()
       return o.userId.toLowerCase().includes(q) || o.id.toLowerCase().includes(q)
@@ -224,9 +229,18 @@ export default function AdminOrders() {
                     {items.map(x => `${products[x.id]?.emoji ?? x.emoji ?? ''} ${products[x.id]?.name ?? x.name ?? x.id} ${x.label} ×${x.qty}`.trim()).join(' · ') || String(o.items)}
                   </div>
 
-                  {/* Status badge */}
-                  <div style={{ fontSize: '.7rem', fontWeight: 700, color: STATUS_LABELS[o.status]?.color ?? 'var(--muted)' }}>
-                    {STATUS_LABELS[o.status]?.label ?? o.status}
+                  {/* Badge riga: prenotazione + stato */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {o.note?.includes('[PRENOTAZIONE]') && (
+                      <span style={{
+                        fontSize: '.66rem', fontWeight: 800, color: '#d8b4fe',
+                        background: 'rgba(192,132,252,.15)', border: '1px solid rgba(192,132,252,.4)',
+                        borderRadius: 20, padding: '2px 9px', letterSpacing: '.2px',
+                      }}>📋 PRENOTAZIONE IN LOCO</span>
+                    )}
+                    <span style={{ fontSize: '.7rem', fontWeight: 700, color: STATUS_LABELS[o.status]?.color ?? 'var(--muted)' }}>
+                      {STATUS_LABELS[o.status]?.label ?? o.status}
+                    </span>
                   </div>
                 </div>
 
