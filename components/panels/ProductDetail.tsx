@@ -88,6 +88,19 @@ export default function ProductDetail() {
     haptic(60)
   }
 
+  function openTg(msg: string) {
+    const url = `https://t.me/magichous8?text=${encodeURIComponent(msg)}`
+    const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
+    if (tg?.openTelegramLink) tg.openTelegramLink(url)
+    else window.open(url, '_blank')
+  }
+
+  function handleReserve() {
+    const v = variant
+    openTg(`📋 PRENOTAZIONE — ${product.name}${v ? ` [${v.label}]` : ''}${qty > 1 ? ` ×${qty}` : ''}\n\nVorrei prenotare questo prodotto in arrivo. Avvisatemi appena è disponibile 🙌`)
+    haptic(60)
+  }
+
   function shareProduct() {
     const text = `🌿 ${product.name} — ${product.origin ?? ''}\nVedi nel catalogo MagiTripHouse`
     if (navigator.share) {
@@ -325,32 +338,45 @@ export default function ProductDetail() {
             <button className="checkout-btn" disabled style={{ opacity: .45, pointerEvents: 'none' }}>
               ❌ Prodotto Esaurito
             </button>
+          ) : product.isComingSoon ? (
+            <button className="checkout-btn" onClick={handleReserve}>
+              📋 Prenota / Preordina
+            </button>
           ) : (
             <button className="checkout-btn" onClick={handleAdd}>
-              {product.shipFrom === 'meetup' ? '📋 Prenota / Preordina' : '🛒 Aggiungi al Carrello'}
+              🛒 Aggiungi al Carrello
             </button>
           )}
 
-          {product.shipFrom === 'meetup' && (
+          {product.isComingSoon && (
             <>
               <div style={{
-                background: 'rgba(192,132,252,.1)', border: '1px solid rgba(192,132,252,.35)',
+                background: 'rgba(59,130,246,.1)', border: '1px solid rgba(59,130,246,.35)',
                 borderRadius: 10, padding: '9px 12px', marginTop: 6,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                fontSize: '.8rem', fontWeight: 700, color: '#d8b4fe', textAlign: 'center',
+                fontSize: '.8rem', fontWeight: 700, color: '#7ec8f8', textAlign: 'center',
               }}>
-                📋 Prenoti ora — ti avvisiamo quando è disponibile
+                🕐 Prodotto in arrivo — prenota ora, ti avvisiamo quando è disponibile
               </div>
+              <button
+                onClick={() => openTg(`Ciao! Vorrei prenotare ${product.name}${variant ? ` [${variant.label}]` : ''}${qty > 1 ? ` ×${qty}` : ''} e pagare subito per lo sconto 💸`)}
+                style={{
+                  width: '100%', marginTop: 8, padding: '11px', borderRadius: 12, cursor: 'pointer',
+                  fontFamily: 'inherit', fontWeight: 800, fontSize: '.86rem',
+                  background: 'linear-gradient(135deg, rgba(245,200,66,.16), rgba(245,160,0,.1))',
+                  border: '1.5px solid rgba(245,200,66,.45)', color: 'var(--gold)',
+                }}
+              >💸 Paga subito e risparmia — contattaci su Telegram</button>
               <div style={{
                 textAlign: 'center', fontSize: '.72rem',
                 color: 'var(--muted)', marginTop: 4, lineHeight: 1.55,
               }}>
-                🤝 Ritiro a mano di persona · nessun pagamento anticipato
+                💡 Puoi selezionare la quantità qui sopra prima di prenotare
               </div>
             </>
           )}
 
-          {(product.shipFrom === 'spain' || product.shipFrom === 'italy' || !product.shipFrom) && (
+          {!product.isComingSoon && (product.shipFrom === 'spain' || product.shipFrom === 'italy' || !product.shipFrom) && (
             <>
               <div style={{
                 background: 'rgba(61,255,110,.07)', border: '1px solid rgba(61,255,110,.25)',

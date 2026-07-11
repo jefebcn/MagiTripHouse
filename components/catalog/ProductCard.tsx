@@ -40,10 +40,13 @@ export default function ProductCard({ product: p, index }: Props) {
   const badgeStyle   = p.badge ? (BADGE_COLORS[p.badge] ?? { bg: 'rgba(0,0,0,.7)', color: '#fff', border: 'rgba(255,255,255,.2)' }) : null
   const unavailable  = isExhausted || isComingSoon
 
+  // I prodotti "in arrivo" restano cliccabili (per prenotare); solo gli esauriti sono bloccati
+  const clickable = !isExhausted
+
   return (
     <div
-      onClick={() => !unavailable && setDetailProduct(p)}
-      onPointerDown={() => !unavailable && setPressed(true)}
+      onClick={() => clickable && setDetailProduct(p)}
+      onPointerDown={() => clickable && setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       style={{
@@ -51,7 +54,7 @@ export default function ProductCard({ product: p, index }: Props) {
         border: p.category === 'combo' ? '1px solid rgba(255,120,0,.4)' : '1px solid var(--border)',
         borderRadius: 'var(--radius)',
         overflow: 'hidden',
-        cursor: unavailable ? 'default' : 'pointer',
+        cursor: clickable ? 'pointer' : 'default',
         transition: 'transform .15s, box-shadow .15s',
         willChange: 'transform',
         animation: `fadeInUp .35s ease both`,
