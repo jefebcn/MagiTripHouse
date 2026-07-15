@@ -10,6 +10,7 @@ import ProductDetail from '@/components/panels/ProductDetail'
 import Lightbox from '@/components/panels/Lightbox'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useProducts } from '@/hooks/useProducts'
+import { useCartStore } from '@/store/cartStore'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -28,8 +29,25 @@ function LedLine() {
 
 
 export default function Home() {
-  const { view, isLoggedIn, setView, sessionToken, setLastReadNewsAt, setLatestNewsAt } = useUIStore()
+  const { view, isLoggedIn, setView, sessionToken, setLastReadNewsAt, setLatestNewsAt, userHandle } = useUIStore()
+  const cartItems = useCartStore((s) => s.items)
   useTelegram()
+
+  // Salva lo snapshot del carrello lato server (recupero carrello abbandonato)
+  React.useEffect(() => {
+    if (!isLoggedIn || !userHandle) return
+    const t = setTimeout(() => {
+      const items = useCartStore.getState().items
+      if (items.length === 0) {
+        fetch('/api/cart', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userHandle }) }).catch(() => {})
+      } else {
+        const total = items.reduce((s, x) => s + x.variantPrice * x.qty, 0)
+        const payload = items.map(x => ({ name: x.productName, label: x.variantLabel, qty: x.qty, emoji: x.emoji }))
+        fetch('/api/cart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userHandle, items: payload, total }) }).catch(() => {})
+      }
+    }, 2500)
+    return () => clearTimeout(t)
+  }, [cartItems, isLoggedIn, userHandle])
 
   React.useEffect(() => {
     if ('serviceWorker' in navigator) {

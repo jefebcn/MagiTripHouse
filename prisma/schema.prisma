@@ -94,6 +94,14 @@ model PushSubscription {
   createdAt DateTime @default(now())
 }
 
+model AbandonedCart {
+  userId     String    @id
+  items      Json
+  total      Float
+  updatedAt  DateTime  @default(now())
+  notifiedAt DateTime?
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
