@@ -429,6 +429,7 @@ function AccountView() {
   const [pushMsg, setPushMsg] = React.useState<{ ok: boolean; text: string } | null>(null)
   const [permissionDenied, setPermissionDenied] = React.useState(false)
   const [isIos, setIsIos] = React.useState(false)
+  const [isStandalone, setIsStandalone] = React.useState(true)
   const [orders, setOrders] = React.useState<OrderItem[]>([])
   const [showOrders, setShowOrders] = React.useState(false)
   const [showPwd, setShowPwd] = React.useState(false)
@@ -444,6 +445,7 @@ function AccountView() {
   React.useEffect(() => {
     setNameVal(userName)
     setIsIos(/iphone|ipad|ipod/i.test(navigator.userAgent))
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true)
     const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
     setHasSW(supported)
     if (supported) navigator.serviceWorker.ready.then(reg => reg.pushManager.getSubscription().then(sub => setPushEnabled(!!sub)))
@@ -699,6 +701,16 @@ function AccountView() {
           </div>
           <PushToggle enabled={pushEnabled} loading={pushLoading} onToggle={togglePush} />
         </div>
+        {!isStandalone && (
+          <div style={{ background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.25)', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#7ec8f8', marginBottom: 6 }}>📲 Installa l&apos;app per ricevere le notifiche</div>
+            <div style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.7 }}>
+              {isIos
+                ? <>Su iPhone/iPad le notifiche funzionano solo con l&apos;app installata:<br />1. Tocca <strong style={{ color: 'var(--text)' }}>Condividi</strong> ⬆️ in Safari<br />2. <strong style={{ color: 'var(--text)' }}>Aggiungi a Home</strong> ➕<br />3. Apri l&apos;app dalla Home e attiva le notifiche</>
+                : <>Per ricevere le notifiche, aggiungi l&apos;app alla schermata Home:<br />1. Menu del browser <strong style={{ color: 'var(--text)' }}>⋮</strong><br />2. <strong style={{ color: 'var(--text)' }}>Installa app / Aggiungi a Home</strong><br />3. Apri l&apos;app installata e attiva le notifiche</>}
+            </div>
+          </div>
+        )}
         {permissionDenied && (
           <div style={{ background: 'rgba(232,59,59,.06)', border: '1px solid rgba(232,59,59,.2)', borderRadius: 10, padding: '12px 14px' }}>
             <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#e83b3b', marginBottom: 8 }}>🔕 Il browser ha bloccato le notifiche</div>

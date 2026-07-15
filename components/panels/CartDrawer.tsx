@@ -12,6 +12,11 @@ function haptic(pattern: number | number[] = 50) {
 
 const ORIGINS: ShipOrigin[] = ['spain', 'italy', 'pharma', 'meetup']
 
+// Sconto primo ordine — valido solo su spedizioni Spagna/Italia
+const WELCOME_CODE = 'BENVENUTO10'
+const WELCOME_PCT = 0.10
+const DISCOUNT_ORIGINS: ShipOrigin[] = ['spain', 'italy']
+
 export default function CartDrawer() {
   const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView } = useUIStore()
   const { items, changeQty, clearOrigin, itemsByOrigin, totalByOrigin } = useCartStore()
@@ -23,6 +28,10 @@ export default function CartDrawer() {
   const [affBalance, setAffBalance] = useState(0)
   const [creditOrigin, setCreditOrigin] = useState<ShipOrigin | null>(null)
   const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; total: number; method: string | null; isMeetup: boolean } | null>(null)
+  const [discountCode, setDiscountCode] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
+  const [discountPct, setDiscountPct] = useState<Record<ShipOrigin, number>>({ spain: 0, italy: 0, pharma: 0, meetup: 0 })
+  const [discountMsg, setDiscountMsg] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
+  const [discountChecking, setDiscountChecking] = useState<ShipOrigin | null>(null)
 
   const close = useCallback(() => { setConfirmedOrder(null); setCartOpen(false) }, [setCartOpen])
   useSwipeToClose(panelRef, close, cartOpen)
@@ -34,6 +43,32 @@ export default function CartDrawer() {
       .then(d => { if (d?.balance > 0) setAffBalance(d.balance) })
       .catch(() => {})
   }, [cartOpen, isLoggedIn, userHandle])
+
+  async function applyDiscount(origin: ShipOrigin) {
+    const code = discountCode[origin].trim().toUpperCase()
+    if (!code) return
+    if (code !== WELCOME_CODE) {
+      setDiscountPct(p => ({ ...p, [origin]: 0 }))
+      setDiscountMsg(m => ({ ...m, [origin]: '❌ Codice non valido' }))
+      return
+    }
+    setDiscountChecking(origin)
+    try {
+      const res = await fetch(`/api/orders/mine?userId=${encodeURIComponent(userHandle)}`)
+      const orders = res.ok ? await res.json() : []
+      if (Array.isArray(orders) && orders.length > 0) {
+        setDiscountPct(p => ({ ...p, [origin]: 0 }))
+        setDiscountMsg(m => ({ ...m, [origin]: '❌ Valido solo per il primo ordine' }))
+      } else {
+        setDiscountPct(p => ({ ...p, [origin]: WELCOME_PCT }))
+        setDiscountMsg(m => ({ ...m, [origin]: '✅ Sconto 10% primo ordine applicato!' }))
+        haptic(40)
+      }
+    } catch {
+      setDiscountMsg(m => ({ ...m, [origin]: '❌ Errore, riprova' }))
+    }
+    setDiscountChecking(null)
+  }
 
   function handleCheckout(origin: ShipOrigin) {
     const needsConfirm = origin === 'spain' || origin === 'italy'
@@ -66,7 +101,8 @@ export default function CartDrawer() {
     const userId = userHandle || tgUser || 'unknown'
     const subtotal = totalByOrigin(origin)
     const creditApplied = creditOrigin === origin ? Math.min(affBalance, subtotal) : 0
-    const productTotal = subtotal - creditApplied
+    const discountAmount = DISCOUNT_ORIGINS.includes(origin) ? subtotal * (discountPct[origin] ?? 0) : 0
+    const productTotal = subtotal - creditApplied - discountAmount
     const finalTotal = productTotal + sm.shipCost
 
     const orderId = `MTH-${Date.now()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`
@@ -88,6 +124,7 @@ export default function CartDrawer() {
       `Subtotale: €${subtotal.toFixed(2)}`,
     ]
     if (creditApplied > 0) lines.push(`🎁 Credito affiliato: −€${creditApplied.toFixed(2)}`)
+    if (discountAmount > 0) lines.push(`🎟 Sconto primo ordine (10%): −€${discountAmount.toFixed(2)}`)
     if (isMeetup) {
       lines.push(`🤝 Ritiro in loco · nessuna spedizione`)
       lines.push(`💰 *TOTALE: €${(subtotal - creditApplied).toFixed(2)}*`)
@@ -121,7 +158,7 @@ export default function CartDrawer() {
         userId,
         total: finalTotal,
         items: oItems.map((x) => ({ id: x.id, name: x.productName, emoji: x.emoji, label: x.variantLabel, price: x.variantPrice, qty: x.qty })),
-        note: `[${sm.label}]${!isMeetup && payMethod[origin] ? ` [${payMethod[origin] === 'crypto' ? 'Crypto' : 'IBAN'}]` : ''} ${note[origin].trim()}`.trim() || null,
+        note: `[${sm.label}]${!isMeetup && payMethod[origin] ? ` [${payMethod[origin] === 'crypto' ? 'Crypto' : 'IBAN'}]` : ''}${discountAmount > 0 ? ' [BENVENUTO10]' : ''} ${note[origin].trim()}`.trim() || null,
         referredBy: typeof localStorage !== 'undefined' ? localStorage.getItem('tp_ref') : null,
         affiliateCredit: creditApplied > 0 ? creditApplied : undefined,
         affiliateUsername: creditApplied > 0 ? userHandle : undefined,
@@ -135,6 +172,9 @@ export default function CartDrawer() {
     setNote(n => ({ ...n, [origin]: '' }))
     setPayMethod(p => ({ ...p, [origin]: null }))
     setConfirmingOrigin(c => c === origin ? null : c)
+    setDiscountCode(d => ({ ...d, [origin]: '' }))
+    setDiscountPct(p => ({ ...p, [origin]: 0 }))
+    setDiscountMsg(m => ({ ...m, [origin]: '' }))
     setConfirmedOrder({
       id: orderId,
       total: isMeetup ? subtotal - creditApplied : finalTotal,
@@ -248,7 +288,9 @@ export default function CartDrawer() {
               const creditApplied = creditOrigin === origin ? Math.min(affBalance, subtotal) : 0
               const isPharma = origin === 'pharma'
               const isMeetup = origin === 'meetup'
-              const finalTotal = (isPharma || isMeetup) ? subtotal - creditApplied : subtotal - creditApplied + sm.shipCost
+              const canDiscount = DISCOUNT_ORIGINS.includes(origin)
+              const discountAmount = canDiscount ? subtotal * (discountPct[origin] ?? 0) : 0
+              const finalTotal = (isPharma || isMeetup) ? subtotal - creditApplied : subtotal - creditApplied - discountAmount + sm.shipCost
 
               return (
                 <div key={origin} style={{
@@ -419,6 +461,44 @@ export default function CartDrawer() {
                     style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '9px 12px', color: 'var(--text)', fontSize: '.82rem', fontFamily: 'inherit', resize: 'none', outline: 'none', boxSizing: 'border-box' }}
                   />
 
+                  {/* Codice sconto primo ordine (solo Spagna/Italia) */}
+                  {canDiscount && discountPct[origin] === 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          value={discountCode[origin]}
+                          onChange={(e) => { setDiscountCode(d => ({ ...d, [origin]: e.target.value })); setDiscountMsg(m => ({ ...m, [origin]: '' })) }}
+                          placeholder="🎟 Codice sconto"
+                          style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', color: 'var(--text)', fontSize: '.82rem', fontFamily: 'inherit', outline: 'none', textTransform: 'uppercase' }}
+                        />
+                        <button
+                          onClick={() => applyDiscount(origin)}
+                          disabled={discountChecking === origin || !discountCode[origin].trim()}
+                          style={{
+                            padding: '10px 16px', borderRadius: 10, fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem',
+                            cursor: discountChecking === origin || !discountCode[origin].trim() ? 'default' : 'pointer',
+                            background: 'rgba(245,200,66,.12)', border: '1px solid rgba(245,200,66,.4)', color: 'var(--gold)',
+                            opacity: !discountCode[origin].trim() ? .55 : 1,
+                          }}
+                        >{discountChecking === origin ? '…' : 'Applica'}</button>
+                      </div>
+                      {discountMsg[origin] && (
+                        <div style={{ fontSize: '.72rem', color: discountMsg[origin].startsWith('✅') ? 'var(--green)' : 'var(--red)' }}>
+                          {discountMsg[origin]}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {canDiscount && discountPct[origin] > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(245,200,66,.08)', border: '1px solid rgba(245,200,66,.35)', borderRadius: 10, padding: '9px 12px' }}>
+                      <span style={{ fontSize: '.78rem', color: 'var(--gold)', fontWeight: 700 }}>🎟 Sconto 10% primo ordine attivo</span>
+                      <button
+                        onClick={() => { setDiscountPct(p => ({ ...p, [origin]: 0 })); setDiscountCode(d => ({ ...d, [origin]: '' })); setDiscountMsg(m => ({ ...m, [origin]: '' })) }}
+                        style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.9rem' }}
+                      >✕</button>
+                    </div>
+                  )}
+
                   {/* Totals */}
                   <div style={{ background: 'var(--bg3)', borderRadius: 12, padding: 12, fontSize: '.8rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', marginBottom: 4 }}>
@@ -427,6 +507,11 @@ export default function CartDrawer() {
                     {creditApplied > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--green)', marginBottom: 4 }}>
                         <span>🎁 Credito</span><span>−€{creditApplied.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {discountAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--gold)', marginBottom: 4 }}>
+                        <span>🎟 Sconto primo ordine</span><span>−€{discountAmount.toFixed(2)}</span>
                       </div>
                     )}
                     {isMeetup ? (
