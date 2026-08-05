@@ -142,8 +142,8 @@ export default function AdminDashboard() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
             <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem' }}>💰 Profitto stimato</div>
-            <div style={{ fontSize: '.66rem', color: 'var(--muted)' }}>
-              su prodotti con costo impostato{stats.profit.coverage < 1 ? ` · ${Math.round(stats.profit.coverage * 100)}% dei prodotti` : ''}
+            <div style={{ fontSize: '.66rem', color: 'var(--muted)', textAlign: 'right' }}>
+              costo automatico: Cali €4,2/g · Dry €3,4/g · Frozen €5,5/g
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
@@ -162,11 +162,9 @@ export default function AdminDashboard() {
               <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--text)', fontFamily: "'Fredoka One', cursive" }}>{fmt(stats.profit.cost)}</div>
             </div>
           </div>
-          {stats.profit.coverage < 1 && (
-            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
-              💡 Imposta il <strong>costo d&apos;acquisto</strong> nei prodotti (campo accanto al prezzo) per un calcolo completo del profitto.
-            </div>
-          )}
+          <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
+            💡 Cali/Dry/Frozen usano un costo automatico per grammo. Per gli altri prodotti imposta il <strong>costo d&apos;acquisto</strong> nel campo accanto al prezzo.
+          </div>
         </div>
       )}
 

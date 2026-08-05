@@ -19,7 +19,7 @@ export async function GET() {
     prisma.user.findMany({ select: { createdAt: true } }),
     prisma.affiliate.findMany({ orderBy: { joinedAt: 'desc' } }),
     prisma.commissionPayout.findMany({ orderBy: { requestedAt: 'desc' } }),
-    prisma.product.findMany({ select: { id: true, name: true, variants: true } }),
+    prisma.product.findMany({ select: { id: true, name: true, category: true, variants: true } }),
   ])
 
   // Lookup costo d'acquisto per prodotto+taglio (per id e per nome, come fallback)
@@ -39,6 +39,26 @@ export async function GET() {
   const lookupCost = (id?: string, name?: string, label?: string): number | null => {
     if (label && id && costByIdLabel.has(`${id}__${label}`)) return costByIdLabel.get(`${id}__${label}`)!
     if (label && name && costByNameLabel.has(`${name}__${label}`)) return costByNameLabel.get(`${name}__${label}`)!
+    return null
+  }
+
+  // Mappa prodotto → categoria (per il costo di default)
+  const catById = new Map<string, string>()
+  const catByName = new Map<string, string>()
+  for (const p of products) {
+    if (p.category) { catById.set(p.id, p.category); catByName.set(p.name, p.category) }
+  }
+  // Costo di default per grammo quando il costo esplicito non è impostato:
+  // Cali €4.2/g · Dry €3.4/g · Frozen €5.5/g
+  const defaultCostPerGram = (id?: string, name?: string): number | null => {
+    const n = (name ?? '').toLowerCase()
+    if (n.includes('froz')) return 5.5
+    if (n.includes('dry'))  return 3.4
+    if (n.includes('cali')) return 4.2
+    const cat = (id && catById.get(id)) || (name && catByName.get(name)) || ''
+    if (cat === 'frozen') return 5.5
+    if (cat === 'hash')   return 3.4
+    if (cat === 'premium') return 4.2
     return null
   }
 
@@ -70,16 +90,30 @@ export async function GET() {
       productCounts[key] = (productCounts[key] ?? 0) + qty
 
       const productName = item.name ?? item.label ?? item.id ?? '?'
-      const g = parseGrams(item.label ?? '') * qty
+      const gramsPerUnit = parseGrams(item.label ?? '')
+      const g = gramsPerUnit * qty
       const rev = (item.price ?? 0) * qty
-      const unitCost = lookupCost(item.id, item.name, item.label)
-      const lineCost = unitCost != null ? unitCost * qty : 0
+
+      // Costo esplicito per variante; se assente, costo di default per grammo (Cali/Dry/Frozen)
+      const explicitUnitCost = lookupCost(item.id, item.name, item.label)
+      let lineCost = 0
+      let hasCost = false
+      if (explicitUnitCost != null) {
+        lineCost = explicitUnitCost * qty
+        hasCost = true
+      } else {
+        const cpg = defaultCostPerGram(item.id, item.name)
+        if (cpg != null && gramsPerUnit > 0) {
+          lineCost = gramsPerUnit * cpg * qty
+          hasCost = true
+        }
+      }
 
       if (!productStats[productName]) productStats[productName] = { grams: 0, revenue: 0, qty: 0, ordersCount: 0, cost: 0, profit: 0, costKnown: false }
       productStats[productName].grams   += g
       productStats[productName].revenue += rev
       productStats[productName].qty     += qty
-      if (unitCost != null) {
+      if (hasCost) {
         productStats[productName].cost   += lineCost
         productStats[productName].profit += rev - lineCost
         productStats[productName].costKnown = true
