@@ -102,6 +102,26 @@ model AbandonedCart {
   notifiedAt DateTime?
 }
 
+model WarehousePayment {
+  id           String   @id @default(cuid())
+  seq          Int
+  periodStart  DateTime
+  periodEnd    DateTime
+  base         Float
+  vacationDays Int      @default(0)
+  deduction    Float    @default(0)
+  total        Float
+  receiptNo    String
+  paidAt       DateTime @default(now())
+}
+
+model WarehouseVacation {
+  id        String   @id @default(cuid())
+  days      Int
+  note      String?
+  createdAt DateTime @default(now())
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String

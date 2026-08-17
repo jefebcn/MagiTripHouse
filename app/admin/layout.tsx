@@ -11,6 +11,7 @@ const NAV = [
   { href: '/admin/news',       icon: '📢', label: 'Novità'    },
   { href: '/admin/members',    icon: '👥', label: 'Membri'    },
   { href: '/admin/affiliates', icon: '🤝', label: 'Affiliati' },
+  { href: '/admin/warehouse',  icon: '🏭', label: 'Magazzino' },
   { href: '/admin/bulk-images',icon: '🖼️', label: 'Immagini'  },
 ]
 

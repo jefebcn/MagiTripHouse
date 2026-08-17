@@ -24,6 +24,7 @@ const QUICK_ACTIONS = [
   { href: '/admin/products?category=combo', icon: '🔥', label: 'Crea combo'     },
   { href: '/admin/news',                    icon: '📢', label: 'Pubblica novità' },
   { href: '/admin/orders',                  icon: '📋', label: 'Gestisci ordini' },
+  { href: '/admin/warehouse',               icon: '🏭', label: 'Magazzino'       },
 ]
 
 function fmt(n: number) {
