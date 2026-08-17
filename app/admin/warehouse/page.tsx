@@ -76,29 +76,56 @@ export default function AdminWarehouse() {
   }
 
   function printReceipt(r: { receiptNo: string; periodStart: string; periodEnd: string; base: number; vacationDays: number; deduction: number; total: number; date: string; draft?: boolean }) {
-    const row = (label: string, value: string, strong = false) =>
-      `<div style="display:flex;justify-content:space-between;padding:7px 0;${strong ? 'border-top:2px solid #111;margin-top:6px;font-size:19px;font-weight:800' : 'color:#444'}"><span>${label}</span><span>${value}</span></div>`
+    const line = (label: string, value: string, sub?: string) =>
+      `<tr><td style="padding:13px 0;border-bottom:1px solid #eee"><div style="font-weight:600">${label}</div>${sub ? `<div style="font-size:11px;color:#999;margin-top:2px">${sub}</div>` : ''}</td><td style="padding:13px 0;border-bottom:1px solid #eee;text-align:right;font-weight:600;white-space:nowrap">${value}</td></tr>`
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${r.receiptNo}</title>
-    <style>@page{size:A5;margin:14mm}body{font-family:'Helvetica Neue',Arial,sans-serif;color:#111;margin:0}
-    .box{max-width:440px;margin:0 auto;border:1.5px solid #111;border-radius:10px;padding:26px 28px}
-    .brand{font-size:22px;font-weight:800;letter-spacing:.5px}.muted{color:#777;font-size:12px}
-    .badge{display:inline-block;background:#f2f2f2;border:1px solid #ddd;border-radius:20px;padding:3px 12px;font-size:12px;font-family:monospace;margin-top:6px}
-    .draft{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);font-size:66px;color:rgba(0,0,0,.07);font-weight:800;letter-spacing:4px}</style>
-    </head><body>${r.draft ? '<div class="draft">BOZZA</div>' : ''}
-    <div class="box">
-      <div class="brand">Magic Trip House</div>
-      <div class="muted">Ricevuta affitto magazzino</div>
-      <div class="badge">${r.receiptNo}</div>
-      <div style="margin-top:20px">
-        ${row('Periodo', `${fmtDay(r.periodStart)} – ${fmtDay(r.periodEnd)}`)}
-        ${row('Quota base (15 giorni)', `€ ${r.base.toFixed(2)}`)}
-        ${r.deduction > 0 ? row(`Detrazione vacanza (${r.vacationDays} giorni)`, `− € ${r.deduction.toFixed(2)}`) : ''}
-        ${row('TOTALE', `€ ${r.total.toFixed(2)}`, true)}
-        ${row(r.draft ? 'Data emissione' : 'Pagato il', r.date)}
+    <style>
+      @page{size:A5;margin:0}
+      *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a1a1a;background:#fff}
+      .page{width:148mm;min-height:210mm;margin:0 auto;padding:0;position:relative;overflow:hidden}
+      .band{background:linear-gradient(120deg,#0b3d1e,#1a7a3d);color:#fff;padding:26px 30px 22px}
+      .band .brand{font-size:24px;font-weight:800;letter-spacing:.4px;display:flex;align-items:center;gap:9px}
+      .band .sub{font-size:12px;opacity:.85;margin-top:4px;letter-spacing:2px;text-transform:uppercase}
+      .rtag{position:absolute;top:24px;right:30px;text-align:right;color:#fff}
+      .rtag .lbl{font-size:10px;opacity:.8;letter-spacing:2px;text-transform:uppercase}
+      .rtag .num{font-family:'SF Mono',Menlo,monospace;font-size:15px;font-weight:700;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:4px 10px;margin-top:4px;display:inline-block}
+      .body{padding:26px 30px}
+      .meta{display:flex;gap:14px;margin-bottom:18px}
+      .meta .cell{flex:1;background:#f6f8f6;border:1px solid #eaefea;border-radius:10px;padding:11px 14px}
+      .meta .k{font-size:10px;color:#8a9a8a;text-transform:uppercase;letter-spacing:1px}
+      .meta .v{font-size:14px;font-weight:700;margin-top:3px}
+      table{width:100%;border-collapse:collapse}
+      .total{margin-top:20px;background:#f2fbf5;border:1.5px solid #cdeed7;border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
+      .total .k{font-size:13px;font-weight:700;color:#0b3d1e;letter-spacing:.5px}
+      .total .v{font-size:30px;font-weight:800;color:#1a7a3d}
+      .paid{display:inline-block;margin-top:16px;background:${r.draft ? '#fff5e0' : '#eafaef'};border:1px solid ${r.draft ? '#f0d48a' : '#bfe9cc'};color:${r.draft ? '#a8770a' : '#1a7a3d'};border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700}
+      .foot{position:absolute;bottom:0;left:0;right:0;padding:16px 30px;border-top:1px solid #eee;color:#9a9a9a;font-size:10.5px;text-align:center;line-height:1.6}
+      .wm{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%) rotate(-22deg);font-size:80px;color:rgba(200,120,0,.07);font-weight:800;letter-spacing:6px;pointer-events:none}
+    </style></head><body>
+    <div class="page">
+      ${r.draft ? '<div class="wm">BOZZA</div>' : ''}
+      <div class="band">
+        <div class="brand">🏭 Magic Trip House</div>
+        <div class="sub">Ricevuta affitto magazzino</div>
+        <div class="rtag"><div class="lbl">Ricevuta N°</div><div class="num">${r.receiptNo}</div></div>
       </div>
-      <div class="muted" style="margin-top:24px;text-align:center">Pagamento affitto locale magazzino · rata quindicinale</div>
+      <div class="body">
+        <div class="meta">
+          <div class="cell"><div class="k">${r.draft ? 'Data emissione' : 'Data pagamento'}</div><div class="v">${r.date}</div></div>
+          <div class="cell"><div class="k">Periodo di riferimento</div><div class="v">${fmtDay(r.periodStart)} – ${fmtDay(r.periodEnd)}</div></div>
+        </div>
+        <table>
+          <tr><td style="padding:0 0 8px;font-size:10px;color:#8a9a8a;text-transform:uppercase;letter-spacing:1px">Descrizione</td><td style="padding:0 0 8px;font-size:10px;color:#8a9a8a;text-transform:uppercase;letter-spacing:1px;text-align:right">Importo</td></tr>
+          ${line('Canone affitto magazzino', `€ ${r.base.toFixed(2)}`, 'Rata quindicinale (15 giorni)')}
+          ${r.deduction > 0 ? line('Detrazione giorni di chiusura', `− € ${r.deduction.toFixed(2)}`, `${r.vacationDays} giorni non conteggiati`) : ''}
+        </table>
+        <div class="total"><span class="k">TOTALE ${r.draft ? 'DA PAGARE' : 'PAGATO'}</span><span class="v">€ ${r.total.toFixed(2)}</span></div>
+        <div class="paid">${r.draft ? '⏳ Bozza — non ancora saldato' : '✓ Pagamento effettuato'}</div>
+      </div>
+      <div class="foot">Magic Trip House · Affitto locale magazzino · pagamento quindicinale (2 rate/mese)<br/>Documento generato automaticamente${r.draft ? ' — valido come ricevuta dopo il saldo' : ''}</div>
     </div>
-    <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
     </body></html>`
     const w = window.open('', '_blank')
     if (!w) { alert('Consenti i popup del browser per generare il PDF (poi scegli “Salva come PDF”).'); return }
