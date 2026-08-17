@@ -75,10 +75,50 @@ export default function AdminWarehouse() {
     } finally { setBusy(false) }
   }
 
+  function printReceipt(r: { receiptNo: string; periodStart: string; periodEnd: string; base: number; vacationDays: number; deduction: number; total: number; date: string; draft?: boolean }) {
+    const row = (label: string, value: string, strong = false) =>
+      `<div style="display:flex;justify-content:space-between;padding:7px 0;${strong ? 'border-top:2px solid #111;margin-top:6px;font-size:19px;font-weight:800' : 'color:#444'}"><span>${label}</span><span>${value}</span></div>`
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${r.receiptNo}</title>
+    <style>@page{size:A5;margin:14mm}body{font-family:'Helvetica Neue',Arial,sans-serif;color:#111;margin:0}
+    .box{max-width:440px;margin:0 auto;border:1.5px solid #111;border-radius:10px;padding:26px 28px}
+    .brand{font-size:22px;font-weight:800;letter-spacing:.5px}.muted{color:#777;font-size:12px}
+    .badge{display:inline-block;background:#f2f2f2;border:1px solid #ddd;border-radius:20px;padding:3px 12px;font-size:12px;font-family:monospace;margin-top:6px}
+    .draft{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);font-size:66px;color:rgba(0,0,0,.07);font-weight:800;letter-spacing:4px}</style>
+    </head><body>${r.draft ? '<div class="draft">BOZZA</div>' : ''}
+    <div class="box">
+      <div class="brand">Magic Trip House</div>
+      <div class="muted">Ricevuta affitto magazzino</div>
+      <div class="badge">${r.receiptNo}</div>
+      <div style="margin-top:20px">
+        ${row('Periodo', `${fmtDay(r.periodStart)} – ${fmtDay(r.periodEnd)}`)}
+        ${row('Quota base (15 giorni)', `€ ${r.base.toFixed(2)}`)}
+        ${r.deduction > 0 ? row(`Detrazione vacanza (${r.vacationDays} giorni)`, `− € ${r.deduction.toFixed(2)}`) : ''}
+        ${row('TOTALE', `€ ${r.total.toFixed(2)}`, true)}
+        ${row(r.draft ? 'Data emissione' : 'Pagato il', r.date)}
+      </div>
+      <div class="muted" style="margin-top:24px;text-align:center">Pagamento affitto locale magazzino · rata quindicinale</div>
+    </div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
+    </body></html>`
+    const w = window.open('', '_blank')
+    if (!w) { alert('Consenti i popup del browser per generare il PDF (poi scegli “Salva come PDF”).'); return }
+    w.document.write(html); w.document.close()
+  }
+
   if (loading) return <div style={{ color: 'var(--muted)', textAlign: 'center', padding: 40 }}>Caricamento…</div>
   if (!data) return <div style={{ color: 'var(--red)', textAlign: 'center', padding: 40 }}>Errore nel caricamento</div>
 
   const { config, next } = data
+
+  function printNextDraft() {
+    printReceipt({
+      receiptNo: `MAG-${String(next.seq + 1).padStart(4, '0')}`,
+      periodStart: next.periodStart, periodEnd: next.periodEnd,
+      base: next.base, vacationDays: next.deductDays, deduction: next.deduction, total: next.total,
+      date: new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }),
+      draft: true,
+    })
+  }
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -135,6 +175,10 @@ export default function AdminWarehouse() {
           </div>
         )}
 
+        <button
+          onClick={printNextDraft}
+          style={{ width: '100%', marginBottom: 8, padding: '11px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '.85rem', background: 'rgba(245,200,66,.12)', border: '1px solid rgba(245,200,66,.4)', color: 'var(--gold)' }}
+        >🧾 Genera ricevuta PDF (bozza)</button>
         <button
           onClick={pay}
           disabled={busy}
@@ -228,7 +272,13 @@ export default function AdminWarehouse() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: '.72rem', marginTop: 4 }}><span>Pagato il</span><span>{fmtDate(receipt.paidAt)}</span></div>
             </div>
-            <button onClick={() => setReceipt(null)} style={{ width: '100%', marginTop: 18, padding: '11px', borderRadius: 10, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer' }}>Chiudi</button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+              <button
+                onClick={() => printReceipt({ receiptNo: receipt.receiptNo, periodStart: receipt.periodStart, periodEnd: receipt.periodEnd, base: receipt.base, vacationDays: receipt.vacationDays, deduction: receipt.deduction, total: receipt.total, date: fmtDate(receipt.paidAt) })}
+                style={{ flex: 1, padding: '11px', borderRadius: 10, background: 'rgba(245,200,66,.14)', border: '1px solid rgba(245,200,66,.4)', color: 'var(--gold)', fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer' }}
+              >🧾 Scarica PDF</button>
+              <button onClick={() => setReceipt(null)} style={{ padding: '11px 18px', borderRadius: 10, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer' }}>Chiudi</button>
+            </div>
           </div>
         </div>
       )}
