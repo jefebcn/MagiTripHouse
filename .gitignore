@@ -28,3 +28,4 @@ tsconfig.tsbuildinfo
 *.dc.html
 /canvas.json
 storia-*.html
+/tattoo-bg.*
