@@ -23,3 +23,8 @@ npm-debug.log*
 .vercel
 tsconfig.tsbuildinfo
 .claude/
+
+# Design canvas working files (storie/social generate via Claude Design)
+*.dc.html
+/canvas.json
+storia-*.html
