@@ -14,12 +14,13 @@ export async function GET() {
   const monthStart = new Date(todayStart); monthStart.setDate(todayStart.getDate() - 30)
   const yearStart = new Date(todayStart); yearStart.setFullYear(todayStart.getFullYear() - 1)
 
-  const [orders, users, affiliates, payouts, products] = await Promise.all([
+  const [orders, users, affiliates, payouts, products, warehousePayments] = await Promise.all([
     prisma.order.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.user.findMany({ select: { createdAt: true } }),
     prisma.affiliate.findMany({ orderBy: { joinedAt: 'desc' } }),
     prisma.commissionPayout.findMany({ orderBy: { requestedAt: 'desc' } }),
     prisma.product.findMany({ select: { id: true, name: true, category: true, variants: true } }),
+    prisma.warehousePayment.findMany({ select: { total: true } }),
   ])
 
   // Lookup costo d'acquisto per prodotto+taglio (per id e per nome, come fallback)
@@ -70,6 +71,7 @@ export async function GET() {
   function parseGrams(label: string): number {
     return parseFloat(label.replace(/[^0-9.]/g, '')) || 0
   }
+  const round2 = (n: number) => Math.round(n * 100) / 100
 
   // Per-product aggregation: grams, revenue, qty, orders count, cost, profit
   type ProductStat = { grams: number; revenue: number; qty: number; ordersCount: number; cost: number; profit: number; costKnown: boolean }
@@ -134,6 +136,13 @@ export async function GET() {
       }
     }
   }
+
+  // Perdita netta spedizione: il negozio paga ~€20 e incassa €10 → −€10 per ordine spedito (Spagna/Italia)
+  const SHIP_NET_LOSS = 10
+  const shippingLossOrders = orders.filter(o => {
+    const n = o.note ?? ''
+    return n.includes('[Spagna]') || n.includes('[Italia]')
+  }).length
 
   const topProducts = Object.entries(productCounts)
     .sort((a, b) => b[1] - a[1])
@@ -211,6 +220,10 @@ export async function GET() {
       revenueWithKnownCost,
       margin: revenueWithKnownCost > 0 ? (profitTotal / revenueWithKnownCost) * 100 : null,
       coverage: productStatsList.length > 0 ? productStatsList.filter(p => p.costKnown).length / productStatsList.length : 0,
+      warehouseRent: round2(warehousePayments.reduce((s, p) => s + p.total, 0)),
+      shippingOrders: shippingLossOrders,
+      shippingLoss: round2(shippingLossOrders * SHIP_NET_LOSS),
+      net: round2(profitTotal - warehousePayments.reduce((s, p) => s + p.total, 0) - shippingLossOrders * SHIP_NET_LOSS),
     },
     affiliates: affiliates.map(a => ({
       ...a,

@@ -10,7 +10,7 @@ interface Stats {
   topProducts: Array<{ name: string; count: number }>
   grams: { total: number; today: number; week: number; month: number; year: number }
   productStats: Array<{ name: string; grams: number; revenue: number; qty: number; ordersCount: number; avgPricePerGram: number; cost: number; profit: number; costKnown: boolean; margin: number | null }>
-  profit: { cost: number; profit: number; revenueWithKnownCost: number; margin: number | null; coverage: number }
+  profit: { cost: number; profit: number; revenueWithKnownCost: number; margin: number | null; coverage: number; warehouseRent: number; shippingOrders: number; shippingLoss: number; net: number }
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -149,7 +149,7 @@ export default function AdminDashboard() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
             <div>
-              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Profitto netto</div>
+              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Profitto prodotti</div>
               <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--green)', fontFamily: "'Fredoka One', cursive" }}>{fmt(stats.profit.profit)}</div>
             </div>
             <div>
@@ -163,8 +163,29 @@ export default function AdminDashboard() {
               <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--text)', fontFamily: "'Fredoka One', cursive" }}>{fmt(stats.profit.cost)}</div>
             </div>
           </div>
+
+          {/* Breakdown profitto NETTO */}
+          <div style={{ marginTop: 16, background: 'rgba(0,0,0,.18)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: '.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
+                <span>Profitto prodotti</span><span style={{ color: 'var(--green)', fontWeight: 700 }}>{fmt(stats.profit.profit)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
+                <span>🏭 Affitto magazzino</span><span style={{ color: 'var(--orange)', fontWeight: 700 }}>−{fmt(stats.profit.warehouseRent)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
+                <span>🚚 Perdite spedizione <span style={{ fontSize: '.66rem', opacity: .7 }}>({stats.profit.shippingOrders} ordini × €10)</span></span>
+                <span style={{ color: 'var(--orange)', fontWeight: 700 }}>−{fmt(stats.profit.shippingLoss)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 2 }}>
+                <span style={{ fontWeight: 700 }}>💰 Profitto NETTO</span>
+                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.7rem', color: stats.profit.net >= 0 ? 'var(--green)' : 'var(--red)', textShadow: stats.profit.net >= 0 ? 'var(--led-green)' : 'none' }}>{fmt(stats.profit.net)}</span>
+              </div>
+            </div>
+          </div>
+
           <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
-            💡 Cali/Dry/Frozen usano un costo automatico per grammo. Per gli altri prodotti imposta il <strong>costo d&apos;acquisto</strong> nel campo accanto al prezzo.
+            💡 Cali/Dry/Frozen usano un costo automatico per grammo. Il netto sottrae affitto magazzino (rate pagate) e perdita spedizione (€10/ordine spedito).
           </div>
         </div>
       )}
