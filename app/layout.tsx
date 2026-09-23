@@ -3,12 +3,12 @@ import Script from 'next/script'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'MagiTripHouse',
-  description: 'Catalogo CBD Premium',
+  title: 'Magic Trip House',
+  description: 'Premium quality · consegna discreta a casa o in locker in tutta Europa',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    title: 'MagiTripHouse',
+    title: 'Magic Trip House',
     statusBarStyle: 'black-translucent',
   },
   icons: {

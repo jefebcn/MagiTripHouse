@@ -30,7 +30,7 @@ const MEETUP_DEADLINE = new Date('2026-07-01T00:00:00')
 
 export default function HubView() {
   const { goToCatalog, setView, userName } = useUIStore()
-  const { products } = useProducts()
+  const { products, isLoading } = useProducts()
   const firstName = (userName || '').trim().split(/\s+/)[0]
 
   const [now, setNow] = React.useState(() => new Date())
@@ -249,7 +249,7 @@ export default function HubView() {
                     borderRadius: 20, padding: '3px 10px',
                     fontSize: '.66rem', color: sm.color, fontWeight: 700,
                   }}>
-                    {n} prodott{n === 1 ? 'o' : 'i'} ›
+                    {isLoading ? '…' : `${n} prodott${n === 1 ? 'o' : 'i'}`} ›
                   </span>
                 </div>
               </button>
@@ -285,7 +285,7 @@ export default function HubView() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', color: '#818cf8' }}>Pharma EU</span>
-                  <span style={{ fontSize: '.62rem', color: 'var(--muted)' }}>· {n} prodotti</span>
+                  <span style={{ fontSize: '.62rem', color: 'var(--muted)' }}>· {isLoading ? '…' : n} prodotti</span>
                 </div>
                 <div style={{ fontSize: '.63rem', color: 'rgba(106,138,106,.7)', marginTop: 2 }}>
                   Deus Medical · Astera Labs · Biaxol · 🚚 {sm.delivery}

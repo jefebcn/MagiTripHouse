@@ -1,7 +1,7 @@
 {
-  "name": "MagiTripHouse",
-  "short_name": "MagiTripHouse",
-  "description": "Catalogo CBD Premium",
+  "name": "Magic Trip House",
+  "short_name": "Magic Trip House",
+  "description": "Premium quality · consegna discreta a casa o in locker in tutta Europa",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#080c08",
