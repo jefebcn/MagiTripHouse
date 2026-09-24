@@ -11,10 +11,6 @@ export const metadata: Metadata = {
     title: 'Magic Trip House',
     statusBarStyle: 'black-translucent',
   },
-  icons: {
-    apple: '/IMG_2768.jpeg',
-    icon: '/IMG_2768.jpeg',
-  },
 }
 
 export const viewport: Viewport = {
