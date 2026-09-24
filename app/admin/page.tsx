@@ -144,7 +144,7 @@ export default function AdminDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
             <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem' }}>💰 Profitto stimato</div>
             <div style={{ fontSize: '.66rem', color: 'var(--muted)', textAlign: 'right' }}>
-              costo automatico: Cali €4,2/g · Dry €3,4/g · Frozen €5,5/g
+              costo automatico: Cali €4,2/g · Dry €3,4/g · Frozen €5,5/g · Vapepen €18/pz
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>

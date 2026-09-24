@@ -62,6 +62,12 @@ export async function GET() {
     if (cat === 'premium') return 4.2
     return null
   }
+  // Costo di default per pezzo: vapepen €18/pezzo
+  const defaultCostPerPiece = (name?: string): number | null => {
+    const n = (name ?? '').toLowerCase()
+    if (n.includes('vape') || n.includes('vapepen') || n.includes('vaporizz')) return 18
+    return null
+  }
 
   const revenue = (from?: Date) =>
     orders
@@ -97,6 +103,7 @@ export async function GET() {
       const rev = (item.price ?? 0) * qty
 
       // Costo esplicito per variante; se assente, costo di default per grammo (Cali/Dry/Frozen)
+      // oppure per pezzo (vapepen €18/pz)
       const explicitUnitCost = lookupCost(item.id, item.name, item.label)
       let lineCost = 0
       let hasCost = false
@@ -105,8 +112,13 @@ export async function GET() {
         hasCost = true
       } else {
         const cpg = defaultCostPerGram(item.id, item.name)
+        const cpp = defaultCostPerPiece(item.name)
         if (cpg != null && gramsPerUnit > 0) {
           lineCost = gramsPerUnit * cpg * qty
+          hasCost = true
+        } else if (cpp != null) {
+          const piecesPerUnit = parseGrams(item.label ?? '') || 1  // "1pz", "3pz"… (1 se senza numero)
+          lineCost = piecesPerUnit * cpp * qty
           hasCost = true
         }
       }
