@@ -15,7 +15,9 @@ const ORIGINS: ShipOrigin[] = ['spain', 'italy', 'pharma', 'meetup']
 // Sconto primo ordine — valido solo su spedizioni Spagna/Italia
 const WELCOME_CODE = 'BENVENUTO10'
 const WELCOME_PCT = 0.10
-const MEETUP_MIN = 100 // ordine minimo € per prodotti meetup / ritiro in loco
+const MEETUP_MIN = 100      // ordine minimo € per prodotti meetup / ritiro in loco
+const MEETUP_MIN_VAPE = 50  // minimo ridotto se l'ordine meetup è solo vape pen
+const isVape = (name?: string) => (name ?? '').toLowerCase().includes('vape')
 const DISCOUNT_ORIGINS: ShipOrigin[] = ['spain', 'italy']
 
 export default function CartDrawer() {
@@ -71,9 +73,15 @@ export default function CartDrawer() {
     setDiscountChecking(null)
   }
 
+  // Minimo meetup: €50 se il carrello meetup è solo vape pen, altrimenti €100
+  function meetupMin(): number {
+    const its = itemsByOrigin('meetup')
+    return its.length && its.every(i => isVape(i.productName)) ? MEETUP_MIN_VAPE : MEETUP_MIN
+  }
+
   function handleCheckout(origin: ShipOrigin) {
-    if (origin === 'meetup' && totalByOrigin('meetup') < MEETUP_MIN) {
-      alert(`Ordine minimo di €${MEETUP_MIN} per i prodotti in loco (meetup). Aggiungi altri prodotti per procedere.`)
+    if (origin === 'meetup' && totalByOrigin('meetup') < meetupMin()) {
+      alert(`Ordine minimo di €${meetupMin()} per i prodotti in loco (meetup). Aggiungi altri prodotti per procedere.`)
       return
     }
     const needsConfirm = origin === 'spain' || origin === 'italy'
@@ -293,6 +301,7 @@ export default function CartDrawer() {
               const creditApplied = creditOrigin === origin ? Math.min(affBalance, subtotal) : 0
               const isPharma = origin === 'pharma'
               const isMeetup = origin === 'meetup'
+              const mMin = isMeetup ? meetupMin() : 0
               const canDiscount = DISCOUNT_ORIGINS.includes(origin)
               const discountAmount = canDiscount ? subtotal * (discountPct[origin] ?? 0) : 0
               const finalTotal = (isPharma || isMeetup) ? subtotal - creditApplied : subtotal - creditApplied - discountAmount + sm.shipCost
@@ -383,10 +392,10 @@ export default function CartDrawer() {
                       <div style={{ fontWeight: 700, color: '#d8b4fe', marginBottom: 4 }}>🤝 Ritiro in loco</div>
                       <div>Prodotti disponibili solo di persona al meetup · nessuna spedizione</div>
                       <div>📍 Luogo e orario verranno concordati in chat dopo l&apos;ordine</div>
-                      <div style={{ marginTop: 5, fontWeight: 700, color: subtotal < MEETUP_MIN ? '#ff8c66' : '#c9f7d4' }}>
-                        {subtotal < MEETUP_MIN
-                          ? `⚠️ Ordine minimo €${MEETUP_MIN} · aggiungi ancora €${(MEETUP_MIN - subtotal).toFixed(2)}`
-                          : `✓ Ordine minimo €${MEETUP_MIN} raggiunto`}
+                      <div style={{ marginTop: 5, fontWeight: 700, color: subtotal < mMin ? '#ff8c66' : '#c9f7d4' }}>
+                        {subtotal < mMin
+                          ? `⚠️ Ordine minimo €${mMin}${mMin === MEETUP_MIN_VAPE ? ' (vape pen)' : ''} · aggiungi ancora €${(mMin - subtotal).toFixed(2)}`
+                          : `✓ Ordine minimo €${mMin} raggiunto`}
                       </div>
                     </div>
                   )}
@@ -568,11 +577,11 @@ export default function CartDrawer() {
                   <button
                     className="checkout-btn"
                     onClick={() => handleCheckout(origin)}
-                    disabled={isMeetup && subtotal < MEETUP_MIN}
-                    style={isMeetup && subtotal < MEETUP_MIN ? { opacity: .5, cursor: 'not-allowed' } : undefined}
+                    disabled={isMeetup && subtotal < mMin}
+                    style={isMeetup && subtotal < mMin ? { opacity: .5, cursor: 'not-allowed' } : undefined}
                   >
                     {isMeetup
-                      ? (subtotal < MEETUP_MIN ? `Ordine minimo €${MEETUP_MIN} — mancano €${(MEETUP_MIN - subtotal).toFixed(2)}` : `${sm.flag} Invia ordine ritiro in loco →`)
+                      ? (subtotal < mMin ? `Ordine minimo €${mMin} — mancano €${(mMin - subtotal).toFixed(2)}` : `${sm.flag} Invia ordine ritiro in loco →`)
                       : confirmingOrigin === origin
                         ? `✅ Conferma e invia su Telegram →`
                         : `${sm.flag} Invia ordine ${sm.label} →`}
