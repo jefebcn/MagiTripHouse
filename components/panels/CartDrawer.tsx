@@ -242,7 +242,7 @@ export default function CartDrawer() {
 
             {!confirmedOrder.isMeetup && (
               <div style={{ fontSize: '.72rem', color: 'rgba(245,200,66,.85)', background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.2)', borderRadius: 10, padding: '9px 12px', lineHeight: 1.5 }}>
-                📍 Trovi lo stato e il tracking in <strong>Account → I miei ordini</strong>
+                📍 Trovi lo stato e il tracking nella scheda <strong>📦 Ordini</strong>
               </div>
             )}
 
@@ -262,8 +262,17 @@ export default function CartDrawer() {
       <div className="panel-overlay" onClick={close} />
       <div ref={panelRef} className="panel-content">
         <div className="panel-handle" />
-        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', letterSpacing: '.5px' }}>
-          🛒 Carrello
+        <div style={{ position: 'sticky', top: -20, zIndex: 10, margin: '-20px -20px 0', padding: '14px 20px 10px', background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem', letterSpacing: '.5px' }}>🛒 Carrello</span>
+          <button
+            onClick={close}
+            aria-label="Chiudi"
+            style={{
+              width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', flexShrink: 0,
+              background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)',
+              fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >✕</button>
         </div>
 
         {totalCount === 0 ? (

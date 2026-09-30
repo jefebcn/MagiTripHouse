@@ -126,6 +126,20 @@ export default function ProductDetail() {
       <div ref={panelRef} className="panel-content" style={{ gap: 14 }}>
         <div className="panel-handle" />
 
+        {/* Chiudi — resta visibile anche scorrendo */}
+        <div style={{ position: 'sticky', top: 0, zIndex: 10, height: 0, marginBottom: -14, display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={close}
+            aria-label="Chiudi"
+            style={{
+              marginTop: 8, marginRight: 8, width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
+              background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,.2)', color: '#fff', fontSize: '1rem', fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,.4)',
+            }}
+          >✕</button>
+        </div>
+
         {/* Image */}
         <div
           onClick={() => product.imageUrl && openLightbox(product.imageUrl, product.mediaType ?? 'image', product.name)}
@@ -153,7 +167,7 @@ export default function ProductDetail() {
           <button
             onClick={(e) => { e.stopPropagation(); shareProduct() }}
             style={{
-              position: 'absolute', top: 10, right: 10, zIndex: 3,
+              position: 'absolute', top: 10, left: 10, zIndex: 3,
               background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(8px)',
               border: '1px solid rgba(255,255,255,.15)', borderRadius: 20,
               padding: '5px 11px', color: '#fff', fontSize: '.72rem', fontWeight: 700,

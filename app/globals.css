@@ -105,6 +105,8 @@ body > * { position: relative; z-index: 1; }
   border-top: 1px solid rgba(61,255,110,.2);
   box-shadow: 0 -8px 40px rgba(0,0,0,.6), 0 0 60px rgba(61,255,110,.04);
 }
+/* I figli non devono comprimersi quando il contenuto supera l'altezza (es. foto schiacciata) */
+.panel-content > * { flex-shrink: 0; }
 .panel-handle {
   width: 36px; height: 4px;
   background: rgba(61,255,110,.3); border-radius: 2px;
