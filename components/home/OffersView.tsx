@@ -1,12 +1,27 @@
 'use client'
-import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useUIStore } from '@/store/uiStore'
 import { useProducts, type Product } from '@/hooks/useProducts'
 import ProductCard from '@/components/catalog/ProductCard'
 
-interface PublicCode { code: string; percent: number; firstOrderOnly: boolean; origins: string[]; expiresAt: string | null }
+// Grammi dal label del formato ("5g", "1kg", "100 g", "10"); 0 se non è a peso (pezzi, ml…)
+function grams(label: string): number {
+  const t = label.trim().toLowerCase().replace(',', '.')
+  const m = t.match(/^(\d+(?:\.\d+)?)\s*(kg|g|gr)?$/)
+  if (!m) return 0
+  const n = parseFloat(m[1])
+  return m[2] === 'kg' ? n * 1000 : n
+}
 
-const ORIGIN_LABEL: Record<string, string> = { spain: '🇪🇸 Spagna', italy: '🇮🇹 Italia', meetup: '🤝 Meetup', pharma: '💊 Pharma' }
+// Risparmio al grammo fra formato più piccolo e più grande
+function volumeSaving(p: Product) {
+  const vs = (p.variants ?? []).map(v => ({ label: v.label, g: grams(v.label), price: v.price })).filter(v => v.g > 0 && v.price > 0).sort((a, b) => a.g - b.g)
+  if (vs.length < 2) return null
+  const first = vs[0], last = vs[vs.length - 1]
+  const from = first.price / first.g, to = last.price / last.g
+  const saving = Math.round((1 - to / from) * 100)
+  return saving >= 5 ? { p, from, to, saving, fromLabel: first.label, toLabel: last.label } : null
+}
 const NEW_DAYS = 14
 
 function SectionTitle({ icon, title, sub, color = 'var(--green)' }: { icon: string; title: string; sub?: string; color?: string }) {
@@ -27,23 +42,9 @@ function Grid({ items }: { items: Product[] }) {
 }
 
 export default function OffersView() {
-  const { view, sessionToken, goToCatalog } = useUIStore()
+  const { goToCatalog, setDetailProduct } = useUIStore()
   const { products, isLoading } = useProducts()
-  const [codes, setCodes] = useState<PublicCode[] | null>(null)
-  const [hasOrders, setHasOrders] = useState(false)
-  const [copied, setCopied] = useState<string | null>(null)
 
-  // Ricarica a ogni apertura della scheda: i codici si gestiscono da admin
-  useEffect(() => {
-    if (view !== 'offers') return
-    fetch('/api/discount/public').then(r => r.ok ? r.json() : []).then(d => setCodes(Array.isArray(d) ? d : [])).catch(() => setCodes([]))
-    if (sessionToken) {
-      fetch('/api/orders/mine', { headers: { Authorization: `Bearer ${sessionToken}` } })
-        .then(r => r.ok ? r.json() : []).then(d => setHasOrders(Array.isArray(d) && d.length > 0)).catch(() => {})
-    }
-  }, [view, sessionToken])
-
-  const visibleCodes = (codes ?? []).filter(c => !(c.firstOrderOnly && hasOrders))
   const sellable = products.filter(p => p.category !== 'request' && p.stock !== 0)
   const onSale = sellable.filter(p => p.isOnSale && !p.isComingSoon)
   const fresh = sellable
@@ -51,13 +52,9 @@ export default function OffersView() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 6)
   const soon = products.filter(p => p.isComingSoon && p.category !== 'request').slice(0, 4)
-  const nothing = !isLoading && codes !== null && !visibleCodes.length && !onSale.length && !fresh.length && !soon.length
-
-  function copy(code: string) {
-    navigator.clipboard?.writeText(code).catch(() => {})
-    setCopied(code)
-    setTimeout(() => setCopied(c => c === code ? null : c), 1800)
-  }
+  const volume = sellable.filter(p => !p.isComingSoon).map(volumeSaving).filter((v): v is NonNullable<typeof v> => !!v)
+    .sort((a, b) => b.saving - a.saving).slice(0, 6)
+  const nothing = !isLoading && !volume.length && !onSale.length && !fresh.length && !soon.length
 
   return (
     <div style={{ paddingBottom: 110 }}>
@@ -66,45 +63,38 @@ export default function OffersView() {
         <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', lineHeight: 1.1 }}>
           🔥 <span style={{ background: 'linear-gradient(90deg, #ff8a3d, var(--gold))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Offerte</span>
         </div>
-        <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginTop: 4 }}>Codici sconto, prezzi speciali e ultimi arrivi</div>
+        <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginTop: 4 }}>Prezzi speciali, risparmio a volume e ultimi arrivi</div>
       </div>
 
-      {/* Codici sconto */}
-      {visibleCodes.length > 0 && (
+      {/* Più prendi, meno paghi: risparmio a volume (nessun coupon) */}
+      {volume.length > 0 && (
         <div style={{ marginBottom: 22 }}>
-          <SectionTitle icon="🎟️" title="Codici sconto" sub="tocca per copiare" color="var(--gold)" />
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '0 16px 4px', scrollbarWidth: 'none', scrollSnapType: 'x mandatory', scrollPaddingLeft: 16 }}>
-            {visibleCodes.map(c => (
-              <button key={c.code} onClick={() => copy(c.code)} style={{
-                flex: '0 0 auto', minWidth: 220, scrollSnapAlign: 'start', position: 'relative', overflow: 'hidden',
-                display: 'flex', alignItems: 'stretch', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                background: 'linear-gradient(135deg, rgba(245,200,66,.14), rgba(255,138,61,.08))',
-                border: '1.5px solid rgba(245,200,66,.45)', borderRadius: 16,
+          <SectionTitle icon="📦" title="Più prendi, meno paghi" sub="risparmio al grammo" color="var(--gold)" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 16px' }}>
+            {volume.map(v => (
+              <button key={v.p.id} onClick={() => setDetailProduct(v.p)} style={{
+                display: 'flex', alignItems: 'center', gap: 12, width: '100%', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 10, color: 'var(--text)',
               }}>
-                <div style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '12px 14px',
-                  borderRight: '2px dashed rgba(245,200,66,.4)', minWidth: 78,
-                }}>
-                  <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem', color: 'var(--gold)', lineHeight: 1 }}>−{c.percent}%</span>
+                <div style={{ position: 'relative', width: 56, height: 56, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {v.p.imageUrl && v.p.mediaType !== 'video'
+                    ? <Image src={v.p.imageUrl} alt={v.p.name} fill sizes="56px" style={{ objectFit: 'cover' }} />
+                    : <span style={{ fontSize: '1.6rem' }}>{v.p.emoji}</span>}
                 </div>
-                <div style={{ flex: 1, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '.92rem', letterSpacing: '.08em', color: 'var(--text)' }}>
-                    {copied === c.code ? '✓ Copiato!' : c.code}
-                  </span>
-                  <span style={{ fontSize: '.62rem', color: 'var(--muted)', lineHeight: 1.35 }}>
-                    {c.firstOrderOnly ? 'Primo ordine · ' : ''}
-                    {c.origins.length ? c.origins.map(o => ORIGIN_LABEL[o] ?? o).join(', ') : 'Tutte le spedizioni'}
-                  </span>
-                  {c.expiresAt && (
-                    <span style={{ fontSize: '.6rem', color: '#ff8a3d', fontWeight: 700 }}>
-                      ⏳ fino al {new Date(c.expiresAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
-                    </span>
-                  )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.p.name}</div>
+                  <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
+                    {v.fromLabel}: €{v.from.toFixed(2)}/g → <strong style={{ color: 'var(--green)' }}>{v.toLabel}: €{v.to.toFixed(2)}/g</strong>
+                  </div>
                 </div>
+                <span style={{
+                  flexShrink: 0, fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: '#041004',
+                  background: 'linear-gradient(135deg, var(--gold), #ff9a3d)', borderRadius: 10, padding: '5px 8px',
+                }}>−{v.saving}%</span>
               </button>
             ))}
           </div>
-          <div style={{ fontSize: '.64rem', color: 'var(--muted)', padding: '6px 16px 0' }}>Inseriscilo nel carrello, nel campo “Codice sconto”.</div>
+          <div style={{ fontSize: '.64rem', color: 'var(--muted)', padding: '6px 16px 0' }}>Risparmio al grammo tra il formato più piccolo e il più grande.</div>
         </div>
       )}
 
@@ -132,7 +122,7 @@ export default function OffersView() {
         </div>
       )}
 
-      {(isLoading || codes === null) && (
+      {isLoading && (
         <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.8rem', padding: 30 }}>Caricamento…</div>
       )}
 

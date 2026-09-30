@@ -433,6 +433,7 @@ function HomeOrderCard() {
   const { sessionToken, setView, goToCatalog } = useUIStore()
   const [orders, setOrders] = React.useState<MiniOrder[] | null>(null)
   const [welcomePct, setWelcomePct] = React.useState<number | null>(null)
+  const [welcomeCap, setWelcomeCap] = React.useState<number | null>(null)
   const [dismissed, setDismissed] = React.useState(true)
   const [copied, setCopied] = React.useState(false)
 
@@ -450,7 +451,7 @@ function HomeOrderCard() {
           fetch('/api/discount/validate', {
             method: 'POST', headers: { 'Content-Type': 'application/json', ...h },
             body: JSON.stringify({ code: WELCOME_CODE, origin: 'spain' }),
-          }).then(r => r.json()).then(v => { if (v?.ok) setWelcomePct(v.percent) }).catch(() => {})
+          }).then(r => r.json()).then(v => { if (v?.ok) { setWelcomePct(v.percent); setWelcomeCap(v.maxDiscount ?? null) } }).catch(() => {})
         }
       })
       .catch(() => {})
@@ -516,7 +517,7 @@ function HomeOrderCard() {
             background: 'rgba(245,200,66,.1)', border: '1.5px dashed rgba(245,200,66,.55)', borderRadius: 12,
             padding: '9px 12px', cursor: 'pointer', fontFamily: 'inherit',
           }}>
-            <span style={{ fontSize: '.76rem', color: 'var(--gold)', fontWeight: 700 }}>🎟 −{welcomePct}% sul primo ordine</span>
+            <span style={{ fontSize: '.76rem', color: 'var(--gold)', fontWeight: 700 }}>🎟 −{welcomePct}% sul primo ordine{welcomeCap != null ? ` (max €${welcomeCap})` : ''}</span>
             <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--gold)', letterSpacing: '.08em' }}>
               {copied ? '✓ copiato' : WELCOME_CODE}
             </span>

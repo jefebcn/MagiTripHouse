@@ -3,9 +3,9 @@ import { useUIStore } from '@/store/uiStore'
 import { useCartStore } from '@/store/cartStore'
 
 const TABS = [
-  { id: 'hub',     label: 'Home',     icon: '🏠' },
-  { id: 'catalog', label: 'Catalogo', icon: '🛍️' },
   { id: 'offers',  label: 'Offerte',  icon: '🔥' },
+  { id: 'catalog', label: 'Catalogo', icon: '🛍️' },
+  { id: 'hub',     label: 'Home',     icon: '🏠' },
   { id: 'cart',    label: 'Carrello', icon: '🛒' },
   { id: 'account', label: 'Account',  icon: '👤' },
 ] as const
@@ -29,7 +29,7 @@ export default function BottomNav() {
     >
       {TABS.map((tab) => {
         const isCart = tab.id === 'cart'
-        const isCenter = tab.id === 'offers'
+        const isCenter = tab.id === 'hub'
         const active = !isCart && view === tab.id
         const onClick = () => isCart ? setCartOpen(true) : setView(tab.id as Parameters<typeof setView>[0])
 
@@ -39,17 +39,19 @@ export default function BottomNav() {
               flex: 1, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 0,
             }}>
-              <span className={active ? undefined : 'offers-glow'} style={{
-                width: 52, height: 52, marginTop: -22, borderRadius: 18, fontSize: '1.5rem',
+              <span className={active ? 'home-glow' : undefined} style={{
+                width: 58, height: 58, marginTop: -26, borderRadius: 20, fontSize: '1.65rem',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'linear-gradient(145deg, #ff9a3d 0%, #ff5a2a 55%, #e8336b 100%)',
+                background: active
+                  ? 'linear-gradient(145deg, #5dff86 0%, var(--green) 45%, var(--green2) 100%)'
+                  : 'linear-gradient(145deg, #1d3a22 0%, #13261a 100%)',
                 border: '3px solid var(--bg)',
                 boxShadow: active
-                  ? '0 0 0 2px rgba(255,154,61,.7), 0 8px 22px rgba(255,90,42,.55)'
-                  : '0 8px 20px rgba(255,90,42,.4)',
+                  ? '0 0 0 2px rgba(61,255,110,.45), 0 8px 24px rgba(61,255,110,.45)'
+                  : '0 0 0 1px rgba(61,255,110,.35), 0 8px 20px rgba(0,0,0,.5)',
                 transform: active ? 'translateY(-2px)' : 'none', transition: '.2s',
               }}>{tab.icon}</span>
-              <span style={{ fontSize: '.6rem', fontWeight: 700, color: active ? '#ffb070' : 'rgba(255,176,112,.8)', paddingBottom: 3 }}>{tab.label}</span>
+              <span style={{ fontSize: '.62rem', fontWeight: 800, color: 'var(--green)', paddingBottom: 3 }}>{tab.label}</span>
             </button>
           )
         }

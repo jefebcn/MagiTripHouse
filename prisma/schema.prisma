@@ -126,7 +126,8 @@ model DiscountCode {
   maxUses        Int?
   uses           Int       @default(0)
   note           String?
-  showInOffers   Boolean   @default(false)  // visibile a tutti nella scheda Offerte
+  maxDiscount    Float?                   // tetto dello sconto in € (es. 10 = max −€10)
+  minOrder       Float?                   // subtotale minimo in € per applicarlo
   createdAt      DateTime  @default(now())
 }
 

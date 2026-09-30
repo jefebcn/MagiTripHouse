@@ -31,10 +31,17 @@ export async function POST(req: Request) {
   const maxUses = b.maxUses === '' || b.maxUses == null ? null : Math.max(1, Math.floor(Number(b.maxUses)))
   if (maxUses != null && !Number.isFinite(maxUses)) return NextResponse.json({ error: 'Limite utilizzi non valido' }, { status: 400 })
 
+  const euro = (v: unknown) => v === '' || v == null ? null : Math.round(Number(v) * 100) / 100
+  const maxDiscount = euro(b.maxDiscount)
+  const minOrder = euro(b.minOrder)
+  if (maxDiscount != null && (!Number.isFinite(maxDiscount) || maxDiscount <= 0)) return NextResponse.json({ error: 'Sconto massimo non valido' }, { status: 400 })
+  if (minOrder != null && (!Number.isFinite(minOrder) || minOrder < 0)) return NextResponse.json({ error: 'Ordine minimo non valido' }, { status: 400 })
+
   const data = {
+    maxDiscount,
+    minOrder,
     percent,
     firstOrderOnly: !!b.firstOrderOnly,
-    showInOffers: !!b.showInOffers,
     origins,
     active: b.active === undefined ? true : !!b.active,
     expiresAt,

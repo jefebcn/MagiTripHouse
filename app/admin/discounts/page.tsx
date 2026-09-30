@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 interface DiscountCode {
-  code: string; percent: number; firstOrderOnly: boolean; showInOffers: boolean; origins: string[]; active: boolean
+  code: string; percent: number; firstOrderOnly: boolean; maxDiscount: number | null; minOrder: number | null; origins: string[]; active: boolean
   expiresAt: string | null; maxUses: number | null; uses: number; note: string | null; createdAt: string
 }
 
@@ -19,7 +19,8 @@ export default function AdminDiscounts() {
   const [code, setCode] = useState('')
   const [percent, setPercent] = useState('10')
   const [firstOrderOnly, setFirstOrderOnly] = useState(false)
-  const [showInOffers, setShowInOffers] = useState(false)
+  const [maxDiscount, setMaxDiscount] = useState('10')
+  const [minOrder, setMinOrder] = useState('')
   const [origins, setOrigins] = useState<string[]>([])
   const [expiresAt, setExpiresAt] = useState('')
   const [maxUses, setMaxUses] = useState('')
@@ -44,7 +45,7 @@ export default function AdminDiscounts() {
   }
 
   function edit(c: DiscountCode) {
-    setCode(c.code); setPercent(String(c.percent)); setFirstOrderOnly(c.firstOrderOnly); setShowInOffers(!!c.showInOffers)
+    setCode(c.code); setPercent(String(c.percent)); setFirstOrderOnly(c.firstOrderOnly); setMaxDiscount(c.maxDiscount != null ? String(c.maxDiscount) : ''); setMinOrder(c.minOrder != null ? String(c.minOrder) : '')
     setOrigins(c.origins); setExpiresAt(c.expiresAt ? c.expiresAt.slice(0, 10) : '')
     setMaxUses(c.maxUses != null ? String(c.maxUses) : ''); setNote(c.note ?? '')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -57,7 +58,7 @@ export default function AdminDiscounts() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        code, percent: Number(percent), firstOrderOnly, showInOffers, origins,
+        code, percent: Number(percent), firstOrderOnly, origins, maxDiscount: maxDiscount || null, minOrder: minOrder || null,
         // fine giornata: il codice vale per tutto il giorno di scadenza
         expiresAt: expiresAt ? `${expiresAt}T23:59:59` : null,
         maxUses: maxUses || null, note,
@@ -67,7 +68,7 @@ export default function AdminDiscounts() {
     setSaving(false)
     if (res.ok) {
       setResult(`✅ Codice ${data.code} salvato`)
-      setCode(''); setPercent('10'); setFirstOrderOnly(false); setShowInOffers(false); setOrigins([]); setExpiresAt(''); setMaxUses(''); setNote('')
+      setCode(''); setPercent('10'); setFirstOrderOnly(false); setMaxDiscount('10'); setMinOrder(''); setOrigins([]); setExpiresAt(''); setMaxUses(''); setNote('')
       load()
     } else {
       setResult(`❌ ${data.error ?? 'Errore'}`)
@@ -139,10 +140,22 @@ export default function AdminDiscounts() {
           <input type="checkbox" checked={firstOrderOnly} onChange={e => setFirstOrderOnly(e.target.checked)} />
           Solo primo ordine
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem', cursor: 'pointer' }}>
-          <input type="checkbox" checked={showInOffers} onChange={e => setShowInOffers(e.target.checked)} />
-          🔥 Mostra a tutti nella scheda Offerte
-        </label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <label style={{ flex: 1, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: 'var(--muted)' }}>
+            Sconto massimo € (consigliato)
+            <input type="number" min={1} step="any" placeholder="nessun tetto" value={maxDiscount} onChange={e => setMaxDiscount(e.target.value)} style={iStyle} />
+          </label>
+          <label style={{ flex: 1, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: 'var(--muted)' }}>
+            Ordine minimo € (opzionale)
+            <input type="number" min={0} step="any" placeholder="nessuno" value={minOrder} onChange={e => setMinOrder(e.target.value)} style={iStyle} />
+          </label>
+        </div>
+        <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.5, marginTop: -4 }}>
+          Esempio: 10% con tetto €10 → su €70 sconti €7, su €700 sconti comunque solo €10.
+          {percent && maxDiscount && Number(percent) > 0 && (
+            <> Il tetto scatta da €{Math.round(Number(maxDiscount) / (Number(percent) / 100))} di spesa in su.</>
+          )}
+        </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <label style={{ flex: 1, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: 'var(--muted)' }}>
@@ -177,7 +190,7 @@ export default function AdminDiscounts() {
       </div>
       {codes.length === 0 && (
         <div style={{ fontSize: '.8rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-          Nessun codice creato. BENVENUTO10 (−10% primo ordine, Spagna/Italia) resta attivo di default:
+          Nessun codice creato. BENVENUTO10 (−10% primo ordine, max −€10, Spagna/Italia) resta attivo di default:
           se crei un codice con lo stesso nome qui, vale la configurazione del pannello.
         </div>
       )}
@@ -200,7 +213,8 @@ export default function AdminDiscounts() {
               <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 6, lineHeight: 1.6 }}>
                 {c.origins.length ? c.origins.map(o => ORIGINS.find(x => x.key === o)?.label ?? o).join(' · ') : 'Tutte le spedizioni'}
                 {c.firstOrderOnly && ' · solo primo ordine'}
-                {c.showInOffers && ' · 🔥 visibile in Offerte'}
+                {c.maxDiscount != null && ` · max −€${c.maxDiscount}`}
+                {c.minOrder != null && ` · minimo €${c.minOrder}`}
                 {c.expiresAt && ` · scade il ${new Date(c.expiresAt).toLocaleDateString('it-IT')}`}
                 {c.note && <div style={{ fontStyle: 'italic' }}>{c.note}</div>}
               </div>
