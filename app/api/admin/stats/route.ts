@@ -11,10 +11,10 @@ export async function GET() {
   const now = new Date()
   // "Oggi" parte dalla mezzanotte italiana, non da quella UTC del server
   const romeOffsetMin = (() => {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Rome', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Rome', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
       .formatToParts(now).reduce<Record<string, string>>((a, p) => { a[p.type] = p.value; return a }, {})
-    const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute)
-    return Math.round((asUtc - now.getTime()) / 60000)
+    const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute, +parts.second)
+    return Math.round((asUtc - Math.floor(now.getTime() / 1000) * 1000) / 60000)
   })()
   const romeNow = new Date(now.getTime() + romeOffsetMin * 60000)
   const todayStart = new Date(Date.UTC(romeNow.getUTCFullYear(), romeNow.getUTCMonth(), romeNow.getUTCDate()) - romeOffsetMin * 60000)
