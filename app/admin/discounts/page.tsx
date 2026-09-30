@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 interface DiscountCode {
-  code: string; percent: number; firstOrderOnly: boolean; maxDiscount: number | null; minOrder: number | null; origins: string[]; active: boolean
+  code: string; percent: number; firstOrderOnly: boolean; maxDiscount: number | null; minOrder: number | null; showInOffers: boolean; origins: string[]; active: boolean
   expiresAt: string | null; maxUses: number | null; uses: number; note: string | null; createdAt: string
 }
 
@@ -21,6 +21,7 @@ export default function AdminDiscounts() {
   const [firstOrderOnly, setFirstOrderOnly] = useState(false)
   const [maxDiscount, setMaxDiscount] = useState('10')
   const [minOrder, setMinOrder] = useState('')
+  const [showInOffers, setShowInOffers] = useState(true)
   const [origins, setOrigins] = useState<string[]>([])
   const [expiresAt, setExpiresAt] = useState('')
   const [maxUses, setMaxUses] = useState('')
@@ -45,7 +46,7 @@ export default function AdminDiscounts() {
   }
 
   function edit(c: DiscountCode) {
-    setCode(c.code); setPercent(String(c.percent)); setFirstOrderOnly(c.firstOrderOnly); setMaxDiscount(c.maxDiscount != null ? String(c.maxDiscount) : ''); setMinOrder(c.minOrder != null ? String(c.minOrder) : '')
+    setCode(c.code); setPercent(String(c.percent)); setFirstOrderOnly(c.firstOrderOnly); setMaxDiscount(c.maxDiscount != null ? String(c.maxDiscount) : ''); setMinOrder(c.minOrder != null ? String(c.minOrder) : ''); setShowInOffers(!!c.showInOffers)
     setOrigins(c.origins); setExpiresAt(c.expiresAt ? c.expiresAt.slice(0, 10) : '')
     setMaxUses(c.maxUses != null ? String(c.maxUses) : ''); setNote(c.note ?? '')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -58,7 +59,7 @@ export default function AdminDiscounts() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        code, percent: Number(percent), firstOrderOnly, origins, maxDiscount: maxDiscount || null, minOrder: minOrder || null,
+        code, percent: Number(percent), firstOrderOnly, origins, maxDiscount: maxDiscount || null, minOrder: minOrder || null, showInOffers,
         // fine giornata: il codice vale per tutto il giorno di scadenza
         expiresAt: expiresAt ? `${expiresAt}T23:59:59` : null,
         maxUses: maxUses || null, note,
@@ -68,7 +69,7 @@ export default function AdminDiscounts() {
     setSaving(false)
     if (res.ok) {
       setResult(`✅ Codice ${data.code} salvato`)
-      setCode(''); setPercent('10'); setFirstOrderOnly(false); setMaxDiscount('10'); setMinOrder(''); setOrigins([]); setExpiresAt(''); setMaxUses(''); setNote('')
+      setCode(''); setPercent('10'); setFirstOrderOnly(false); setMaxDiscount('10'); setMinOrder(''); setShowInOffers(true); setOrigins([]); setExpiresAt(''); setMaxUses(''); setNote('')
       load()
     } else {
       setResult(`❌ ${data.error ?? 'Errore'}`)
@@ -140,6 +141,10 @@ export default function AdminDiscounts() {
           <input type="checkbox" checked={firstOrderOnly} onChange={e => setFirstOrderOnly(e.target.checked)} />
           Solo primo ordine
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem', cursor: 'pointer' }}>
+          <input type="checkbox" checked={showInOffers} onChange={e => setShowInOffers(e.target.checked)} />
+          🔥 Mostra nella scheda Offerte (visibile a tutti)
+        </label>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <label style={{ flex: 1, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: 'var(--muted)' }}>
             Sconto massimo € (consigliato)
@@ -188,10 +193,11 @@ export default function AdminDiscounts() {
       <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', marginBottom: 12 }}>
         Codici ({codes.length})
       </div>
-      {codes.length === 0 && (
-        <div style={{ fontSize: '.8rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-          Nessun codice creato. BENVENUTO10 (−10% primo ordine, max −€10, Spagna/Italia) resta attivo di default:
-          se crei un codice con lo stesso nome qui, vale la configurazione del pannello.
+      {(
+        <div style={{ fontSize: '.8rem', color: 'var(--muted)', lineHeight: 1.5, marginBottom: 12 }}>
+          ℹ️ Sono già attivi di default e visibili in Offerte: MAGIC-5 (−5%, max €15), SHIP10 (−10%, max €10, da €100, Spagna/Italia),
+          MAGIC-10 (−10%, max €30, da €200) e BENVENUTO10 (−10% primo ordine, max €10). Per cambiarli o disattivarli crea qui un codice con lo stesso nome:
+          vale la configurazione del pannello.
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -215,6 +221,7 @@ export default function AdminDiscounts() {
                 {c.firstOrderOnly && ' · solo primo ordine'}
                 {c.maxDiscount != null && ` · max −€${c.maxDiscount}`}
                 {c.minOrder != null && ` · minimo €${c.minOrder}`}
+                {c.showInOffers && ' · 🔥 in Offerte'}
                 {c.expiresAt && ` · scade il ${new Date(c.expiresAt).toLocaleDateString('it-IT')}`}
                 {c.note && <div style={{ fontStyle: 'italic' }}>{c.note}</div>}
               </div>

@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     minOrder,
     percent,
     firstOrderOnly: !!b.firstOrderOnly,
+    showInOffers: !!b.showInOffers,
     origins,
     active: b.active === undefined ? true : !!b.active,
     expiresAt,
