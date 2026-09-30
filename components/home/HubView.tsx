@@ -1,5 +1,6 @@
 'use client'
 import React from 'react'
+import Image from 'next/image'
 import Header from '@/components/layout/Header'
 import Marquee from '@/components/layout/Marquee'
 import { useUIStore } from '@/store/uiStore'
@@ -301,6 +302,9 @@ export default function HubView() {
         })()}
       </div>
 
+      {/* ═══════════ NUOVI ARRIVI (scroll orizzontale) ═══════════ */}
+      <NewArrivals />
+
       {/* ═══════════ CATEGORIE (scroll orizzontale) ═══════════ */}
       <div style={{ marginTop: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', marginBottom: 12 }}>
@@ -377,6 +381,91 @@ export default function HubView() {
         </button>
       </div>
 
+    </div>
+  )
+}
+
+// ─── Nuovi arrivi: ultimi prodotti aggiunti, scroll orizzontale ───
+const NEW_DAYS = 14
+
+function NewArrivals() {
+  const { products, isLoading } = useProducts()
+  const { setDetailProduct } = useUIStore()
+
+  const items = React.useMemo(() => (
+    [...products]
+      .filter(p => p.category !== 'request' && p.stock !== 0)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10)
+  ), [products])
+
+  if (isLoading || items.length === 0) return null
+
+  const now = Date.now()
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', marginBottom: 12 }}>
+        <div style={{ width: 3, height: 16, background: 'var(--green)', borderRadius: 2, boxShadow: 'var(--led-green)' }} />
+        <span style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.7px', fontWeight: 700 }}>
+          Nuovi arrivi
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '0 16px 4px', scrollbarWidth: 'none' }}>
+        {items.map(p => {
+          const minPrice = p.variants?.length ? Math.min(...p.variants.map(v => v.price)) : 0
+          const isNew = now - new Date(p.createdAt).getTime() < NEW_DAYS * 86_400_000
+          return (
+            <button
+              key={p.id}
+              onClick={() => setDetailProduct(p)}
+              style={{
+                flexShrink: 0, width: 138, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14,
+                padding: 0, overflow: 'hidden', color: 'var(--text)',
+              }}
+            >
+              <div style={{ position: 'relative', width: '100%', height: 120, background: 'var(--bg3)' }}>
+                {p.imageUrl ? (
+                  p.mediaType === 'video' ? (
+                    <video
+                      src={`${p.imageUrl}#t=0.1`}
+                      muted playsInline preload="metadata"
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
+                        filter: p.isComingSoon ? 'brightness(0.6)' : 'none' }}
+                    />
+                  ) : (
+                    <Image
+                      src={p.imageUrl} alt={p.name} fill sizes="138px"
+                      style={{ objectFit: 'cover', filter: p.isComingSoon ? 'brightness(0.6)' : 'none' }}
+                    />
+                  )
+                ) : (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.4rem' }}>
+                    {p.emoji}
+                  </div>
+                )}
+                {(p.isComingSoon || isNew) && (
+                  <span style={{
+                    position: 'absolute', top: 7, left: 7,
+                    background: p.isComingSoon ? 'rgba(59,130,246,.9)' : 'rgba(61,255,110,.92)',
+                    color: p.isComingSoon ? '#fff' : '#051a0b',
+                    borderRadius: 20, padding: '2px 8px', fontSize: '.56rem', fontWeight: 800, letterSpacing: '.6px',
+                  }}>{p.isComingSoon ? 'IN ARRIVO' : 'NUOVO'}</span>
+                )}
+              </div>
+              <div style={{ padding: '8px 10px 10px' }}>
+                <div style={{ fontSize: '.74rem', fontWeight: 700, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.name}
+                </div>
+                <div style={{ fontSize: '.7rem', color: 'var(--green)', fontWeight: 700, marginTop: 3 }}>
+                  {minPrice > 0 ? `da €${minPrice}` : ''}
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
