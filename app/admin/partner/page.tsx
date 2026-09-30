@@ -78,7 +78,7 @@ export default function AdminPartner() {
       </div>
       <div style={{ fontSize: '.8rem', color: 'var(--muted)', lineHeight: 1.5, marginBottom: 18 }}>
         I clienti inseriscono il numero d’ordine fatto su KratosLabs. Controlla che l’ordine esista e sia pagato, poi approva:
-        il cliente riceve un coupon personale −15% (max €20), monouso, valido 30 giorni. Ogni ordine KratosLabs vale una sola volta e ogni cliente ha un solo premio.
+        il cliente riceve un coupon personale −15% (max €50), monouso, valido 30 giorni. Ogni ordine KratosLabs vale una sola volta e ogni cliente ha un solo premio.
       </div>
       {msg && <div style={{ fontSize: '.85rem', marginBottom: 12, color: msg.startsWith('✅') ? 'var(--green)' : 'var(--red)' }}>{msg}</div>}
 

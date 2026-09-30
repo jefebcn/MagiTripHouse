@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { prisma } from './prisma'
 
 // Premio per chi acquista sul sito partner (KratosLabs): coupon personale, monouso, con tetto in €
-export const PARTNER_REWARD = { percent: 15, maxDiscount: 20, validDays: 30 }
+export const PARTNER_REWARD = { percent: 15, maxDiscount: 50, validDays: 30 }
 
 export function normalizePartnerOrder(raw: unknown): string {
   return typeof raw === 'string' ? raw.trim().toUpperCase().replace(/\s+/g, '').slice(0, 40) : ''
