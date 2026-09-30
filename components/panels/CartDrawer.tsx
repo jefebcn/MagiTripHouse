@@ -5,6 +5,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useCartStore, SHIP_META, type ShipOrigin } from '@/store/cartStore'
 import { useSwipeToClose } from '@/hooks/useSwipeToClose'
 import { useTelegram } from '@/hooks/useTelegram'
+import { track } from '@vercel/analytics'
 
 function haptic(pattern: number | number[] = 50) {
   try { if (navigator.vibrate) navigator.vibrate(pattern) } catch { /* noop */ }
@@ -179,6 +180,7 @@ export default function CartDrawer() {
       }),
     }).catch(() => {})
 
+    track('order_sent', { origin, total: Math.round(finalTotal * 100) / 100, payment: isMeetup ? 'meetup' : (payMethod[origin] ?? ''), discount: discountAmount > 0 })
     haptic([80, 40, 80])
     const pmChosen = payMethod[origin]
     clearOrigin(origin)

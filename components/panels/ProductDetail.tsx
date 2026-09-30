@@ -5,6 +5,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useCartStore, SHIP_META, type ShipOrigin } from '@/store/cartStore'
 import { useSwipeToClose } from '@/hooks/useSwipeToClose'
 import type { Variant } from '@/hooks/useProducts'
+import { track } from '@vercel/analytics'
 
 function haptic(ms = 50) {
   try { if (navigator.vibrate) navigator.vibrate(ms) } catch { /* noop */ }
@@ -84,6 +85,7 @@ export default function ProductDetail() {
       ? { label: `${customGrams}g`, price: displayPrice }
       : (variant ?? { label: '?', price: 0 })
     addItem(product.id, product.name, effectiveVariant, qty, product.imageUrl, product.mediaType, product.emoji, (product.shipFrom ?? 'spain') as ShipOrigin)
+    track('add_to_cart', { product: product.name, variant: effectiveVariant.label, origin: product.shipFrom ?? 'spain', value: effectiveVariant.price * qty })
     close()
     haptic(60)
   }
@@ -98,6 +100,7 @@ export default function ProductDetail() {
   function handleReserve() {
     const v = variant
     openTg(`📋 PRENOTAZIONE — ${product.name}${v ? ` [${v.label}]` : ''}${qty > 1 ? ` ×${qty}` : ''}\n\nVorrei prenotare questo prodotto in arrivo. Avvisatemi appena è disponibile 🙌`)
+    track('reserve', { product: product.name, variant: v?.label ?? '' })
     haptic(60)
   }
 
