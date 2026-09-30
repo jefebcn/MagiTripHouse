@@ -140,6 +140,17 @@ model LoginAttempt {
   lockedUntil DateTime?
 }
 
+// Utilizzo di un codice sconto: ogni cliente può usare ogni codice una sola volta
+model DiscountRedemption {
+  id         String   @id @default(cuid())
+  code       String
+  userHandle String
+  orderId    String
+  createdAt  DateTime @default(now())
+
+  @@unique([code, userHandle])
+}
+
 // Premio partner: il cliente dichiara un acquisto su KratosLabs, l'admin verifica e sblocca un coupon personale
 model PartnerClaim {
   id           String    @id @default(cuid())

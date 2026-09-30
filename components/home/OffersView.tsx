@@ -15,6 +15,7 @@ export default function OffersView() {
   const { view, sessionToken, setCartOpen } = useUIStore()
   const [codes, setCodes] = useState<Code[] | null>(null)
   const [hasOrders, setHasOrders] = useState(false)
+  const [used, setUsed] = useState<string[]>([])
   const [copied, setCopied] = useState<string | null>(null)
 
   // Ricarica a ogni apertura: i codici si gestiscono dal pannello admin
@@ -24,6 +25,8 @@ export default function OffersView() {
     if (sessionToken) {
       fetch('/api/orders/mine', { headers: { Authorization: `Bearer ${sessionToken}` } })
         .then(r => r.ok ? r.json() : []).then(d => setHasOrders(Array.isArray(d) && d.length > 0)).catch(() => {})
+      fetch('/api/discount/used', { headers: { Authorization: `Bearer ${sessionToken}` } })
+        .then(r => r.ok ? r.json() : []).then(d => setUsed(Array.isArray(d) ? d : [])).catch(() => {})
     }
   }, [view, sessionToken])
 
@@ -42,12 +45,13 @@ export default function OffersView() {
         🔥 <span style={{ background: 'linear-gradient(90deg, #ff8a3d, var(--gold))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Offerte</span>
       </div>
       <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
-        Codici sconto da inserire nel carrello. Ogni codice ha uno <strong style={{ color: 'var(--text)' }}>sconto massimo in €</strong>. Si usa un codice per ordine.
+        Codici sconto da inserire nel carrello. Ogni codice ha uno <strong style={{ color: 'var(--text)' }}>sconto massimo in €</strong>. Ogni codice si usa <strong style={{ color: 'var(--text)' }}>una sola volta</strong>, un codice per ordine.
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 18 }}>
         {visible.map(c => {
           const isCopied = copied === c.code
+          const isUsed = used.includes(c.code)
           const conditions = [
             c.firstOrderOnly ? 'Solo primo ordine' : null,
             c.minOrder != null ? `Ordine minimo ${eur(c.minOrder)}` : null,
@@ -59,6 +63,7 @@ export default function OffersView() {
               position: 'relative', display: 'flex', overflow: 'hidden', borderRadius: 18,
               background: 'linear-gradient(135deg, rgba(245,200,66,.12), rgba(255,138,61,.06) 60%, var(--card))',
               border: '1.5px solid rgba(245,200,66,.4)',
+              opacity: isUsed ? .45 : 1, filter: isUsed ? 'grayscale(.8)' : 'none',
             }}>
               {/* Valore */}
               <div style={{
@@ -82,6 +87,9 @@ export default function OffersView() {
                     : <>Sconto del {c.percent}% sul totale prodotti</>}
                 </div>
                 <div style={{ fontSize: '.64rem', color: 'rgba(237,250,238,.6)', lineHeight: 1.45 }}>{conditions.join(' · ')}</div>
+                {isUsed ? (
+                  <span style={{ marginTop: 6, alignSelf: 'flex-start', padding: '7px 14px', borderRadius: 10, fontSize: '.74rem', fontWeight: 800, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--muted)' }}>✓ Già usato</span>
+                ) : (
                 <button onClick={() => copy(c.code)} style={{
                   marginTop: 6, alignSelf: 'flex-start', padding: '7px 14px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
                   fontSize: '.74rem', fontWeight: 800,
@@ -89,6 +97,7 @@ export default function OffersView() {
                   border: `1px solid ${isCopied ? 'rgba(61,255,110,.5)' : 'rgba(245,200,66,.5)'}`,
                   color: isCopied ? 'var(--green)' : 'var(--gold)',
                 }}>{isCopied ? '✓ Copiato' : '📋 Copia codice'}</button>
+                )}
               </div>
             </div>
           )

@@ -59,12 +59,31 @@ export async function validateDiscount(rawCode: unknown, origin: string, userHan
   if (rule.origins.length && !rule.origins.includes(origin)) return { ok: false, error: 'Codice non valido per questa spedizione' }
   if (rule.percent <= 0 || rule.percent > 90) return { ok: false, error: 'Codice non valido' }
 
+  // Ogni codice: una sola volta per cliente
+  const alreadyUsed = await prisma.discountRedemption.findUnique({ where: { code_userHandle: { code, userHandle: userHandle.toLowerCase() } } })
+  if (alreadyUsed) return { ok: false, error: 'Hai già usato questo codice' }
+
   if (rule.firstOrderOnly) {
     const prev = await prisma.order.count({ where: { userId: userHandle } })
     if (prev > 0) return { ok: false, error: 'Valido solo per il primo ordine' }
   }
 
   return { ok: true, code, percent: rule.percent, maxDiscount: rule.maxDiscount ?? null, minOrder: rule.minOrder ?? null }
+}
+
+// Registra l'uso del codice da parte del cliente. false = già usato (anche in caso di due ordini in contemporanea)
+export async function redeemDiscount(code: string, userHandle: string, orderId: string): Promise<boolean> {
+  try {
+    await prisma.discountRedemption.create({ data: { code, userHandle: userHandle.toLowerCase(), orderId } })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function usedCodes(userHandle: string): Promise<string[]> {
+  const rows = await prisma.discountRedemption.findMany({ where: { userHandle: userHandle.toLowerCase() }, select: { code: true } })
+  return rows.map(r => r.code)
 }
 
 // Conta un utilizzo (solo per i codici salvati nel DB)

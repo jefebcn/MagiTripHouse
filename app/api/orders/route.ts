@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { notifyAdminOrder } from '@/lib/telegram'
 import { sendPushToUser } from '@/lib/push'
 import { getBearerUser } from '@/lib/session'
-import { validateDiscount, registerDiscountUse } from '@/lib/discount'
+import { validateDiscount, registerDiscountUse, redeemDiscount } from '@/lib/discount'
 
 export async function GET() {
   const session = await auth()
@@ -35,10 +35,16 @@ export async function POST(req: Request) {
     if (d.ok) validCode = d.code
     else note = `⚠️ CODICE SCONTO NON VALIDO (${body.discountCode.slice(0, 32)}: ${d.error}) ${note ?? ''}`.trim()
   }
+  // Blocca il codice per questo cliente (vincolo unico: regge anche due ordini inviati insieme)
+  const orderId = body.id.trim().slice(0, 64)
+  if (validCode && !(await redeemDiscount(validCode, user.handle, orderId))) {
+    note = `⚠️ CODICE SCONTO GIÀ USATO (${validCode}) ${note ?? ''}`.trim()
+    validCode = null
+  }
 
   const order = await prisma.order.create({
     data: {
-      id:         body.id.trim().slice(0, 64),
+      id:         orderId,
       userId:     user.handle,
       status:     'pending',
       total,
@@ -47,6 +53,10 @@ export async function POST(req: Request) {
       referredBy: typeof body.referredBy === 'string' ? body.referredBy.slice(0, 32) : null,
       commissionCredited: false,
     },
+  }).catch(async (e) => {
+    // Ordine non creato: il codice torna disponibile per il cliente
+    if (validCode) await prisma.discountRedemption.deleteMany({ where: { code: validCode, userHandle: user.handle.toLowerCase() } }).catch(() => {})
+    throw e
   })
 
   // Scala il credito affiliato dell'utente stesso (mai di un altro)
