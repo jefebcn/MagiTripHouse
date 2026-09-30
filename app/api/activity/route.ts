@@ -9,7 +9,7 @@ export async function PATCH(req: Request) {
   const bearer = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!bearer) return NextResponse.json({ ok: false })
   const payload = await verifyToken(bearer)
-  if (!payload) return NextResponse.json({ ok: false })
+  if (!payload) return NextResponse.json({ ok: false, expired: true }, { status: 401 })
 
   await prisma.userActivity.upsert({
     where: { userId: payload.id },

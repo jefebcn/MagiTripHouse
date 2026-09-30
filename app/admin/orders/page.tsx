@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import ManualOrderForm from './ManualOrderForm'
 
 interface OrderItem {
   id: string
@@ -139,6 +140,8 @@ export default function AdminOrders() {
           <div style={{ fontSize: '.6rem', color: 'var(--muted)' }}>{filtered.length} ordini</div>
         </div>
       </div>
+
+      <ManualOrderForm onCreated={(o) => setOrders(prev => [o as Order, ...prev])} />
 
       {/* Search */}
       <div style={{

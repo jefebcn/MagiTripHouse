@@ -7,6 +7,7 @@ import { useSwipeToClose } from '@/hooks/useSwipeToClose'
 import { useTelegram } from '@/hooks/useTelegram'
 import { track } from '@vercel/analytics'
 import { discountAmount as calcDiscount } from '@/lib/discount-math'
+import { submitOrder, flushOutbox, type SaveResult } from '@/lib/order-outbox'
 
 function haptic(pattern: number | number[] = 50) {
   try { if (navigator.vibrate) navigator.vibrate(pattern) } catch { /* noop */ }
@@ -19,7 +20,7 @@ const MEETUP_MIN_VAPE = 50  // minimo ridotto se l'ordine meetup è solo vape pe
 const isVape = (name?: string) => (name ?? '').toLowerCase().includes('vape')
 
 export default function CartDrawer() {
-  const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView, sessionToken } = useUIStore()
+  const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView, sessionToken, logout } = useUIStore()
   const authH: Record<string, string> = sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}
   const { items, changeQty, clearOrigin, itemsByOrigin, totalByOrigin } = useCartStore()
   const { user: tgUser } = useTelegram()
@@ -29,7 +30,7 @@ export default function CartDrawer() {
   const [confirmingOrigin, setConfirmingOrigin] = useState<ShipOrigin | null>(null)
   const [affBalance, setAffBalance] = useState(0)
   const [creditOrigin, setCreditOrigin] = useState<ShipOrigin | null>(null)
-  const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; total: number; method: string | null; isMeetup: boolean } | null>(null)
+  const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; total: number; method: string | null; isMeetup: boolean; save: SaveResult | 'saving' } | null>(null)
   const [discountCode, setDiscountCode] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
   const [discountPct, setDiscountPct] = useState<Record<ShipOrigin, number>>({ spain: 0, italy: 0, pharma: 0, meetup: 0 })
   const [discountMsg, setDiscountMsg] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
@@ -172,10 +173,8 @@ export default function CartDrawer() {
     const msg = lines.join('\n')
     const tgUrl = `https://t.me/magichous8?text=${encodeURIComponent(msg)}`
 
-    fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authH },
-      body: JSON.stringify({
+    // Salvataggio sul server con esito controllato (se fallisce resta in coda e viene reinviato)
+    submitOrder(orderId, {
         id: orderId,
         userId,
         total: (isMeetup || isPharma) ? productTotal : finalTotal,
@@ -186,8 +185,7 @@ export default function CartDrawer() {
         referredBy: typeof localStorage !== 'undefined' ? localStorage.getItem('tp_ref') : null,
         affiliateCredit: creditApplied > 0 ? creditApplied : undefined,
         affiliateUsername: creditApplied > 0 ? userHandle : undefined,
-      }),
-    }).catch(() => {})
+    }, sessionToken).then(save => setConfirmedOrder(c => c && c.id === orderId ? { ...c, save } : c))
 
     track('order_sent', { origin, total: Math.round(finalTotal * 100) / 100, payment: isMeetup ? 'meetup' : (payMethod[origin] ?? ''), discount: discountAmount > 0 })
     haptic([80, 40, 80])
@@ -206,6 +204,7 @@ export default function CartDrawer() {
       total: (isMeetup || isPharma) ? productTotal : finalTotal,
       method: isMeetup ? null : (pmChosen === 'crypto' ? 'Crypto' : 'IBAN'),
       isMeetup,
+      save: 'saving',
     })
 
     const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
@@ -248,6 +247,37 @@ export default function CartDrawer() {
                 <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.25rem', color: 'var(--green)' }}>€{confirmedOrder.total.toFixed(2)}</span>
               </div>
             </div>
+
+            {/* Esito registrazione dell'ordine sul server */}
+            {confirmedOrder.save === 'saving' && (
+              <div style={{ fontSize: '.74rem', color: 'var(--muted)' }}>⏳ Registrazione dell’ordine in corso…</div>
+            )}
+            {confirmedOrder.save === 'saved' && (
+              <div style={{ fontSize: '.74rem', color: 'var(--green)', fontWeight: 700 }}>✅ Ordine registrato</div>
+            )}
+            {(confirmedOrder.save === 'failed' || confirmedOrder.save === 'auth') && (
+              <div style={{ width: '100%', fontSize: '.74rem', lineHeight: 1.5, color: '#ffb199', background: 'rgba(232,59,59,.08)', border: '1px solid rgba(232,59,59,.35)', borderRadius: 10, padding: '10px 12px', textAlign: 'left' }}>
+                {confirmedOrder.save === 'auth'
+                  ? <>⚠️ <strong>La tua sessione è scaduta</strong>: l’ordine è salvato sul telefono e verrà registrato in automatico appena rientri nel tuo account.</>
+                  : <>⚠️ <strong>Registrazione non riuscita</strong> (connessione?). L’ordine è salvato sul telefono e viene reinviato in automatico.</>}
+                {confirmedOrder.save === 'failed' && (
+                  <button
+                    onClick={async () => {
+                      setConfirmedOrder(c => c ? { ...c, save: 'saving' } : c)
+                      const r = await flushOutbox(sessionToken)
+                      setConfirmedOrder(c => c ? { ...c, save: r.left === 0 ? 'saved' : 'failed' } : c)
+                    }}
+                    style={{ display: 'block', marginTop: 8, padding: '8px 14px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '.76rem', background: 'rgba(232,59,59,.15)', border: '1px solid rgba(232,59,59,.45)', color: '#ffb199' }}
+                  >🔄 Riprova ora</button>
+                )}
+                {confirmedOrder.save === 'auth' && (
+                  <button
+                    onClick={() => { logout(); close() }}
+                    style={{ display: 'block', marginTop: 8, padding: '8px 14px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '.76rem', background: 'rgba(232,59,59,.15)', border: '1px solid rgba(232,59,59,.45)', color: '#ffb199' }}
+                  >🔑 Rientra nell’account</button>
+                )}
+              </div>
+            )}
 
             {!confirmedOrder.isMeetup && (
               <div style={{ fontSize: '.72rem', color: 'rgba(245,200,66,.85)', background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.2)', borderRadius: 10, padding: '9px 12px', lineHeight: 1.5 }}>

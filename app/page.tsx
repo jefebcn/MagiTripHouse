@@ -13,6 +13,7 @@ import Lightbox from '@/components/panels/Lightbox'
 import { useTelegram } from '@/hooks/useTelegram'
 import { useProducts } from '@/hooks/useProducts'
 import { useCartStore } from '@/store/cartStore'
+import { flushOutbox } from '@/lib/order-outbox'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -31,7 +32,7 @@ function LedLine() {
 
 
 export default function Home() {
-  const { view, isLoggedIn, setView, sessionToken, userHandle } = useUIStore()
+  const { view, isLoggedIn, setView, sessionToken, userHandle, logout } = useUIStore()
   const cartItems = useCartStore((s) => s.items)
   useTelegram()
 
@@ -58,11 +59,20 @@ export default function Home() {
     }
   }, [])
 
+  // Loggato ma senza token (vecchie versioni dell'app): serve un nuovo accesso per poter ordinare
+  React.useEffect(() => {
+    if (isLoggedIn && !sessionToken) logout()
+  }, [isLoggedIn, sessionToken, logout])
+
   React.useEffect(() => {
     if (!sessionToken) return
     const ping = () => fetch('/api/activity', {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${sessionToken}` },
+    }).then(r => {
+      // Sessione scaduta/non valida: esci, così al prossimo accesso gli ordini in coda vengono registrati
+      if (r.status === 401) { logout(); return }
+      flushOutbox(sessionToken).catch(() => {})
     }).catch(() => {})
     ping()
     const id = setInterval(ping, 60_000)

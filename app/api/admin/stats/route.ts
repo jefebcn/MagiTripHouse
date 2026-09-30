@@ -9,7 +9,15 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const now = new Date()
-  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0)
+  // "Oggi" parte dalla mezzanotte italiana, non da quella UTC del server
+  const romeOffsetMin = (() => {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Rome', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+      .formatToParts(now).reduce<Record<string, string>>((a, p) => { a[p.type] = p.value; return a }, {})
+    const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute)
+    return Math.round((asUtc - now.getTime()) / 60000)
+  })()
+  const romeNow = new Date(now.getTime() + romeOffsetMin * 60000)
+  const todayStart = new Date(Date.UTC(romeNow.getUTCFullYear(), romeNow.getUTCMonth(), romeNow.getUTCDate()) - romeOffsetMin * 60000)
   const weekStart = new Date(todayStart); weekStart.setDate(todayStart.getDate() - 7)
   const monthStart = new Date(todayStart); monthStart.setDate(todayStart.getDate() - 30)
   const yearStart = new Date(todayStart); yearStart.setFullYear(todayStart.getFullYear() - 1)

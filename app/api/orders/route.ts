@@ -26,6 +26,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Ordine non valido' }, { status: 400 })
   }
 
+  // Idempotente: un reinvio dello stesso ordine (coda del telefono) non crea doppioni
+  const existing = await prisma.order.findUnique({ where: { id: body.id.trim().slice(0, 64) } })
+  if (existing) {
+    if (existing.userId.toLowerCase() !== user.handle.toLowerCase()) return NextResponse.json({ error: 'Ordine non valido' }, { status: 409 })
+    return NextResponse.json(existing, { status: 200 })
+  }
+
   // Ri-valida il codice sconto lato server (prima di creare l'ordine: il check "primo ordine" conta gli ordini esistenti).
   // Se non è valido l'ordine passa comunque, ma viene segnalato nella nota così l'admin corregge il totale.
   let note = typeof body.note === 'string' ? body.note.slice(0, 1000) : null
