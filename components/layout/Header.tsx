@@ -14,7 +14,7 @@ const PARTICLES = [
   { emoji: '⭐', angle:-135, dist: 95 },
 ]
 
-export default function Header() {
+export default function Header({ size }: { size?: number } = {}) {
   const [burstKey, setBurstKey] = React.useState(0)
   const [bursting, setBursting] = React.useState(false)
 
@@ -30,7 +30,7 @@ export default function Header() {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      padding: '22px 16px 8px',
+      padding: size ? 0 : '22px 16px 8px',
       background: 'transparent',
       position: 'relative',
       overflow: 'visible',
@@ -75,8 +75,8 @@ export default function Header() {
         <Image
           src="/logo.png"
           alt="Magic Trip House"
-          width={155}
-          height={78}
+          width={size ?? 155}
+          height={size ?? 78}
           style={{ objectFit: 'contain', display: 'block' }}
           priority
         />

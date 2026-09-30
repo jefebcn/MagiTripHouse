@@ -2,7 +2,6 @@
 import React from 'react'
 import Image from 'next/image'
 import Header from '@/components/layout/Header'
-import Marquee from '@/components/layout/Marquee'
 import { useUIStore } from '@/store/uiStore'
 import { useProducts } from '@/hooks/useProducts'
 import { SHIP_META, type ShipOrigin } from '@/store/cartStore'
@@ -21,16 +20,24 @@ const CATEGORY_SHORTCUTS = [
   { id: 'combo',   label: 'Combo',   emoji: '🔥' },
 ]
 
-const TRUST_CHIPS = [
-  { icon: '🔒', label: 'Discreto' },
-  { icon: '🚚', label: 'Tutta Europa' },
-  { icon: '⭐', label: 'Top quality' },
+const INFO_TILES = [
+  { icon: '📦', title: 'Discreto',    text: 'Packaging neutro, nessun riferimento' },
+  { icon: '📍', title: 'Tracking',    text: 'ITA 24–48h · ESP 48–72h' },
+  { icon: '💳', title: 'Pagamento',   text: 'Crypto o IBAN, in chat' },
 ]
+
+// Spedizioni Lun–Mer: stato mostrato nella hero
+function shippingStatus(d: Date): { open: boolean; label: string } {
+  const day = d.getDay() // 0 dom … 6 sab
+  if (day === 1 || day === 2) return { open: true, label: 'Spedizioni aperte fino a mercoledì' }
+  if (day === 3) return { open: true, label: 'Oggi ultimo giorno di spedizioni' }
+  return { open: false, label: 'Prossime spedizioni lunedì' }
+}
 
 const MEETUP_DEADLINE = new Date('2026-07-01T00:00:00')
 
 export default function HubView() {
-  const { goToCatalog, setView, userName } = useUIStore()
+  const { goToCatalog, setView, userName, userAvatar } = useUIStore()
   const { products, isLoading } = useProducts()
   const firstName = (userName || '').trim().split(/\s+/)[0]
 
@@ -39,6 +46,10 @@ export default function HubView() {
     const t = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(t)
   }, [])
+
+  const shipStatus = shippingStatus(now)
+  const hour = now.getHours()
+  const greeting = hour < 6 ? 'Buonanotte' : hour < 13 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'
 
   const msLeft = MEETUP_DEADLINE.getTime() - now.getTime()
   const meetupActive = msLeft > 0
@@ -51,86 +62,119 @@ export default function HubView() {
   return (
     <div style={{ paddingBottom: 110 }}>
 
-      {/* ═══════════ HERO ═══════════ */}
-      <div style={{ position: 'relative', overflow: 'hidden' }}>
-        {/* Disco glow concentrato dietro il logo */}
-        <div style={{
-          position: 'absolute', top: 0, left: '50%',
-          transform: 'translateX(-50%)',
-          width: 340, height: 200,
-          background: 'radial-gradient(ellipse, rgba(61,255,110,.22) 0%, rgba(61,255,110,.06) 45%, transparent 70%)',
-          pointerEvents: 'none', zIndex: 0,
-        }} />
-
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <Header />
-        </div>
-
-        {/* Greeting */}
-        <div style={{ textAlign: 'center', padding: '6px 24px 20px', position: 'relative', zIndex: 1 }}>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '.15px', lineHeight: 1.4 }}>
+      {/* ═══════════ TOP BAR ═══════════ */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 16px 0' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--muted)', letterSpacing: '.3px' }}>{greeting}</div>
+          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {firstName
-              ? <>Bentornato, <span style={{ color: 'var(--green)', textShadow: '0 0 14px rgba(61,255,110,.55)' }}>{firstName}</span> 👋</>
-              : <>Benvenuto su <span style={{ color: 'var(--green)', textShadow: '0 0 14px rgba(61,255,110,.55)' }}>Magic Trip House</span> 👋</>
-            }
+              ? <><span style={{ color: 'var(--green)', textShadow: '0 0 14px rgba(61,255,110,.45)' }}>{firstName}</span> 👋</>
+              : <>Benvenuto 👋</>}
           </div>
-          <div style={{ fontSize: '.73rem', color: 'rgba(106,138,106,.8)', marginTop: 4, letterSpacing: '.3px' }}>
-            📦 Consegna a casa tua o in un locker · Italia ed Europa
-          </div>
-
-          {/* Trust chips */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
-            {TRUST_CHIPS.map(c => (
-              <span key={c.label} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: 'rgba(61,255,110,.07)',
-                border: '1px solid rgba(61,255,110,.2)',
-                borderRadius: 20, padding: '5px 13px',
-                fontSize: '.7rem', color: 'rgba(237,250,238,.72)', fontWeight: 600,
-              }}>
-                <span>{c.icon}</span>{c.label}
-              </span>
-            ))}
-          </div>
-
-          {/* Link "Come funziona" */}
-          <button
-            onClick={() => setView('faq')}
-            style={{
-              marginTop: 12, background: 'none', border: 'none', cursor: 'pointer',
-              fontFamily: 'inherit', fontSize: '.74rem', color: 'rgba(245,200,66,.85)',
-              fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3,
-            }}
-          >❓ Come funziona? Pagamento, spedizioni e tracking</button>
         </div>
-
-        {/* Separatore sfumato */}
-        <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(61,255,110,.18) 30%, rgba(61,255,110,.18) 70%, transparent)', margin: '0 24px' }} />
-      </div>
-
-      {/* ═══════════ MARQUEE ═══════════ */}
-      <div style={{ marginTop: 14 }}>
-        <Marquee />
+        <button onClick={() => setView('faq')} aria-label="Come funziona" style={{
+          width: 42, height: 42, borderRadius: 14, flexShrink: 0, cursor: 'pointer', fontSize: '1.05rem',
+          background: 'rgba(245,200,66,.08)', border: '1px solid rgba(245,200,66,.3)', color: 'var(--gold)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>❓</button>
+        <button onClick={() => setView('account')} aria-label="Account" style={{
+          width: 42, height: 42, borderRadius: 14, flexShrink: 0, cursor: 'pointer', overflow: 'hidden', padding: 0,
+          background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.3)', color: 'var(--green)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem',
+        }}>
+          {userAvatar
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={userAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : (firstName ? firstName[0].toUpperCase() : '👤')}
+        </button>
       </div>
 
       {/* ═══════════ SEARCH ═══════════ */}
-      <div style={{ padding: '16px 16px 0' }}>
+      <div style={{ padding: '14px 16px 0' }}>
         <button
           onClick={() => goToCatalog({ ship: null })}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-            background: 'rgba(61,255,110,.05)',
-            border: '1.5px solid rgba(61,255,110,.2)',
-            borderRadius: 16, padding: '14px 18px',
+            background: 'var(--card)', border: '1px solid var(--border)',
+            borderRadius: 14, padding: '13px 16px',
             cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-            boxShadow: '0 0 0 0 rgba(61,255,110,0)',
-            transition: 'box-shadow .2s, border-color .2s',
           }}
         >
-          <span style={{ fontSize: '1.1rem', color: 'var(--green)', opacity: .9 }}>🔍</span>
-          <span style={{ flex: 1, color: 'rgba(106,138,106,.8)', fontSize: '.92rem' }}>Cerca un prodotto…</span>
-          <span style={{ fontSize: '.82rem', color: 'rgba(61,255,110,.5)', fontWeight: 700 }}>›</span>
+          <span style={{ fontSize: '1rem', opacity: .85 }}>🔍</span>
+          <span style={{ flex: 1, color: 'var(--muted)', fontSize: '.88rem' }}>Cerca un prodotto…</span>
+          <span style={{ fontSize: '.7rem', color: 'var(--green)', fontWeight: 700, background: 'rgba(61,255,110,.1)', borderRadius: 8, padding: '3px 8px' }}>
+            {isLoading ? '…' : `${products.filter(p => p.category !== 'request').length} prodotti`}
+          </span>
         </button>
+      </div>
+
+      {/* ═══════════ HERO CARD ═══════════ */}
+      <div style={{ padding: '14px 16px 0' }}>
+        <div style={{
+          position: 'relative', overflow: 'hidden', borderRadius: 22, padding: '18px 16px 16px',
+          background: 'radial-gradient(120% 90% at 100% 0%, rgba(61,255,110,.22) 0%, rgba(61,255,110,.05) 45%, transparent 70%), linear-gradient(160deg, #122012 0%, var(--card) 70%)',
+          border: '1px solid rgba(61,255,110,.28)', boxShadow: '0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04)',
+        }}>
+          {/* Griglia decorativa */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none', opacity: .5,
+            backgroundImage: 'linear-gradient(rgba(61,255,110,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(61,255,110,.05) 1px, transparent 1px)',
+            backgroundSize: '22px 22px', maskImage: 'linear-gradient(180deg, #000, transparent 85%)', WebkitMaskImage: 'linear-gradient(180deg, #000, transparent 85%)',
+          }} />
+
+          <div style={{ position: 'relative', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Stato spedizioni (live) */}
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 999, padding: '4px 10px',
+                fontSize: '.64rem', fontWeight: 800, letterSpacing: '.3px', whiteSpace: 'nowrap',
+                background: shipStatus.open ? 'rgba(61,255,110,.12)' : 'rgba(245,200,66,.1)',
+                border: `1px solid ${shipStatus.open ? 'rgba(61,255,110,.4)' : 'rgba(245,200,66,.35)'}`,
+                color: shipStatus.open ? 'var(--green)' : 'var(--gold)',
+              }}>
+                <span className={shipStatus.open ? 'pulse-dot' : undefined} style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 8px currentColor' }} />
+                {shipStatus.label}
+              </span>
+
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', lineHeight: 1.15, marginTop: 10 }}>
+                Premium quality,<br /><span style={{ color: 'var(--green)', textShadow: '0 0 16px rgba(61,255,110,.4)' }}>consegna discreta.</span>
+              </div>
+              <div style={{ fontSize: '.72rem', color: 'rgba(237,250,238,.65)', marginTop: 6, lineHeight: 1.45 }}>
+                A casa tua o in un locker, in Italia e in tutta Europa.
+              </div>
+            </div>
+
+            {/* Logo: fluttua, tap = esplosione di particelle */}
+            <div style={{ flexShrink: 0, marginTop: -4, marginRight: -4 }}>
+              <Header size={104} />
+            </div>
+          </div>
+
+          <div style={{ position: 'relative', display: 'flex', gap: 8, marginTop: 14 }}>
+            <button onClick={() => goToCatalog({ ship: null })} style={{
+              flex: 1, padding: '12px', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: '.88rem',
+              background: 'linear-gradient(135deg, var(--green), var(--green2))', border: 'none', color: '#041004',
+              boxShadow: '0 0 20px rgba(61,255,110,.35)',
+            }}>Sfoglia il catalogo ›</button>
+            <button onClick={() => setView('faq')} style={{
+              padding: '12px 14px', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '.8rem',
+              background: 'rgba(8,12,8,.5)', border: '1px solid var(--border)', color: 'var(--text)',
+            }}>Come funziona</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════ INFO TILES ═══════════ */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, padding: '10px 16px 0' }}>
+        {INFO_TILES.map(t => (
+          <div key={t.title} style={{
+            background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '10px 10px 9px',
+          }}>
+            <div style={{ fontSize: '1.15rem' }}>{t.icon}</div>
+            <div style={{ fontWeight: 800, fontSize: '.72rem', marginTop: 4, color: 'var(--text)' }}>{t.title}</div>
+            <div style={{ fontSize: '.6rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.35 }}>{t.text}</div>
+          </div>
+        ))}
       </div>
 
       {/* ═══════════ BENVENUTO (nuovo utente) / ORDINE IN CORSO ═══════════ */}
