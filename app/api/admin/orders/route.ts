@@ -30,7 +30,11 @@ export async function POST(req: Request) {
   const createdAt = b.createdAt ? new Date(b.createdAt) : new Date()
   if (Number.isNaN(createdAt.getTime())) return NextResponse.json({ error: 'Data non valida' }, { status: 400 })
 
-  const id = `MTH-${createdAt.getTime()}-M${Math.random().toString(36).slice(2, 4).toUpperCase()}`
+  // Numero d'ordine originale (dal messaggio Telegram) se fornito, altrimenti uno nuovo
+  const givenId = typeof b.id === 'string' ? b.id.trim().toUpperCase() : ''
+  if (givenId && !/^MTH-\d{10,}-[A-Z0-9]{2,6}$/.test(givenId)) return NextResponse.json({ error: 'Numero ordine non valido' }, { status: 400 })
+  const id = givenId || `MTH-${createdAt.getTime()}-M${Math.random().toString(36).slice(2, 4).toUpperCase()}`
+  if (await prisma.order.findUnique({ where: { id } })) return NextResponse.json({ error: `L'ordine ${id} è già registrato` }, { status: 409 })
   const note = `[Manuale]${typeof b.note === 'string' && b.note.trim() ? ` ${b.note.trim().slice(0, 900)}` : ''}`
 
   const order = await prisma.order.create({

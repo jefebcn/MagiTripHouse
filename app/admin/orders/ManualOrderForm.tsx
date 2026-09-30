@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import { parseOrderMessage } from '@/lib/parse-order-message'
 
 interface Variant { label: string; price: number }
 interface Product { id: string; name: string; emoji: string; variants: Variant[] }
@@ -11,11 +12,14 @@ const iStyle: React.CSSProperties = {
 }
 
 // Ora locale nel formato richiesto da <input type="datetime-local">
-function nowLocal() {
-  const d = new Date()
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
-  return d.toISOString().slice(0, 16)
+function toLocalInput(d: Date) {
+  const x = new Date(d)
+  x.setMinutes(x.getMinutes() - x.getTimezoneOffset())
+  return x.toISOString().slice(0, 16)
 }
+const nowLocal = () => toLocalInput(new Date())
+// Confronto nomi senza emoji/punteggiatura
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, ' ').trim()
 
 export default function ManualOrderForm({ onCreated }: { onCreated: (order: unknown) => void }) {
   const [open, setOpen] = useState(false)
@@ -30,6 +34,8 @@ export default function ManualOrderForm({ onCreated }: { onCreated: (order: unkn
   const [totalOverride, setTotalOverride] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [paste, setPaste] = useState('')
+  const [orderId, setOrderId] = useState('')
 
   useEffect(() => {
     if (!open || products.length) return
@@ -47,13 +53,29 @@ export default function ManualOrderForm({ onCreated }: { onCreated: (order: unkn
     setLines(ls => [...ls, { productId: picked.id, name: picked.name, emoji: picked.emoji, label: v.label, price: v.price, qty: 1 }])
   }
 
+  // Compila il form dal messaggio Telegram dell'ordine
+  function fillFromMessage() {
+    const r = parseOrderMessage(paste)
+    if (!r.items.length) return setMsg('❌ Non trovo prodotti nel messaggio: incollalo per intero')
+    setLines(r.items.map(it => {
+      const p = products.find(x => norm(x.name) === norm(it.name)) ?? products.find(x => norm(x.name).endsWith(norm(it.name)) || norm(it.name).endsWith(norm(x.name)))
+      return { productId: p?.id ?? '', name: p?.name ?? it.name, emoji: p?.emoji ?? it.emoji, label: it.label, price: it.unitPrice, qty: it.qty }
+    }))
+    if (r.id) setOrderId(r.id)
+    if (r.createdAt) setDate(toLocalInput(r.createdAt))
+    if (r.total != null) setTotalOverride(String(r.total))
+    if (r.note) setNote(r.note)
+    if (r.customer && !userId) setUserId(r.customer.toLowerCase())
+    setMsg(`✅ Compilato: ${r.items.length} prodotti${r.total != null ? ` · €${r.total.toFixed(2)}` : ''}. Controlla il cliente e salva.`)
+  }
+
   async function save() {
     setMsg('')
     setSaving(true)
     const res = await fetch('/api/admin/orders', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        userId, status, note, total,
+        id: orderId || undefined, userId, status, note, total,
         createdAt: new Date(date).toISOString(),
         items: lines.map(l => ({ id: l.productId, name: l.name, emoji: l.emoji, label: l.label, price: l.price, qty: l.qty })),
       }),
@@ -63,7 +85,7 @@ export default function ManualOrderForm({ onCreated }: { onCreated: (order: unkn
     if (!res.ok) return setMsg(`❌ ${d.error ?? 'Errore'}`)
     onCreated(d)
     setMsg(`✅ Ordine ${d.id} registrato`)
-    setUserId(''); setNote(''); setLines([]); setTotalOverride(''); setDate(nowLocal())
+    setUserId(''); setNote(''); setLines([]); setTotalOverride(''); setDate(nowLocal()); setOrderId(''); setPaste('')
     setTimeout(() => { setMsg(''); setOpen(false) }, 2500)
   }
 
@@ -85,6 +107,26 @@ export default function ManualOrderForm({ onCreated }: { onCreated: (order: unkn
       <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.45 }}>
         Per ordini presi in chat o non salvati dall’app. Conta nel fatturato del giorno scelto (giornaliero, settimanale, mensile).
       </div>
+
+      {/* Incolla il messaggio Telegram → compila tutto */}
+      <textarea
+        value={paste} onChange={e => setPaste(e.target.value)} rows={4}
+        placeholder="📋 Incolla qui il messaggio dell’ordine (🛒 NUOVO ORDINE — Magic Trip House …) per compilare tutto in automatico"
+        style={{ ...iStyle, resize: 'vertical', fontSize: '.78rem' }}
+      />
+      <button onClick={fillFromMessage} disabled={!paste.trim() || !products.length} style={{
+        padding: '10px', borderRadius: 10, fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem',
+        cursor: paste.trim() && products.length ? 'pointer' : 'default', opacity: paste.trim() && products.length ? 1 : .5,
+        background: 'rgba(245,200,66,.12)', border: '1px solid rgba(245,200,66,.45)', color: 'var(--gold)',
+      }}>{products.length ? '⚡ Compila dal messaggio' : 'Caricamento prodotti…'}</button>
+
+      {orderId && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.78rem' }}>
+          <span style={{ color: 'var(--muted)' }}>N° ordine originale:</span>
+          <strong style={{ fontFamily: 'monospace', color: 'var(--green)' }}>{orderId}</strong>
+          <button onClick={() => setOrderId('')} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input placeholder="Cliente (username, es. xander91)" value={userId} onChange={e => setUserId(e.target.value)} style={{ ...iStyle, flex: 2, minWidth: 180 }} />
