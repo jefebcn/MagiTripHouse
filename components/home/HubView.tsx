@@ -133,6 +133,9 @@ export default function HubView() {
         </button>
       </div>
 
+      {/* ═══════════ BENVENUTO (nuovo utente) / ORDINE IN CORSO ═══════════ */}
+      <HomeOrderCard />
+
       {/* ═══════════ BANNER CANALE TELEGRAM ═══════════ */}
       <div style={{ padding: '12px 16px 0' }}>
         <button
@@ -459,6 +462,124 @@ function NewArrivals() {
             </button>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Card contestuale: benvenuto per chi non ha mai ordinato, oppure stato dell'ordine in corso ───
+const WELCOME_CODE = 'BENVENUTO10'
+const WELCOME_DISMISS_KEY = 'mth_welcome_dismissed'
+type MiniOrder = { id: string; status: string; tracking: string | null; createdAt: string }
+const ACTIVE_LABEL: Record<string, { text: string; icon: string; color: string }> = {
+  pending: { text: 'In attesa di pagamento', icon: '⏳', color: '#f5c842' },
+  paid:    { text: 'Pagato · in preparazione', icon: '✅', color: '#3dff6e' },
+  shipped: { text: 'Spedito · in viaggio', icon: '📦', color: '#7ec8f8' },
+}
+
+function HomeOrderCard() {
+  const { sessionToken, setView, goToCatalog } = useUIStore()
+  const [orders, setOrders] = React.useState<MiniOrder[] | null>(null)
+  const [welcomePct, setWelcomePct] = React.useState<number | null>(null)
+  const [dismissed, setDismissed] = React.useState(true)
+  const [copied, setCopied] = React.useState(false)
+
+  React.useEffect(() => {
+    try { setDismissed(localStorage.getItem(WELCOME_DISMISS_KEY) === '1') } catch { setDismissed(false) }
+    if (!sessionToken) return
+    const h = { Authorization: `Bearer ${sessionToken}` }
+    fetch('/api/orders/mine', { headers: h })
+      .then(r => r.ok ? r.json() : [])
+      .then((d: MiniOrder[]) => {
+        const list = Array.isArray(d) ? d : []
+        setOrders(list)
+        // Mostra il codice benvenuto solo se è davvero utilizzabile
+        if (list.length === 0) {
+          fetch('/api/discount/validate', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', ...h },
+            body: JSON.stringify({ code: WELCOME_CODE, origin: 'spain' }),
+          }).then(r => r.json()).then(v => { if (v?.ok) setWelcomePct(v.percent) }).catch(() => {})
+        }
+      })
+      .catch(() => {})
+  }, [sessionToken])
+
+  if (!orders) return null
+
+  // Utente che ha già ordinato: mostra l'ordine più recente ancora in corso (pending solo se recente)
+  if (orders.length > 0) {
+    const recent = (o: MiniOrder) => Date.now() - new Date(o.createdAt).getTime() < 21 * 86_400_000
+    const active = orders.find(o => (o.status === 'paid' || o.status === 'shipped') || (o.status === 'pending' && recent(o)))
+    if (!active) return null
+    const st = ACTIVE_LABEL[active.status]
+    return (
+      <div style={{ padding: '12px 16px 0' }}>
+        <button onClick={() => setView('orders')} style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+          background: 'var(--card)', border: `1.5px solid ${st.color}55`, borderRadius: 16, padding: '12px 16px',
+        }}>
+          <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>{st.icon}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>Il tuo ordine {active.id}</div>
+            <div style={{ fontWeight: 800, fontSize: '.88rem', color: st.color, marginTop: 1 }}>{st.text}</div>
+            {active.tracking && <div style={{ fontSize: '.68rem', color: '#7ec8f8', marginTop: 2 }}>📍 Tracking disponibile</div>}
+          </div>
+          <span style={{ fontSize: '.76rem', fontWeight: 700, color: 'var(--muted)', flexShrink: 0 }}>Dettagli ›</span>
+        </button>
+      </div>
+    )
+  }
+
+  // Nuovo utente: come funziona + codice primo ordine
+  if (dismissed) return null
+  const dismiss = () => { setDismissed(true); try { localStorage.setItem(WELCOME_DISMISS_KEY, '1') } catch { /* */ } }
+  const steps = [
+    { icon: '🛍️', title: 'Scegli', text: 'Spagna o Italia, aggiungi al carrello' },
+    { icon: '💳', title: 'Paga', text: 'Crypto o IBAN, in chat su Telegram' },
+    { icon: '📦', title: 'Ricevi', text: 'A casa o in locker, con tracking' },
+  ]
+  return (
+    <div style={{ padding: '12px 16px 0' }}>
+      <div style={{
+        position: 'relative', borderRadius: 16, padding: '14px 14px 12px',
+        background: 'linear-gradient(135deg, rgba(61,255,110,.10), rgba(245,200,66,.06))',
+        border: '1.5px solid rgba(61,255,110,.3)', boxShadow: '0 0 20px rgba(61,255,110,.08)',
+      }}>
+        <button onClick={dismiss} aria-label="Chiudi" style={{
+          position: 'absolute', top: 6, right: 8, background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1rem', cursor: 'pointer', padding: 4,
+        }}>✕</button>
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', marginBottom: 10 }}>👋 Primo ordine? Ecco come funziona</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {steps.map((s, i) => (
+            <div key={s.title} style={{ flex: 1, background: 'rgba(8,12,8,.45)', border: '1px solid var(--border)', borderRadius: 12, padding: '9px 8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.3rem' }}>{s.icon}</div>
+              <div style={{ fontWeight: 800, fontSize: '.74rem', marginTop: 3 }}>{i + 1}. {s.title}</div>
+              <div style={{ fontSize: '.6rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.35 }}>{s.text}</div>
+            </div>
+          ))}
+        </div>
+        {welcomePct != null && (
+          <button onClick={() => { navigator.clipboard?.writeText(WELCOME_CODE).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1800) }} style={{
+            marginTop: 10, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+            background: 'rgba(245,200,66,.1)', border: '1.5px dashed rgba(245,200,66,.55)', borderRadius: 12,
+            padding: '9px 12px', cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            <span style={{ fontSize: '.76rem', color: 'var(--gold)', fontWeight: 700 }}>🎟 −{welcomePct}% sul primo ordine</span>
+            <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--gold)', letterSpacing: '.08em' }}>
+              {copied ? '✓ copiato' : WELCOME_CODE}
+            </span>
+          </button>
+        )}
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <button onClick={() => goToCatalog({ ship: null })} style={{
+            flex: 1, padding: '10px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer',
+            background: 'rgba(61,255,110,.18)', border: '1px solid rgba(61,255,110,.5)', color: 'var(--green)',
+          }}>Inizia a ordinare ›</button>
+          <button onClick={() => setView('faq')} style={{
+            padding: '10px 14px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: '.78rem', cursor: 'pointer',
+            background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--muted)',
+          }}>❓ FAQ</button>
+        </div>
       </div>
     </div>
   )

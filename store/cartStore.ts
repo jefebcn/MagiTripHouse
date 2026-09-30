@@ -90,7 +90,13 @@ export const useCartStore = create<CartState>()(
           .reduce((s, x) => s + x.qty, 0)
       },
     }),
-    { name: 'tp_cart' },
+    {
+      name: 'tp_cart',
+      // Pharma non è più vendibile dal sito: ripulisce i carrelli salvati in precedenza
+      onRehydrateStorage: () => (state) => {
+        if (state && state.items.some(i => i.shipFrom === 'pharma')) state.clearOrigin('pharma')
+      },
+    },
   ),
 )
 

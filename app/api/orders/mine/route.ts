@@ -8,7 +8,8 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
 
   const orders = await prisma.order.findMany({
-    where: { userId: user.handle },
+    // Case-insensitive: gli ordini storici potevano avere lo username con maiuscole diverse
+    where: { userId: { equals: user.handle, mode: 'insensitive' } },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,

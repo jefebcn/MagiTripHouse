@@ -9,7 +9,8 @@ export async function GET(req: Request) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const products = await prisma.product.findMany({
-    where: showAll ? {} : { hidden: false },
+    // Pharma non si vende più qui (rimanda al sito partner KratosLabs): restano solo in admin
+    where: showAll ? {} : { hidden: false, shipFrom: { not: 'pharma' } },
     orderBy: [{ sortOrder: 'asc' }],
   })
   products.sort((a, b) => {

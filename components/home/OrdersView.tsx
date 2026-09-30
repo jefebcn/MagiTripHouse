@@ -12,13 +12,21 @@ const STEPS = [
   { key: 'delivered', icon: '🎉', label: 'Consegnato' },
 ]
 
+// Ordini vecchi rimasti "pending" (creati prima che l'admin gestisse gli stati): mostrati come archiviati
+const ARCHIVE_AFTER_DAYS = 21
+const isArchived = (o: Order) =>
+  o.status === 'pending' && Date.now() - new Date(o.createdAt).getTime() > ARCHIVE_AFTER_DAYS * 86_400_000
+
 const STATUS_TEXT: Record<string, { text: string; color: string }> = {
+  archived:  { text: 'Ordine archiviato', color: 'var(--muted)' },
   pending:   { text: 'In attesa di pagamento', color: '#f5c842' },
   paid:      { text: 'Pagamento ricevuto · in preparazione', color: '#3dff6e' },
   shipped:   { text: 'Spedito · in viaggio', color: '#7ec8f8' },
   delivered: { text: 'Consegnato', color: '#3dff6e' },
   cancelled: { text: 'Annullato', color: '#e83b3b' },
 }
+
+const isDone = (o: Order) => ['delivered', 'cancelled', 'archived'].includes(o.status) || isArchived(o)
 
 function openTelegram(url: string) {
   const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
@@ -37,10 +45,20 @@ export default function OrdersView() {
     fetch('/api/orders/mine', { headers: { Authorization: `Bearer ${sessionToken}` } })
       .then(r => r.ok ? r.json() : [])
       .then((d: Order[]) => {
-        const list = Array.isArray(d) ? d : []
+        const server = Array.isArray(d) ? d : []
+        // Storico locale (vecchie versioni dell'app salvavano gli ordini solo sul telefono)
+        let local: Order[] = []
+        try {
+          const saved = JSON.parse(localStorage.getItem('tp_orders') ?? '[]') as Array<{ id: string; total: number; createdAt?: string; items?: OrderLine[] }>
+          const known = new Set(server.map(o => o.id))
+          local = saved
+            .filter(x => x?.id && !known.has(x.id))
+            .map(x => ({ id: x.id, status: 'archived', tracking: null, total: Number(x.total) || 0, items: x.items ?? [], note: null, createdAt: x.createdAt ?? new Date(0).toISOString() }))
+        } catch { /* storico locale illeggibile: ignorato */ }
+        const list = [...server, ...local].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         setOrders(list)
         // Apre in automatico l'ordine più recente ancora in corso
-        setOpen(o => o ?? list.find(x => x.status !== 'delivered' && x.status !== 'cancelled')?.id ?? null)
+        setOpen(o => o ?? list.find(x => !isDone(x))?.id ?? null)
       })
       .catch(() => setOrders([]))
   }, [sessionToken])
@@ -54,7 +72,7 @@ export default function OrdersView() {
     setTimeout(() => setCopied(c => c === text ? null : c), 1800)
   }
 
-  const active = orders?.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length ?? 0
+  const active = orders?.filter(o => !isDone(o)).length ?? 0
 
   return (
     <div style={{ padding: '18px 16px 110px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -78,11 +96,12 @@ export default function OrdersView() {
       )}
 
       {orders?.map(o => {
-        const st = STATUS_TEXT[o.status] ?? { text: o.status, color: 'var(--muted)' }
-        const stepIdx = STEPS.findIndex(s => s.key === o.status)
+        const status = isArchived(o) ? 'archived' : o.status
+        const st = STATUS_TEXT[status] ?? { text: status, color: 'var(--muted)' }
+        const stepIdx = STEPS.findIndex(s => s.key === status)
         const isOpen = open === o.id
         const items = Array.isArray(o.items) ? o.items : []
-        const date = new Date(o.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })
+        const date = new Date(o.createdAt).getTime() > 0 ? new Date(o.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
         return (
           <div key={o.id} style={{
             background: 'var(--card)', border: `1px solid ${isOpen ? 'rgba(61,255,110,.3)' : 'var(--border)'}`,
@@ -159,7 +178,7 @@ export default function OrdersView() {
                     )}
                   </div>
                 ))}
-                {o.status === 'pending' && (
+                {status === 'pending' && (
                   <div style={{ fontSize: '.72rem', color: 'rgba(245,200,66,.85)', background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.22)', borderRadius: 10, padding: '9px 11px', lineHeight: 1.5 }}>
                     💳 Completa il pagamento in chat: l’ordine parte appena lo riceviamo.
                   </div>
