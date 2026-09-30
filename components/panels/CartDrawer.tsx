@@ -21,7 +21,8 @@ const isVape = (name?: string) => (name ?? '').toLowerCase().includes('vape')
 const DISCOUNT_ORIGINS: ShipOrigin[] = ['spain', 'italy']
 
 export default function CartDrawer() {
-  const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView } = useUIStore()
+  const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView, sessionToken } = useUIStore()
+  const authH: Record<string, string> = sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}
   const { items, changeQty, clearOrigin, itemsByOrigin, totalByOrigin } = useCartStore()
   const { user: tgUser } = useTelegram()
   const panelRef = useRef<HTMLDivElement>(null)
@@ -40,12 +41,12 @@ export default function CartDrawer() {
   useSwipeToClose(panelRef, close, cartOpen)
 
   useEffect(() => {
-    if (!cartOpen || !isLoggedIn || !userHandle) return
-    fetch(`/api/affiliates/me?username=${userHandle}`)
+    if (!cartOpen || !isLoggedIn || !userHandle || !sessionToken) return
+    fetch('/api/affiliates/me', { headers: { Authorization: `Bearer ${sessionToken}` } })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.balance > 0) setAffBalance(d.balance) })
       .catch(() => {})
-  }, [cartOpen, isLoggedIn, userHandle])
+  }, [cartOpen, isLoggedIn, userHandle, sessionToken])
 
   async function applyDiscount(origin: ShipOrigin) {
     const code = discountCode[origin].trim().toUpperCase()
@@ -57,7 +58,7 @@ export default function CartDrawer() {
     }
     setDiscountChecking(origin)
     try {
-      const res = await fetch(`/api/orders/mine?userId=${encodeURIComponent(userHandle)}`)
+      const res = await fetch('/api/orders/mine', { headers: authH })
       const orders = res.ok ? await res.json() : []
       if (Array.isArray(orders) && orders.length > 0) {
         setDiscountPct(p => ({ ...p, [origin]: 0 }))
@@ -165,7 +166,7 @@ export default function CartDrawer() {
 
     fetch('/api/orders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authH },
       body: JSON.stringify({
         id: orderId,
         userId,

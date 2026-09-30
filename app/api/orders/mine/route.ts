@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getBearerUser } from '@/lib/session'
 
-// Ordini del singolo cliente — filtrati per userId (handle Telegram)
+// Ordini dell'utente loggato — l'identità viene dal token, non dalla query
 export async function GET(req: Request) {
-  const userId = new URL(req.url).searchParams.get('userId')?.trim()
-  if (!userId) return NextResponse.json([])
+  const user = await getBearerUser(req)
+  if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
 
   const orders = await prisma.order.findMany({
-    where: { userId },
+    where: { userId: user.handle },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,

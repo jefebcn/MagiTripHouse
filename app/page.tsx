@@ -35,19 +35,20 @@ export default function Home() {
 
   // Salva lo snapshot del carrello lato server (recupero carrello abbandonato)
   React.useEffect(() => {
-    if (!isLoggedIn || !userHandle) return
+    if (!isLoggedIn || !userHandle || !sessionToken) return
     const t = setTimeout(() => {
       const items = useCartStore.getState().items
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }
       if (items.length === 0) {
-        fetch('/api/cart', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userHandle }) }).catch(() => {})
+        fetch('/api/cart', { method: 'DELETE', headers }).catch(() => {})
       } else {
         const total = items.reduce((s, x) => s + x.variantPrice * x.qty, 0)
         const payload = items.map(x => ({ name: x.productName, label: x.variantLabel, qty: x.qty, emoji: x.emoji }))
-        fetch('/api/cart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: userHandle, items: payload, total }) }).catch(() => {})
+        fetch('/api/cart', { method: 'POST', headers, body: JSON.stringify({ items: payload, total }) }).catch(() => {})
       }
     }, 2500)
     return () => clearTimeout(t)
-  }, [cartItems, isLoggedIn, userHandle])
+  }, [cartItems, isLoggedIn, userHandle, sessionToken])
 
   React.useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -144,7 +145,7 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
 })
 
 function NewsView() {
-  const { sessionToken, channelJoined, setChannelJoined, setView, userHandle } = useUIStore()
+  const { sessionToken, channelJoined, setChannelJoined, setView } = useUIStore()
 
   const [subscribed, setSubscribed] = React.useState(false)
   const [memberCount, setMemberCount] = React.useState<number | null>(null)
@@ -204,7 +205,7 @@ function NewsView() {
           const raw = atob(b64); const arr = new Uint8Array(raw.length)
           for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i)
           const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr })
-          await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub.toJSON(), userId: userHandle }) })
+          await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}) }, body: JSON.stringify(sub.toJSON()) })
           setSubscribed(true)
         } catch { /* permission denied or unsupported */ }
       }).catch(() => {})
@@ -471,8 +472,8 @@ function AccountView() {
     const saved = localStorage.getItem('tp_orders')
     if (saved) { try { const parsed = JSON.parse(saved); setOrders(parsed); setOrderCount(parsed.length) } catch { /* */ } }
     // Ordini reali dal server (con stato + tracking aggiornati dall'admin)
-    if (userHandle) {
-      fetch(`/api/orders/mine?userId=${encodeURIComponent(userHandle)}`)
+    if (userHandle && sessionToken) {
+      fetch('/api/orders/mine', { headers: { Authorization: `Bearer ${sessionToken}` } })
         .then(r => r.ok ? r.json() : [])
         .then((data: Array<{ id: string; total: number; status: string; tracking: string | null; createdAt: string }>) => {
           if (!Array.isArray(data) || data.length === 0) return
@@ -536,7 +537,7 @@ function AccountView() {
         setPermissionDenied(false)
         const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) })
-        await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub.toJSON(), userId: userHandle }) })
+        await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}) }, body: JSON.stringify(sub.toJSON()) })
         setPushEnabled(true); setPushMsg({ ok: true, text: '🔔 Notifiche attivate!' })
         setTimeout(() => setPushMsg(null), 3000)
       }
@@ -1219,21 +1220,22 @@ interface AffMe {
 }
 
 function AffiliatesView() {
-  const { userHandle, isLoggedIn, setView } = useUIStore()
+  const { userHandle, isLoggedIn, setView, sessionToken } = useUIStore()
   const [data, setData] = React.useState<AffMe | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
 
   React.useEffect(() => {
-    if (!isLoggedIn || !userHandle) return
+    if (!isLoggedIn || !userHandle || !sessionToken) return
     setLoading(true)
+    const authH = { Authorization: `Bearer ${sessionToken}` }
     // Ensure affiliate record exists then fetch stats
-    fetch('/api/affiliates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: userHandle }) })
-      .then(() => fetch(`/api/affiliates/me?username=${userHandle}`))
+    fetch('/api/affiliates', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authH }, body: '{}' })
+      .then(() => fetch('/api/affiliates/me', { headers: authH }))
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [isLoggedIn, userHandle])
+  }, [isLoggedIn, userHandle, sessionToken])
 
   function copyCode() {
     if (!data) return

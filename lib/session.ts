@@ -24,6 +24,13 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
   }
 }
 
+// Utente autenticato dal token di sessione (header "Authorization: Bearer <token>")
+export async function getBearerUser(req: Request): Promise<SessionPayload | null> {
+  const bearer = req.headers.get('authorization')?.replace('Bearer ', '').trim()
+  if (!bearer) return null
+  return verifyToken(bearer)
+}
+
 export async function hashPwd(password: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')

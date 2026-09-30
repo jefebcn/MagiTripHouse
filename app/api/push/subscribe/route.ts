@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getBearerUser } from '@/lib/session'
 
 export async function POST(req: Request) {
   const sub = await req.json()
@@ -7,7 +8,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 })
   }
 
-  const userId = typeof sub.userId === 'string' && sub.userId.trim() ? sub.userId.trim() : null
+  // L'utente associato viene SOLO dal token (mai dal body): evita di ricevere le notifiche di altri.
+  // Senza login l'iscrizione resta anonima (riceve solo i broadcast).
+  const user = await getBearerUser(req)
+  const userId = user?.handle ?? null
 
   await prisma.pushSubscription.upsert({
     where:  { endpoint: sub.endpoint },

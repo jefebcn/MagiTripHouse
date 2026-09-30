@@ -1,19 +1,21 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getBearerUser } from '@/lib/session'
 
-// Salva/aggiorna lo snapshot del carrello dell'utente (per il recupero carrello abbandonato)
+// Salva/aggiorna lo snapshot del carrello dell'utente loggato (recupero carrello abbandonato)
 export async function POST(req: Request) {
-  const body = await req.json()
-  const userId = typeof body.userId === 'string' ? body.userId.trim() : ''
-  if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+  const user = await getBearerUser(req)
+  if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+  const userId = user.handle
 
-  const items = Array.isArray(body.items) ? body.items : []
+  const body = await req.json()
+  const items = Array.isArray(body.items) ? body.items.slice(0, 100) : []
   if (!items.length) {
     await prisma.abandonedCart.deleteMany({ where: { userId } })
     return NextResponse.json({ ok: true, cleared: true })
   }
 
-  const total = typeof body.total === 'number' ? body.total : 0
+  const total = typeof body.total === 'number' && Number.isFinite(body.total) ? body.total : 0
   const now = new Date()
   await prisma.abandonedCart.upsert({
     where: { userId },
@@ -24,9 +26,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const body = await req.json().catch(() => ({}))
-  const userId = typeof body.userId === 'string' ? body.userId.trim() : ''
-  if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
-  await prisma.abandonedCart.deleteMany({ where: { userId } })
+  const user = await getBearerUser(req)
+  if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+  await prisma.abandonedCart.deleteMany({ where: { userId: user.handle } })
   return NextResponse.json({ ok: true })
 }

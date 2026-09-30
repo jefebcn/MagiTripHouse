@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getBearerUser } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
 
+// Dati affiliato dell'utente loggato (mai di altri utenti)
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const username = searchParams.get('username')
-  if (!username) return NextResponse.json({ error: 'Missing username' }, { status: 400 })
+  const user = await getBearerUser(req)
+  if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+  const username = user.handle
 
   const aff = await prisma.affiliate.findUnique({ where: { username } })
   if (!aff) return NextResponse.json({ error: 'Not found' }, { status: 404 })

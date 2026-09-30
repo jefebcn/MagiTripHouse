@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { getBearerUser } from '@/lib/session'
 
 function generateAffCode(username: string): string {
   const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -25,8 +26,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { username } = await req.json()
-  if (!username) return NextResponse.json({ error: 'Missing username' }, { status: 400 })
+  const user = await getBearerUser(req)
+  if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+  const username = user.handle
 
   const existing = await prisma.affiliate.findUnique({ where: { username } })
   if (existing) return NextResponse.json(existing)
@@ -39,8 +41,11 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const { username, referrerCode } = await req.json()
-  if (!username || !referrerCode) {
+  const user = await getBearerUser(req)
+  if (!user) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+  const username = user.handle
+  const { referrerCode } = await req.json()
+  if (!referrerCode || typeof referrerCode !== 'string') {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
 

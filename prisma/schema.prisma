@@ -39,6 +39,7 @@ model Order {
   note       String?
   tracking   String?
   referredBy String?
+  commissionCredited Boolean @default(true) // true per gli ordini storici (già accreditati alla creazione); i nuovi partono da false
   createdAt  DateTime @default(now())
 }
 

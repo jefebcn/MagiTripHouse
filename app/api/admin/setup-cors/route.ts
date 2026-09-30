@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3'
+import { auth } from '@/lib/auth'
 
 const r2 = new S3Client({
   region: 'auto',
@@ -11,6 +12,8 @@ const r2 = new S3Client({
 })
 
 export async function GET() {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
     await r2.send(new PutBucketCorsCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
