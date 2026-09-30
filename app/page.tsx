@@ -69,6 +69,9 @@ export default function Home() {
     return () => clearInterval(id)
   }, [sessionToken])
 
+  // Cambio scheda: riparti dall'alto (le viste condividono lo scroll della pagina)
+  React.useEffect(() => { window.scrollTo(0, 0) }, [view])
+
   const gated = (content: React.ReactNode) =>
     isLoggedIn ? content : <AuthGate />
 

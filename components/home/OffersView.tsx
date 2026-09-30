@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { useUIStore } from '@/store/uiStore'
 import { useProducts, type Product } from '@/hooks/useProducts'
 import ProductCard from '@/components/catalog/ProductCard'
+import PartnerReward from './PartnerReward'
 
 // Grammi dal label del formato ("5g", "1kg", "100 g", "10"); 0 se non è a peso (pezzi, ml…)
 function grams(label: string): number {
@@ -64,6 +65,11 @@ export default function OffersView() {
           🔥 <span style={{ background: 'linear-gradient(90deg, #ff8a3d, var(--gold))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Offerte</span>
         </div>
         <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginTop: 4 }}>Prezzi speciali, risparmio a volume e ultimi arrivi</div>
+      </div>
+
+      {/* Premio partner KratosLabs (coupon personale, verificato dall'admin) */}
+      <div style={{ padding: '0 16px', marginBottom: 22 }}>
+        <PartnerReward compact />
       </div>
 
       {/* Più prendi, meno paghi: risparmio a volume (nessun coupon) */}

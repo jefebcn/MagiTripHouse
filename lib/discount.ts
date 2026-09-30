@@ -29,6 +29,7 @@ export async function validateDiscount(rawCode: unknown, origin: string, userHan
       : null
 
   if (!rule) return { ok: false, error: 'Codice non valido' }
+  if (db?.userHandle && db.userHandle.toLowerCase() !== userHandle.toLowerCase()) return { ok: false, error: 'Codice personale di un altro utente' }
   if (!rule.active) return { ok: false, error: 'Codice non più attivo' }
   if (rule.expiresAt && rule.expiresAt.getTime() < Date.now()) return { ok: false, error: 'Codice scaduto' }
   if (rule.maxUses != null && rule.uses >= rule.maxUses) return { ok: false, error: 'Codice esaurito' }

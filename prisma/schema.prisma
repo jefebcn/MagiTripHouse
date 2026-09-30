@@ -128,6 +128,7 @@ model DiscountCode {
   note           String?
   maxDiscount    Float?                   // tetto dello sconto in € (es. 10 = max −€10)
   minOrder       Float?                   // subtotale minimo in € per applicarlo
+  userHandle     String?                  // se valorizzato: codice personale, lo usa solo questo utente
   createdAt      DateTime  @default(now())
 }
 
@@ -136,6 +137,18 @@ model LoginAttempt {
   count       Int       @default(0)
   windowStart DateTime  @default(now())
   lockedUntil DateTime?
+}
+
+// Premio partner: il cliente dichiara un acquisto su KratosLabs, l'admin verifica e sblocca un coupon personale
+model PartnerClaim {
+  id           String    @id @default(cuid())
+  userHandle   String
+  partnerOrder String    @unique   // numero ordine KratosLabs (una sola richiesta per ordine)
+  note         String?
+  status       String    @default("pending") // pending | approved | rejected
+  code         String?
+  createdAt    DateTime  @default(now())
+  processedAt  DateTime?
 }
 
 model WarehouseVacation {

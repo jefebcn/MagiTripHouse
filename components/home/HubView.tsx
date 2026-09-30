@@ -2,6 +2,7 @@
 import React from 'react'
 import Image from 'next/image'
 import Header from '@/components/layout/Header'
+import PartnerReward from './PartnerReward'
 import { useUIStore } from '@/store/uiStore'
 import { useProducts } from '@/hooks/useProducts'
 import { SHIP_META, type ShipOrigin } from '@/store/cartStore'
@@ -10,15 +11,6 @@ const SHIP_DESC: Partial<Record<ShipOrigin, string>> = {
   spain: 'Cali · Hash · Frozen · Premium',
   italy: 'Spedizione rapida dall’Italia',
 }
-
-const CATEGORY_SHORTCUTS = [
-  { id: 'premium', label: 'Premium', emoji: '💎' },
-  { id: 'frozen',  label: 'Frozen',  emoji: '🧊' },
-  { id: 'hash',    label: 'Hash',    emoji: '🪨' },
-  { id: 'cbd',     label: 'THC',     emoji: '🌿' },
-  { id: 'new',     label: 'Novità',  emoji: '✨' },
-  { id: 'combo',   label: 'Combo',   emoji: '🔥' },
-]
 
 const INFO_TILES = [
   { icon: '📦', title: 'Discreto',    text: 'Packaging neutro, nessun riferimento' },
@@ -232,25 +224,6 @@ export default function HubView() {
       {/* ═══════════ NUOVI ARRIVI ═══════════ */}
       <NewArrivals />
 
-      {/* ═══════════ CATEGORIE ═══════════ */}
-      <SectionHead title="Categorie" />
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 16px 4px', scrollbarWidth: 'none' }}>
-        {CATEGORY_SHORTCUTS.map(c => (
-          <button
-            key={c.id}
-            onClick={() => goToCatalog({ ship: null, category: c.id })}
-            style={{
-              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7,
-              background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 999,
-              padding: '9px 14px 9px 10px', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text)',
-            }}
-          >
-            <span style={{ fontSize: '1.1rem' }}>{c.emoji}</span>
-            <span style={{ fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{c.label}</span>
-          </button>
-        ))}
-      </div>
-
       {/* ═══════════ PARTNER: Pharma → KratosLabs (si apre fuori dall'app) ═══════════ */}
       <SectionHead title="Partner" />
       <div style={{ padding: '0 16px' }}>
@@ -284,6 +257,7 @@ export default function HubView() {
             <span style={{ flexShrink: 0, fontSize: '.8rem', fontWeight: 700, color: '#a5b4fc' }}>↗</span>
           </div>
         </button>
+        <PartnerReward />
       </div>
 
       {/* ═══════════ COMMUNITY: Telegram + Affiliati ═══════════ */}
