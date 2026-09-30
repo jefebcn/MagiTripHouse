@@ -13,13 +13,9 @@ function haptic(pattern: number | number[] = 50) {
 
 const ORIGINS: ShipOrigin[] = ['spain', 'italy', 'pharma', 'meetup']
 
-// Sconto primo ordine — valido solo su spedizioni Spagna/Italia
-const WELCOME_CODE = 'BENVENUTO10'
-const WELCOME_PCT = 0.10
 const MEETUP_MIN = 100      // ordine minimo € per prodotti meetup / ritiro in loco
 const MEETUP_MIN_VAPE = 50  // minimo ridotto se l'ordine meetup è solo vape pen
 const isVape = (name?: string) => (name ?? '').toLowerCase().includes('vape')
-const DISCOUNT_ORIGINS: ShipOrigin[] = ['spain', 'italy']
 
 export default function CartDrawer() {
   const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView, sessionToken } = useUIStore()
@@ -36,6 +32,7 @@ export default function CartDrawer() {
   const [discountCode, setDiscountCode] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
   const [discountPct, setDiscountPct] = useState<Record<ShipOrigin, number>>({ spain: 0, italy: 0, pharma: 0, meetup: 0 })
   const [discountMsg, setDiscountMsg] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
+  const [discountApplied, setDiscountApplied] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
   const [discountChecking, setDiscountChecking] = useState<ShipOrigin | null>(null)
 
   const close = useCallback(() => { setConfirmedOrder(null); setCartOpen(false) }, [setCartOpen])
@@ -52,22 +49,23 @@ export default function CartDrawer() {
   async function applyDiscount(origin: ShipOrigin) {
     const code = discountCode[origin].trim().toUpperCase()
     if (!code) return
-    if (code !== WELCOME_CODE) {
-      setDiscountPct(p => ({ ...p, [origin]: 0 }))
-      setDiscountMsg(m => ({ ...m, [origin]: '❌ Codice non valido' }))
-      return
-    }
     setDiscountChecking(origin)
     try {
-      const res = await fetch('/api/orders/mine', { headers: authH })
-      const orders = res.ok ? await res.json() : []
-      if (Array.isArray(orders) && orders.length > 0) {
-        setDiscountPct(p => ({ ...p, [origin]: 0 }))
-        setDiscountMsg(m => ({ ...m, [origin]: '❌ Valido solo per il primo ordine' }))
-      } else {
-        setDiscountPct(p => ({ ...p, [origin]: WELCOME_PCT }))
-        setDiscountMsg(m => ({ ...m, [origin]: '✅ Sconto 10% primo ordine applicato!' }))
+      const res = await fetch('/api/discount/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authH },
+        body: JSON.stringify({ code, origin }),
+      })
+      const d = await res.json().catch(() => null)
+      if (d?.ok) {
+        setDiscountPct(p => ({ ...p, [origin]: d.percent / 100 }))
+        setDiscountApplied(a => ({ ...a, [origin]: d.code }))
+        setDiscountMsg(m => ({ ...m, [origin]: `✅ Sconto ${d.percent}% applicato!` }))
         haptic(40)
+      } else {
+        setDiscountPct(p => ({ ...p, [origin]: 0 }))
+        setDiscountApplied(a => ({ ...a, [origin]: '' }))
+        setDiscountMsg(m => ({ ...m, [origin]: `❌ ${d?.error ?? 'Codice non valido'}` }))
       }
     } catch {
       setDiscountMsg(m => ({ ...m, [origin]: '❌ Errore, riprova' }))
@@ -116,10 +114,10 @@ export default function CartDrawer() {
     const userId = userHandle || tgUser || 'unknown'
     const subtotal = totalByOrigin(origin)
     const creditApplied = creditOrigin === origin ? Math.min(affBalance, subtotal) : 0
-    const discountAmount = DISCOUNT_ORIGINS.includes(origin) ? subtotal * (discountPct[origin] ?? 0) : 0
+    const appliedCode = discountApplied[origin]
+    const discountAmount = appliedCode ? Math.round(subtotal * (discountPct[origin] ?? 0) * 100) / 100 : 0
     const productTotal = subtotal - creditApplied - discountAmount
     const finalTotal = productTotal + sm.shipCost
-
     const orderId = `MTH-${Date.now()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`
     const date = new Date().toLocaleDateString('it-IT')
     const isPharma = origin === 'pharma'
@@ -139,13 +137,13 @@ export default function CartDrawer() {
       `Subtotale: €${subtotal.toFixed(2)}`,
     ]
     if (creditApplied > 0) lines.push(`🎁 Credito affiliato: −€${creditApplied.toFixed(2)}`)
-    if (discountAmount > 0) lines.push(`🎟 Sconto primo ordine (10%): −€${discountAmount.toFixed(2)}`)
+    if (discountAmount > 0) lines.push(`🎟 Codice ${appliedCode} (−${Math.round(discountPct[origin] * 100)}%): −€${discountAmount.toFixed(2)}`)
     if (isMeetup) {
       lines.push(`🤝 Ritiro in loco · nessuna spedizione`)
-      lines.push(`💰 *TOTALE: €${(subtotal - creditApplied).toFixed(2)}*`)
+      lines.push(`💰 *TOTALE: €${productTotal.toFixed(2)}*`)
     } else if (isPharma) {
       lines.push(`🚚 Spedizione: da confermare (5–19€ UE · 12–27€ extra-UE)`)
-      lines.push(`💰 *TOTALE prodotti: €${(subtotal - creditApplied).toFixed(2)}* (+spedizione)`)
+      lines.push(`💰 *TOTALE prodotti: €${productTotal.toFixed(2)}* (+spedizione)`)
     } else {
       lines.push(`🚚 Spedizione: €${sm.shipCost.toFixed(2)}`)
       lines.push(`💰 *TOTALE: €${finalTotal.toFixed(2)}*`)
@@ -171,9 +169,11 @@ export default function CartDrawer() {
       body: JSON.stringify({
         id: orderId,
         userId,
-        total: finalTotal,
+        total: (isMeetup || isPharma) ? productTotal : finalTotal,
         items: oItems.map((x) => ({ id: x.id, name: x.productName, emoji: x.emoji, label: x.variantLabel, price: x.variantPrice, qty: x.qty })),
-        note: `[${sm.label}]${!isMeetup && payMethod[origin] ? ` [${payMethod[origin] === 'crypto' ? 'Crypto' : 'IBAN'}]` : ''}${discountAmount > 0 ? ' [BENVENUTO10]' : ''} ${note[origin].trim()}`.trim() || null,
+        note: `[${sm.label}]${!isMeetup && payMethod[origin] ? ` [${payMethod[origin] === 'crypto' ? 'Crypto' : 'IBAN'}]` : ''}${discountAmount > 0 ? ` [${appliedCode}]` : ''} ${note[origin].trim()}`.trim() || null,
+        discountCode: discountAmount > 0 ? appliedCode : undefined,
+        origin,
         referredBy: typeof localStorage !== 'undefined' ? localStorage.getItem('tp_ref') : null,
         affiliateCredit: creditApplied > 0 ? creditApplied : undefined,
         affiliateUsername: creditApplied > 0 ? userHandle : undefined,
@@ -191,9 +191,10 @@ export default function CartDrawer() {
     setDiscountCode(d => ({ ...d, [origin]: '' }))
     setDiscountPct(p => ({ ...p, [origin]: 0 }))
     setDiscountMsg(m => ({ ...m, [origin]: '' }))
+    setDiscountApplied(a => ({ ...a, [origin]: '' }))
     setConfirmedOrder({
       id: orderId,
-      total: isMeetup ? subtotal - creditApplied : finalTotal,
+      total: (isMeetup || isPharma) ? productTotal : finalTotal,
       method: isMeetup ? null : (pmChosen === 'crypto' ? 'Crypto' : 'IBAN'),
       isMeetup,
     })
@@ -305,9 +306,9 @@ export default function CartDrawer() {
               const isPharma = origin === 'pharma'
               const isMeetup = origin === 'meetup'
               const mMin = isMeetup ? meetupMin() : 0
-              const canDiscount = DISCOUNT_ORIGINS.includes(origin)
-              const discountAmount = canDiscount ? subtotal * (discountPct[origin] ?? 0) : 0
-              const finalTotal = (isPharma || isMeetup) ? subtotal - creditApplied : subtotal - creditApplied - discountAmount + sm.shipCost
+              const appliedCode = discountApplied[origin]
+              const discountAmount = appliedCode ? Math.round(subtotal * (discountPct[origin] ?? 0) * 100) / 100 : 0
+              const finalTotal = subtotal - creditApplied - discountAmount + ((isPharma || isMeetup) ? 0 : sm.shipCost)
 
               return (
                 <div key={origin} style={{
@@ -483,8 +484,8 @@ export default function CartDrawer() {
                     style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '9px 12px', color: 'var(--text)', fontSize: '.82rem', fontFamily: 'inherit', resize: 'none', outline: 'none', boxSizing: 'border-box' }}
                   />
 
-                  {/* Codice sconto primo ordine (solo Spagna/Italia) */}
-                  {canDiscount && discountPct[origin] === 0 && (
+                  {/* Codice sconto (validato dal server: origini, primo ordine, scadenza, utilizzi) */}
+                  {!appliedCode && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <input
@@ -511,11 +512,11 @@ export default function CartDrawer() {
                       )}
                     </div>
                   )}
-                  {canDiscount && discountPct[origin] > 0 && (
+                  {appliedCode && (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(245,200,66,.08)', border: '1px solid rgba(245,200,66,.35)', borderRadius: 10, padding: '9px 12px' }}>
-                      <span style={{ fontSize: '.78rem', color: 'var(--gold)', fontWeight: 700 }}>🎟 Sconto 10% primo ordine attivo</span>
+                      <span style={{ fontSize: '.78rem', color: 'var(--gold)', fontWeight: 700 }}>🎟 {appliedCode} · sconto {Math.round(discountPct[origin] * 100)}% attivo</span>
                       <button
-                        onClick={() => { setDiscountPct(p => ({ ...p, [origin]: 0 })); setDiscountCode(d => ({ ...d, [origin]: '' })); setDiscountMsg(m => ({ ...m, [origin]: '' })) }}
+                        onClick={() => { setDiscountPct(p => ({ ...p, [origin]: 0 })); setDiscountApplied(a => ({ ...a, [origin]: '' })); setDiscountCode(d => ({ ...d, [origin]: '' })); setDiscountMsg(m => ({ ...m, [origin]: '' })) }}
                         style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.9rem' }}
                       >✕</button>
                     </div>
@@ -533,7 +534,7 @@ export default function CartDrawer() {
                     )}
                     {discountAmount > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--gold)', marginBottom: 4 }}>
-                        <span>🎟 Sconto primo ordine</span><span>−€{discountAmount.toFixed(2)}</span>
+                        <span>🎟 Sconto {appliedCode}</span><span>−€{discountAmount.toFixed(2)}</span>
                       </div>
                     )}
                     {isMeetup ? (

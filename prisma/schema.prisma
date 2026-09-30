@@ -116,6 +116,19 @@ model WarehousePayment {
   paidAt       DateTime @default(now())
 }
 
+model DiscountCode {
+  code           String    @id            // sempre MAIUSCOLO
+  percent        Float                    // es. 10 = −10%
+  firstOrderOnly Boolean   @default(false)
+  origins        String[]                 // vuoto = tutte le origini; es. ["spain","italy"]
+  active         Boolean   @default(true)
+  expiresAt      DateTime?
+  maxUses        Int?
+  uses           Int       @default(0)
+  note           String?
+  createdAt      DateTime  @default(now())
+}
+
 model WarehouseVacation {
   id        String   @id @default(cuid())
   days      Int

@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { notifyAdminOrder } from '@/lib/telegram'
 import { sendPushToUser } from '@/lib/push'
 import { getBearerUser } from '@/lib/session'
+import { validateDiscount, registerDiscountUse } from '@/lib/discount'
 
 export async function GET() {
   const session = await auth()
@@ -25,6 +26,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Ordine non valido' }, { status: 400 })
   }
 
+  // Ri-valida il codice sconto lato server (prima di creare l'ordine: il check "primo ordine" conta gli ordini esistenti).
+  // Se non è valido l'ordine passa comunque, ma viene segnalato nella nota così l'admin corregge il totale.
+  let note = typeof body.note === 'string' ? body.note.slice(0, 1000) : null
+  let validCode: string | null = null
+  if (typeof body.discountCode === 'string' && body.discountCode.trim()) {
+    const d = await validateDiscount(body.discountCode, typeof body.origin === 'string' ? body.origin : '', user.handle)
+    if (d.ok) validCode = d.code
+    else note = `⚠️ CODICE SCONTO NON VALIDO (${body.discountCode.slice(0, 32)}: ${d.error}) ${note ?? ''}`.trim()
+  }
+
   const order = await prisma.order.create({
     data: {
       id:         body.id.trim().slice(0, 64),
@@ -32,7 +43,7 @@ export async function POST(req: Request) {
       status:     'pending',
       total,
       items,
-      note:       typeof body.note === 'string' ? body.note.slice(0, 1000) : null,
+      note,
       referredBy: typeof body.referredBy === 'string' ? body.referredBy.slice(0, 32) : null,
       commissionCredited: false,
     },
@@ -53,6 +64,8 @@ export async function POST(req: Request) {
       }
     }).catch(() => {})
   }
+
+  if (validCode) registerDiscountUse(validCode).catch(() => {})
 
   // La commissione referral NON viene accreditata qui: solo quando l'admin conferma l'ordine (PATCH)
 
