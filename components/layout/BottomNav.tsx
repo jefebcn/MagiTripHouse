@@ -5,16 +5,15 @@ import { useCartStore } from '@/store/cartStore'
 const TABS = [
   { id: 'hub',       label: 'Home',     icon: '🏠', cart: false },
   { id: 'catalog',   label: 'Catalogo', icon: '🛍️', cart: false },
-  { id: 'news',      label: 'Canale',   icon: '📡', cart: false },
+  { id: 'orders',    label: 'Ordini',   icon: '📦', cart: false },
   { id: 'cart',      label: 'Carrello', icon: '🛒', cart: true  },
   { id: 'account',   label: 'Account',  icon: '👤', cart: false },
 ] as const
 
 export default function BottomNav() {
-  const { view, setView, setCartOpen, latestNewsAt, lastReadNewsAt } = useUIStore()
+  const { view, setView, setCartOpen } = useUIStore()
   const items = useCartStore((s) => s.items)
   const cartCount = items.reduce((sum, x) => sum + x.qty, 0)
-  const hasUnreadNews = !!latestNewsAt && latestNewsAt > lastReadNewsAt
 
   return (
     <nav
@@ -68,14 +67,6 @@ export default function BottomNav() {
                 }}>
                   {cartCount}
                 </span>
-              )}
-              {tab.id === 'news' && hasUnreadNews && (
-                <span style={{
-                  position: 'absolute', top: -2, right: -4,
-                  width: 9, height: 9, background: '#e83b3b',
-                  borderRadius: '50%', border: '1.5px solid rgba(8,12,8,.97)',
-                  boxShadow: '0 0 6px rgba(232,59,59,.8)', display: 'block',
-                }} />
               )}
             </span>
             <span>{tab.label}</span>

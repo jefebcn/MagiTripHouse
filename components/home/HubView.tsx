@@ -258,48 +258,42 @@ export default function HubView() {
           })}
         </div>
 
-        {/* Pharma card — full width */}
-        {(() => {
-          const sm = SHIP_META['pharma']
-          const n  = countByOrigin('pharma')
-          return (
-            <button
-              onClick={() => goToCatalog({ ship: 'pharma' })}
-              style={{
-                width: '100%', position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, rgba(129,140,248,.10) 0%, var(--card) 60%)',
-                border: '1px solid rgba(129,140,248,.26)',
-                borderRadius: 16, padding: '12px 14px',
-                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                display: 'flex', alignItems: 'center', gap: 14,
-                boxShadow: '0 4px 16px rgba(0,0,0,.25)',
-              }}
-            >
-              <div style={{
-                position: 'absolute', right: -30, top: -30,
-                width: 130, height: 130, borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(129,140,248,.18) 0%, transparent 70%)',
-                pointerEvents: 'none',
-              }} />
-
-              <div style={{ fontSize: '2rem', lineHeight: 1, flexShrink: 0 }}>💊</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', color: '#818cf8' }}>Pharma EU</span>
-                  <span style={{ fontSize: '.62rem', color: 'var(--muted)' }}>· {isLoading ? '…' : n} prodotti</span>
-                </div>
-                <div style={{ fontSize: '.63rem', color: 'rgba(106,138,106,.7)', marginTop: 2 }}>
-                  Deus Medical · Astera Labs · Biaxol · 🚚 {sm.delivery}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
-                {['💉','💊','🧬','🧪','🔄'].map(e => (
-                  <span key={e} style={{ fontSize: '.85rem' }}>{e}</span>
-                ))}
-              </div>
-            </button>
-          )
-        })()}
+        {/* Pharma → sito partner KratosLabs (si apre fuori dall'app) */}
+        <button
+          onClick={() => {
+            const url = 'https://www.kratoslabs.shop'
+            const tg = (window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }).Telegram?.WebApp
+            if (tg?.openLink) tg.openLink(url)
+            else window.open(url, '_blank', 'noopener')
+          }}
+          style={{
+            width: '100%', padding: 0, overflow: 'hidden', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            background: 'var(--card)', border: '1px solid rgba(129,140,248,.3)', borderRadius: 16,
+            boxShadow: '0 4px 16px rgba(0,0,0,.25)', display: 'block',
+          }}
+        >
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '1000 / 356' }}>
+            <Image src="/partners/kratos-hero.jpg" alt="KratosLabs" fill sizes="(max-width: 480px) 100vw, 480px" style={{ objectFit: 'cover' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 55%, rgba(8,12,8,.55) 100%)' }} />
+            <span style={{
+              position: 'absolute', top: 8, right: 8, fontSize: '.6rem', fontWeight: 700, letterSpacing: '.4px',
+              background: 'rgba(8,12,8,.7)', border: '1px solid rgba(255,255,255,.2)', borderRadius: 999, padding: '3px 8px', color: '#fff',
+            }}>SITO PARTNER ↗</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px' }}>
+            <div style={{ background: '#fff', borderRadius: 8, padding: '4px 6px', flexShrink: 0, display: 'flex' }}>
+              <Image src="/partners/kratos-logo.png" alt="KratosLabs logo" width={84} height={27} style={{ objectFit: 'contain' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: '#818cf8' }}>Pharma EU</div>
+              <div style={{ fontSize: '.63rem', color: 'var(--muted)', marginTop: 1 }}>Testati · dosaggi dichiarati · analisi su ogni lotto</div>
+            </div>
+            <span style={{
+              flexShrink: 0, fontSize: '.7rem', fontWeight: 700, color: '#818cf8',
+              border: '1px solid rgba(129,140,248,.45)', background: 'rgba(129,140,248,.1)', borderRadius: 20, padding: '5px 10px',
+            }}>Apri ›</span>
+          </div>
+        </button>
       </div>
 
       {/* ═══════════ NUOVI ARRIVI (scroll orizzontale) ═══════════ */}

@@ -5,6 +5,7 @@ import BottomNav from '@/components/layout/BottomNav'
 import HubView from '@/components/home/HubView'
 import FaqView from '@/components/home/FaqView'
 import CatalogView from '@/components/catalog/CatalogView'
+import OrdersView from '@/components/home/OrdersView'
 import CartDrawer from '@/components/panels/CartDrawer'
 import ProductDetail from '@/components/panels/ProductDetail'
 import Lightbox from '@/components/panels/Lightbox'
@@ -29,7 +30,7 @@ function LedLine() {
 
 
 export default function Home() {
-  const { view, isLoggedIn, setView, sessionToken, setLastReadNewsAt, setLatestNewsAt, userHandle } = useUIStore()
+  const { view, isLoggedIn, setView, sessionToken, userHandle } = useUIStore()
   const cartItems = useCartStore((s) => s.items)
   useTelegram()
 
@@ -55,23 +56,6 @@ export default function Home() {
       navigator.serviceWorker.register('/sw.js').catch(() => {})
     }
   }, [])
-
-  React.useEffect(() => {
-    fetch('/api/news')
-      .then(r => r.json())
-      .then((data: { createdAt: string }[]) => {
-        if (data.length > 0) setLatestNewsAt(data[0].createdAt)
-      })
-      .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  React.useEffect(() => {
-    if (view === 'news') {
-      setLastReadNewsAt(new Date().toISOString())
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view])
 
   React.useEffect(() => {
     if (!sessionToken) return
@@ -109,8 +93,8 @@ export default function Home() {
         )}
       </div>
 
-      <div style={{ display: view === 'news' ? 'block' : 'none' }}>
-        {gated(<NewsView />)}
+      <div style={{ display: view === 'orders' ? 'block' : 'none' }}>
+        {gated(<OrdersView />)}
       </div>
 
       <div style={{ display: view === 'account' ? 'block' : 'none', padding: '16px 16px 100px' }}>
@@ -144,220 +128,9 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
   fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
 })
 
-function NewsView() {
-  const { sessionToken, channelJoined, setChannelJoined, setView } = useUIStore()
-
-  const [subscribed, setSubscribed] = React.useState(false)
-  const [memberCount, setMemberCount] = React.useState<number | null>(null)
-  const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(null)
-  const [isStandalone, setIsStandalone] = React.useState(false)
-  const [pwaBannerDismissed, setPwaBannerDismissed] = React.useState(false)
-
-  React.useEffect(() => {
-    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
-    setPwaBannerDismissed(sessionStorage.getItem('pwa_banner_dismissed') === '1')
-
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      navigator.serviceWorker.ready.then(reg =>
-        reg.pushManager.getSubscription().then(sub => { if (sub) setSubscribed(true) })
-      ).catch(() => {})
-    }
-
-    const handler = (e: Event) => { e.preventDefault(); setDeferredPrompt(e as BeforeInstallPromptEvent) }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
-
-  React.useEffect(() => {
-    if (!sessionToken) {
-      fetch('/api/push/count').then(r => r.json()).then(d => setMemberCount(d.count)).catch(() => {})
-      return
-    }
-    fetch('/api/channel/join', { headers: { 'Authorization': `Bearer ${sessionToken}` } })
-      .then(r => r.json())
-      .then(d => {
-        if (d.joined && !channelJoined) setChannelJoined(true)
-        if (typeof d.count === 'number') setMemberCount(d.count)
-      })
-      .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionToken])
-
-  function joinChannel() {
-    if (!channelJoined) {
-      setChannelJoined(true)
-      if (sessionToken) {
-        fetch('/api/channel/join', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${sessionToken}` },
-        })
-          .then(r => r.json())
-          .then(d => { if (typeof d.count === 'number') setMemberCount(d.count) })
-          .catch(() => {})
-      }
-    }
-    if ('serviceWorker' in navigator && 'PushManager' in window && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
-      navigator.serviceWorker.ready.then(async reg => {
-        try {
-          const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-          const pad = '='.repeat((4 - key.length % 4) % 4)
-          const b64 = (key + pad).replace(/-/g, '+').replace(/_/g, '/')
-          const raw = atob(b64); const arr = new Uint8Array(raw.length)
-          for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i)
-          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr })
-          await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}) }, body: JSON.stringify(sub.toJSON()) })
-          setSubscribed(true)
-        } catch { /* permission denied or unsupported */ }
-      }).catch(() => {})
-    }
-  }
-
-  if (!channelJoined) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 24px 100px' }}>
-      <div style={{
-        width: 96, height: 96, borderRadius: '50%', marginBottom: 20,
-        background: 'radial-gradient(circle at 35% 35%, rgba(61,255,110,.4), rgba(61,255,110,.1))',
-        border: '2.5px solid rgba(61,255,110,.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '2.8rem', boxShadow: '0 0 40px rgba(61,255,110,.25)',
-      }}>📡</div>
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', textAlign: 'center', marginBottom: 6 }}>Magic Trip House</div>
-      <div style={{ fontSize: '.82rem', color: 'var(--muted)', textAlign: 'center', marginBottom: 24, lineHeight: 1.5 }}>Canale ufficiale<br />Novità, offerte &amp; aggiornamenti esclusivi</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 20, padding: '10px 24px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--green)' }}>{memberCount ?? '—'}</div>
-          <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>iscritti</div>
-        </div>
-        <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text)' }}>📡</div>
-          <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>canale</div>
-        </div>
-      </div>
-      <button onClick={joinChannel} style={{ width: '100%', maxWidth: 300, padding: '15px', borderRadius: 14, fontFamily: 'inherit', fontWeight: 700, fontSize: '1.05rem', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(61,255,110,.25), rgba(61,255,110,.12))', border: '1.5px solid rgba(61,255,110,.6)', color: 'var(--green)', boxShadow: '0 0 24px rgba(61,255,110,.2)', marginBottom: 10 }}>📡 Entra nel Canale</button>
-      <div style={{ fontSize: '.7rem', color: 'var(--muted)', opacity: .7 }}>Attiva le notifiche per non perderti nulla</div>
-    </div>
-  )
-
-  const showPwaBanner = !isStandalone && !pwaBannerDismissed
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', paddingBottom: 80 }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(8,12,8,.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(61,255,110,.12)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => setView('hub')} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1.3rem', cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}>‹</button>
-        <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: 'rgba(61,255,110,.15)', border: '1.5px solid rgba(61,255,110,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>📡</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', lineHeight: 1.2 }}>Magic Trip House</div>
-          <div style={{ fontSize: '.68rem', color: 'var(--muted)' }}>{memberCount ?? '—'} iscritti · {subscribed ? '🔔 notifiche attive' : '🔕 solo lettura'}</div>
-        </div>
-      </div>
-      {showPwaBanner && (
-        <div style={{ margin: '10px 12px 0', background: 'linear-gradient(135deg,rgba(61,255,110,.1),rgba(245,200,66,.06))', border: '1px solid rgba(61,255,110,.25)', borderRadius: 12, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start', position: 'relative' }}>
-          <button onClick={() => { sessionStorage.setItem('pwa_banner_dismissed','1'); setPwaBannerDismissed(true) }} style={{ position:'absolute', top:8, right:10, background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'.9rem' }}>✕</button>
-          <span style={{ fontSize:'1.5rem', flexShrink:0 }}>📲</span>
-          <div style={{ paddingRight: 20 }}>
-            <div style={{ fontWeight:700, fontSize:'.82rem', color:'var(--green)', marginBottom:3 }}>Installa l&apos;app!</div>
-            <div style={{ fontSize:'.73rem', color:'var(--muted)', lineHeight:1.5 }}>
-              {deferredPrompt
-                ? <button onClick={async () => { deferredPrompt.prompt(); await deferredPrompt.userChoice; setDeferredPrompt(null) }} style={{ background:'rgba(61,255,110,.15)', border:'1px solid rgba(61,255,110,.4)', borderRadius:8, padding:'5px 14px', color:'var(--green)', fontFamily:'inherit', fontWeight:700, fontSize:'.78rem', cursor:'pointer' }}>📲 Installa ora</button>
-                : <>iOS: Condividi → Aggiungi a Home · Android: menu → Aggiungi a schermata Home</>
-              }
-            </div>
-          </div>
-        </div>
-      )}
-      <ChannelFeed />
-    </div>
-  )
-}
-
-function ChannelFeed() {
-  const { view, setLatestNewsAt } = useUIStore()
-  const [news, setNews] = React.useState<NewsItem[]>([])
-  const [loading, setLoading] = React.useState(true)
-
-  React.useEffect(() => {
-    if (view !== 'news') return
-    setLoading(true)
-    fetch('/api/news')
-      .then(r => r.json())
-      .then((data: NewsItem[]) => { setNews(data); setLoading(false); if (data.length > 0) setLatestNewsAt(data[0].createdAt) })
-      .catch(() => setLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view])
-
-  if (loading) return (
-    <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {[1,2,3].map(i => <div key={i} style={{ background: 'var(--card)', borderRadius: 16, height: 110, opacity: .4, animation: 'skeleton-shine 1.4s infinite' }} />)}
-    </div>
-  )
-  if (!news.length) return (
-    <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '60px 24px' }}>
-      <div style={{ fontSize: '3rem', marginBottom: 12 }}>📭</div>
-      <div style={{ fontSize: '.9rem', fontWeight: 600 }}>Nessun messaggio ancora</div>
-      <div style={{ fontSize: '.75rem', marginTop: 6, opacity: .6 }}>I messaggi del canale appariranno qui</div>
-    </div>
-  )
-
-  return (
-    <div style={{ padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {news.map((item, i) => {
-        const dt = new Date(item.createdAt)
-        const today = new Date(); const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
-        const isToday = dt.toDateString() === today.toDateString()
-        const isYest = dt.toDateString() === yesterday.toDateString()
-        const dateLabel = isToday ? 'Oggi' : isYest ? 'Ieri' : dt.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })
-        const prevItem = news[i - 1]
-        const prevDt = prevItem ? new Date(prevItem.createdAt) : null
-        const showDate = !prevDt || prevDt.toDateString() !== dt.toDateString()
-        return (
-          <React.Fragment key={item.id}>
-            {showDate && (
-              <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 6px' }}>
-                <span style={{ background: 'rgba(61,255,110,.08)', border: '1px solid rgba(61,255,110,.15)', borderRadius: 20, padding: '3px 14px', fontSize: '.68rem', color: 'var(--muted)' }}>{dateLabel}</span>
-              </div>
-            )}
-            <div style={{ background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.1)', borderRadius: '4px 16px 16px 16px', overflow: 'hidden', position: 'relative', animation: 'fadeInUp .25s ease both', animationDelay: `${Math.min(i,6)*0.04}s` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px 6px', borderBottom: '1px solid rgba(61,255,110,.07)' }}>
-                <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: 'rgba(61,255,110,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.85rem' }}>📡</div>
-                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--green)', flex: 1 }}>Magic Trip House</span>
-              </div>
-              <div style={{ padding: '10px 14px 12px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: '1.5rem', lineHeight: 1, flexShrink: 0 }}>{item.emoji}</span>
-                  <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', letterSpacing: '.2px', flex: 1, paddingTop: 2 }}>{item.title}</div>
-                </div>
-                <div style={{ fontSize: '.85rem', color: '#cce8d0', lineHeight: 1.65, marginBottom: (item.imageUrl || item.productLink) ? 10 : 6 }}>{item.content}</div>
-                {item.imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.imageUrl} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 320, objectFit: 'cover', display: 'block' }} />
-                )}
-                {item.productLink && (
-                  <a href={item.productLink} target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(61,255,110,.1)', border: '1px solid rgba(61,255,110,.3)', borderRadius: 20, padding: '6px 14px', color: 'var(--green)', fontSize: '.78rem', fontWeight: 700, textDecoration: 'none' }}>🛒 Scopri il prodotto →</a>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                  <span style={{ fontSize: '.65rem', color: 'var(--muted)', opacity: .7 }}>{dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} ✓</span>
-                </div>
-              </div>
-            </div>
-          </React.Fragment>
-        )
-      })}
-    </div>
-  )
-}
-
-interface NewsItem { id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string }
 interface StuckItem { id: number; relAngle: number; emoji: string; isObstacle: boolean; isBonus: boolean; pts: number }
 interface LeaderEntry { id: string; handle: string; name: string; score: number; month: string }
 interface OrderItem { id: string; total: number; date: string; status?: string; tracking?: string | null; createdAt?: string }
-
-const ORDER_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  pending:   { label: '⏳ In attesa di pagamento', color: '#f5c842', bg: 'rgba(245,200,66,.12)' },
-  paid:      { label: '✅ Pagamento ricevuto',      color: '#3dff6e', bg: 'rgba(61,255,110,.12)' },
-  shipped:   { label: '📦 Spedito',                 color: '#7ec8f8', bg: 'rgba(59,130,246,.14)' },
-  delivered: { label: '🎉 Consegnato',              color: '#3dff6e', bg: 'rgba(61,255,110,.12)' },
-}
 
 // ─── Bud Strike constants ───
 const WHEEL_R = 100
@@ -450,7 +223,6 @@ function AccountView() {
   const [isIos, setIsIos] = React.useState(false)
   const [isStandalone, setIsStandalone] = React.useState(true)
   const [orders, setOrders] = React.useState<OrderItem[]>([])
-  const [showOrders, setShowOrders] = React.useState(false)
   const [showPwd, setShowPwd] = React.useState(false)
   const [pwdCurrent, setPwdCurrent] = React.useState('')
   const [pwdNew, setPwdNew] = React.useState('')
@@ -597,9 +369,9 @@ function AccountView() {
         )}
         <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 4 }}>
           {[
-            { label: 'Ordini', value: orderCount, icon: '📋', onClick: () => setShowOrders(v => !v) },
+            { label: 'Ordini', value: orderCount, icon: '📦', onClick: () => setView('orders') },
             { label: 'Referral', value: meData?.affiliate?.referralCount ?? 0, icon: '👥', onClick: undefined },
-            { label: 'Canale', value: meData?.channelMember ? '✓' : '—', icon: '📡', onClick: () => setView('news') },
+            { label: 'Speso', value: `€${Math.round(orders.reduce((t, o) => t + (typeof o.total === 'number' ? o.total : 0), 0))}`, icon: '💶', onClick: () => setView('orders') },
           ].map(s => (
             <button key={s.label} onClick={s.onClick ?? undefined} style={{ flex: 1, background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.1)', borderRadius: 12, padding: '10px 0', cursor: s.onClick ? 'pointer' : 'default', textAlign: 'center', transition: '.15s' }}>
               <div style={{ fontSize: '1rem', marginBottom: 2 }}>{s.icon}</div>
@@ -617,54 +389,14 @@ function AccountView() {
       </div>
 
       {orders.length > 0 && (
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-          <button onClick={() => setShowOrders(v => !v)} style={{ width: '100%', padding: '15px 18px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit' }}>
-            {iconCircle('rgba(61,255,110,.1)', '📋')}
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontWeight: 700, fontSize: '.88rem' }}>I Miei Ordini</div>
-              <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{orderCount} ordine{orderCount !== 1 ? 'i' : ''}</div>
-            </div>
-            <span style={{ color: 'var(--muted)', transition: '.2s', transform: showOrders ? 'rotate(90deg)' : 'none' }}>›</span>
-          </button>
-          {showOrders && (
-            <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {orders.map(o => {
-                const st = o.status ? ORDER_STATUS[o.status] : null
-                return (
-                  <div key={o.id} style={{ background: 'var(--bg3)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.88rem' }}>{o.id}</div>
-                        <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{o.date}</div>
-                      </div>
-                      <div style={{ fontFamily: "'Fredoka One', cursive", color: 'var(--green)', fontSize: '.92rem' }}>€{typeof o.total === 'number' ? o.total.toFixed(2) : o.total}</div>
-                    </div>
-                    {st && (
-                      <div style={{
-                        display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center',
-                        background: st.bg, border: `1px solid ${st.color}55`, color: st.color,
-                        borderRadius: 20, padding: '3px 11px', fontSize: '.72rem', fontWeight: 700,
-                      }}>{st.label}</div>
-                    )}
-                    {o.tracking && (
-                      <button
-                        onClick={() => navigator.clipboard?.writeText(o.tracking!).catch(() => {})}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                          background: 'var(--bg)', border: '1px solid rgba(59,130,246,.3)', borderRadius: 8,
-                          padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                        }}
-                      >
-                        <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>📍 Tracking: <strong style={{ color: '#7ec8f8', fontFamily: 'monospace' }}>{o.tracking}</strong></span>
-                        <span style={{ fontSize: '.66rem', color: 'var(--muted)' }}>📋 copia</span>
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        <button onClick={() => setView('orders')} style={{ width: '100%', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit' }}>
+          {iconCircle('rgba(61,255,110,.1)', '📦')}
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <div style={{ fontWeight: 700, fontSize: '.88rem' }}>I Miei Ordini</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{orderCount} ordin{orderCount !== 1 ? 'i' : 'e'} · stato e tracking</div>
+          </div>
+          <span style={{ color: 'var(--muted)' }}>›</span>
+        </button>
       )}
 
       {meData?.affiliate && (
@@ -747,16 +479,11 @@ function AccountView() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-        <a href="https://t.me/magichous8" target="_blank" rel="noopener" style={{ background: 'var(--card)', border: '1px solid rgba(59,130,246,.2)', borderBottom: 'none', borderRadius: '16px 16px 0 0', padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'var(--text)' }}>
+        <a href="https://t.me/magichous8" target="_blank" rel="noopener" style={{ background: 'var(--card)', border: '1px solid rgba(59,130,246,.2)', borderRadius: 16, padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'var(--text)' }}>
           {iconCircle('rgba(59,130,246,.15)', '✈️')}
           <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: '.88rem' }}>Scrivici su Telegram</div><div style={{ fontSize: '.72rem', color: '#3b82f6', marginTop: 2 }}>@magichous8</div></div>
           <span style={{ color: 'var(--muted)' }}>›</span>
         </a>
-        <button onClick={() => setView('news')} style={{ width: '100%', background: 'var(--card)', border: '1px solid rgba(61,255,110,.15)', borderRadius: '0 0 16px 16px', padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit' }}>
-          {iconCircle('rgba(61,255,110,.1)', '📢')}
-          <div style={{ flex: 1, textAlign: 'left' }}><div style={{ fontWeight: 700, fontSize: '.88rem' }}>Canale Ufficiale</div><div style={{ fontSize: '.72rem', color: 'var(--green)', marginTop: 2 }}>Novità & Offerte esclusive</div></div>
-          <span style={{ color: 'var(--muted)' }}>›</span>
-        </button>
       </div>
 
       <a href="https://www.instagram.com/magictriphouse_4.0" target="_blank" rel="noopener" style={{ background: 'var(--card)', border: '1px solid rgba(193,53,132,.25)', borderRadius: 'var(--radius)', padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: 'var(--text)' }}>
