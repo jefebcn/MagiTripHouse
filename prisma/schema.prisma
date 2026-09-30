@@ -129,6 +129,13 @@ model DiscountCode {
   createdAt      DateTime  @default(now())
 }
 
+model LoginAttempt {
+  key         String    @id            // es. "login:u:mario", "login:ip:1.2.3.4"
+  count       Int       @default(0)
+  windowStart DateTime  @default(now())
+  lockedUntil DateTime?
+}
+
 model WarehouseVacation {
   id        String   @id @default(cuid())
   days      Int

@@ -1,6 +1,11 @@
 import { SignJWT, jwtVerify } from 'jose'
 
-const secret = () => new TextEncoder().encode(process.env.NEXTAUTH_SECRET ?? 'dev-secret-change-me')
+// In produzione il segreto è obbligatorio: con un fallback fisso chiunque potrebbe firmarsi un token
+const secret = () => {
+  const s = process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET
+  if (!s && process.env.NODE_ENV === 'production') throw new Error('NEXTAUTH_SECRET mancante')
+  return new TextEncoder().encode(s ?? 'dev-secret-change-me')
+}
 
 export interface SessionPayload {
   id: string
@@ -29,9 +34,4 @@ export async function getBearerUser(req: Request): Promise<SessionPayload | null
   const bearer = req.headers.get('authorization')?.replace('Bearer ', '').trim()
   if (!bearer) return null
   return verifyToken(bearer)
-}
-
-export async function hashPwd(password: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }

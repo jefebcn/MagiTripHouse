@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { hashPwd, verifyToken } from '@/lib/session'
+import { verifyToken } from '@/lib/session'
+import { hashPassword } from '@/lib/password'
 import { auth } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   }
 
   const { handle, newPassword } = await req.json()
-  if (!handle || !newPassword || newPassword.length < 6)
+  if (typeof handle !== 'string' || typeof newPassword !== 'string' || newPassword.length < 6 || newPassword.length > 200)
     return NextResponse.json({ error: 'Password min. 6 caratteri' }, { status: 400 })
 
   const user = await prisma.user.findUnique({ where: { handle: handle.toLowerCase() } })
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { hash: await hashPwd(newPassword) },
+    data: { hash: await hashPassword(newPassword) },
   })
 
   return NextResponse.json({ ok: true })

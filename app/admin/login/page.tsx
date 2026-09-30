@@ -19,7 +19,7 @@ export default function AdminLogin() {
     if (res?.ok) {
       router.push('/admin')
     } else {
-      setError('Credenziali non valide')
+      setError('Credenziali non valide · dopo 5 tentativi errati l’accesso si blocca per 30 minuti')
     }
   }
 
