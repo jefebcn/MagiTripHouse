@@ -34,6 +34,7 @@ export async function POST(req: Request) {
   const data = {
     percent,
     firstOrderOnly: !!b.firstOrderOnly,
+    showInOffers: !!b.showInOffers,
     origins,
     active: b.active === undefined ? true : !!b.active,
     expiresAt,

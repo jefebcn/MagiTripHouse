@@ -34,7 +34,6 @@ function shippingStatus(d: Date): { open: boolean; label: string } {
   return { open: false, label: 'Prossime spedizioni lunedì' }
 }
 
-const MEETUP_DEADLINE = new Date('2026-07-01T00:00:00')
 
 export default function HubView() {
   const { goToCatalog, setView, userName, userAvatar } = useUIStore()
@@ -51,10 +50,6 @@ export default function HubView() {
   const hour = now.getHours()
   const greeting = hour < 6 ? 'Buonanotte' : hour < 13 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'
 
-  const msLeft = MEETUP_DEADLINE.getTime() - now.getTime()
-  const meetupActive = msLeft > 0
-  const daysLeft  = Math.max(0, Math.floor(msLeft / 86_400_000))
-  const hoursLeft = Math.max(0, Math.floor((msLeft % 86_400_000) / 3_600_000))
 
   const countByOrigin = (o: ShipOrigin) =>
     products.filter(p => (p.shipFrom ?? 'spain') === o && p.category !== 'request').length
@@ -180,132 +175,85 @@ export default function HubView() {
       {/* ═══════════ BENVENUTO (nuovo utente) / ORDINE IN CORSO ═══════════ */}
       <HomeOrderCard />
 
-      {/* ═══════════ BANNER CANALE TELEGRAM ═══════════ */}
-      <div style={{ padding: '12px 16px 0' }}>
-        <button
-          onClick={() => {
-            const url = 'https://t.me/+sOAYXTsv7qRmMTQ0'
-            const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
-            if (tg?.openTelegramLink) tg.openTelegramLink(url)
-            else window.open(url, '_blank')
-          }}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-            background: 'linear-gradient(135deg, rgba(34,158,217,.18), rgba(34,158,217,.07))',
-            border: '1.5px solid rgba(34,158,217,.45)',
-            borderRadius: 16, padding: '13px 16px',
-            cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-            boxShadow: '0 0 18px rgba(34,158,217,.12)',
-          }}
-        >
-          <span style={{ fontSize: '1.6rem', flexShrink: 0 }}>📢</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: '.92rem', color: '#4db8e8' }}>Accedi al canale Telegram</div>
-            <div style={{ fontSize: '.72rem', color: 'rgba(150,200,230,.8)', marginTop: 2 }}>Info, aggiornamenti e novità in tempo reale</div>
-          </div>
-          <span style={{
-            flexShrink: 0, background: 'rgba(34,158,217,.2)', border: '1px solid rgba(34,158,217,.45)',
-            borderRadius: 20, padding: '5px 13px', fontSize: '.76rem', fontWeight: 700, color: '#4db8e8',
-          }}>Apri →</span>
-        </button>
+      {/* ═══════════ SPEDIZIONE: da dove arriva ═══════════ */}
+      <SectionHead title="Scegli da dove spedire" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px' }}>
+        {(['spain', 'italy'] as ShipOrigin[]).map((o) => {
+          const sm = SHIP_META[o]
+          const n  = countByOrigin(o)
+          return (
+            <button
+              key={o}
+              onClick={() => goToCatalog({ ship: o })}
+              style={{
+                position: 'relative', overflow: 'hidden', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                background: `linear-gradient(160deg, ${sm.color}14 0%, var(--card) 55%)`,
+                border: `1px solid ${sm.color}38`, borderRadius: 18, padding: '14px 13px 12px',
+                display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--text)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '1.9rem', lineHeight: 1 }}>{sm.flag}</span>
+                <span style={{ fontSize: '.64rem', fontWeight: 800, color: sm.color, background: `${sm.color}18`, borderRadius: 999, padding: '3px 8px' }}>
+                  {isLoading ? '…' : n}
+                </span>
+              </div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.12rem', color: sm.color, marginTop: 4 }}>{sm.label}</div>
+              <div style={{ fontSize: '.64rem', color: 'var(--muted)', lineHeight: 1.35 }}>{SHIP_DESC[o]}</div>
+              <div style={{ fontSize: '.66rem', color: 'rgba(237,250,238,.75)', marginTop: 4 }}>🚚 {sm.delivery}</div>
+            </button>
+          )
+        })}
       </div>
 
-      {/* ═══════════ SEZIONE CATALOGO ═══════════ */}
-      <div style={{ padding: '22px 16px 0' }}>
-
-        {/* Label sezione */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <div style={{ width: 3, height: 16, background: 'var(--green)', borderRadius: 2, boxShadow: 'var(--led-green)' }} />
-          <span style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.7px', fontWeight: 700 }}>
-            Entra nel catalogo
-          </span>
-        </div>
-
-        {/* Card "solo meetup" — sopra le card di spedizione per chiarire la distinzione */}
-        {countByOrigin('meetup') > 0 && (
+      {/* Meetup: solo se ci sono prodotti da ritirare di persona */}
+      {countByOrigin('meetup') > 0 && (
+        <div style={{ padding: '10px 16px 0' }}>
           <button
             onClick={() => goToCatalog({ ship: 'meetup' })}
             style={{
-              width: '100%', marginBottom: 12, position: 'relative', overflow: 'hidden',
+              width: '100%', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
               background: 'linear-gradient(135deg, rgba(192,132,252,.12) 0%, var(--card) 60%)',
-              border: '1px solid rgba(192,132,252,.3)',
-              borderRadius: 14, padding: '11px 14px',
-              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-              display: 'flex', alignItems: 'center', gap: 12,
+              border: '1px solid rgba(192,132,252,.3)', borderRadius: 16, padding: '12px 14px', color: 'var(--text)',
             }}
           >
-            <div style={{
-              position: 'absolute', right: -28, top: -28,
-              width: 110, height: 110, borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(192,132,252,.2) 0%, transparent 70%)',
-              pointerEvents: 'none',
-            }} />
             <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🤝</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: '#d8b4fe' }}>
-                Disponibili solo per meetup
-              </div>
-              <div style={{ fontSize: '.78rem', fontWeight: 700, color: 'rgba(216,180,254,.95)', marginTop: 3 }}>
-                {countByOrigin('meetup')} prodott{countByOrigin('meetup') === 1 ? 'o' : 'i'} · ritiro a mano di persona
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: '#d8b4fe' }}>Ritiro di persona</div>
+              <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 1 }}>
+                {countByOrigin('meetup')} prodott{countByOrigin('meetup') === 1 ? 'o' : 'i'} disponibili solo al meetup
               </div>
             </div>
-            <span style={{ fontSize: '.82rem', color: 'rgba(192,132,252,.6)', fontWeight: 700, flexShrink: 0 }}>›</span>
+            <span style={{ fontSize: '.9rem', color: 'rgba(192,132,252,.7)', fontWeight: 700 }}>›</span>
           </button>
-        )}
-
-        {/* Spain + Italy cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-          {(['spain', 'italy'] as ShipOrigin[]).map((o) => {
-            const sm = SHIP_META[o]
-            const n  = countByOrigin(o)
-            return (
-              <button
-                key={o}
-                onClick={() => goToCatalog({ ship: o })}
-                style={{
-                  position: 'relative', overflow: 'hidden',
-                  background: `linear-gradient(150deg, ${sm.color}18 0%, var(--card) 60%)`,
-                  border: `1.5px solid ${sm.color}44`,
-                  borderRadius: 20, padding: '20px 14px 18px',
-                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                  display: 'flex', flexDirection: 'column', gap: 5,
-                  boxShadow: `0 6px 24px rgba(0,0,0,.35), 0 0 28px ${sm.color}12`,
-                  minHeight: 150,
-                }}
-              >
-                {/* Cerchio decorativo sfondo */}
-                <div style={{
-                  position: 'absolute', right: -28, top: -28,
-                  width: 110, height: 110, borderRadius: '50%',
-                  background: `radial-gradient(circle, ${sm.color}22 0%, transparent 70%)`,
-                  pointerEvents: 'none',
-                }} />
-
-                <div style={{ fontSize: '2.8rem', lineHeight: 1 }}>{sm.flag}</div>
-                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.25rem', color: sm.color, letterSpacing: '.3px' }}>
-                  {sm.label}
-                </div>
-                <div style={{ fontSize: '.65rem', color: 'rgba(106,138,106,.75)', lineHeight: 1.4 }}>
-                  {SHIP_DESC[o]}
-                </div>
-                <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2 }}>🚚 {sm.delivery}</div>
-                <div style={{ fontSize: '.64rem', color: 'rgba(245,200,66,.8)', marginTop: 1 }}>📅 Spedizioni Lun–Mer</div>
-                <div style={{ marginTop: 6 }}>
-                  <span style={{
-                    display: 'inline-block',
-                    background: `${sm.color}18`, border: `1px solid ${sm.color}40`,
-                    borderRadius: 20, padding: '3px 10px',
-                    fontSize: '.66rem', color: sm.color, fontWeight: 700,
-                  }}>
-                    {isLoading ? '…' : `${n} prodott${n === 1 ? 'o' : 'i'}`} ›
-                  </span>
-                </div>
-              </button>
-            )
-          })}
         </div>
+      )}
 
-        {/* Pharma → sito partner KratosLabs (si apre fuori dall'app) */}
+      {/* ═══════════ NUOVI ARRIVI ═══════════ */}
+      <NewArrivals />
+
+      {/* ═══════════ CATEGORIE ═══════════ */}
+      <SectionHead title="Categorie" />
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 16px 4px', scrollbarWidth: 'none' }}>
+        {CATEGORY_SHORTCUTS.map(c => (
+          <button
+            key={c.id}
+            onClick={() => goToCatalog({ ship: null, category: c.id })}
+            style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7,
+              background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 999,
+              padding: '9px 14px 9px 10px', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text)',
+            }}
+          >
+            <span style={{ fontSize: '1.1rem' }}>{c.emoji}</span>
+            <span style={{ fontSize: '.78rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{c.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ═══════════ PARTNER: Pharma → KratosLabs (si apre fuori dall'app) ═══════════ */}
+      <SectionHead title="Partner" />
+      <div style={{ padding: '0 16px' }}>
         <button
           onClick={() => {
             const url = 'https://www.kratoslabs.shop'
@@ -315,13 +263,11 @@ export default function HubView() {
           }}
           style={{
             width: '100%', padding: 0, overflow: 'hidden', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-            background: 'var(--card)', border: '1px solid rgba(129,140,248,.3)', borderRadius: 16,
-            boxShadow: '0 4px 16px rgba(0,0,0,.25)', display: 'block',
+            background: 'var(--card)', border: '1px solid rgba(129,140,248,.28)', borderRadius: 18, display: 'block',
           }}
         >
           <div style={{ position: 'relative', width: '100%', aspectRatio: '1000 / 356' }}>
             <Image src="/partners/kratos-hero.jpg" alt="KratosLabs" fill sizes="(max-width: 480px) 100vw, 480px" style={{ objectFit: 'cover' }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 55%, rgba(8,12,8,.55) 100%)' }} />
             <span style={{
               position: 'absolute', top: 8, right: 8, fontSize: '.6rem', fontWeight: 700, letterSpacing: '.4px',
               background: 'rgba(8,12,8,.7)', border: '1px solid rgba(255,255,255,.2)', borderRadius: 999, padding: '3px 8px', color: '#fff',
@@ -332,96 +278,63 @@ export default function HubView() {
               <Image src="/partners/kratos-logo.png" alt="KratosLabs logo" width={84} height={27} style={{ objectFit: 'contain' }} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: '#818cf8' }}>Pharma EU</div>
+              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1rem', color: '#a5b4fc' }}>Pharma EU</div>
               <div style={{ fontSize: '.63rem', color: 'var(--muted)', marginTop: 1 }}>Testati · dosaggi dichiarati · analisi su ogni lotto</div>
             </div>
-            <span style={{
-              flexShrink: 0, fontSize: '.7rem', fontWeight: 700, color: '#818cf8',
-              border: '1px solid rgba(129,140,248,.45)', background: 'rgba(129,140,248,.1)', borderRadius: 20, padding: '5px 10px',
-            }}>Apri ›</span>
+            <span style={{ flexShrink: 0, fontSize: '.8rem', fontWeight: 700, color: '#a5b4fc' }}>↗</span>
           </div>
         </button>
       </div>
 
-      {/* ═══════════ NUOVI ARRIVI (scroll orizzontale) ═══════════ */}
-      <NewArrivals />
-
-      {/* ═══════════ CATEGORIE (scroll orizzontale) ═══════════ */}
-      <div style={{ marginTop: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', marginBottom: 12 }}>
-          <div style={{ width: 3, height: 16, background: 'var(--gold)', borderRadius: 2, boxShadow: 'var(--led-gold)' }} />
-          <span style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.7px', fontWeight: 700 }}>
-            Sfoglia categoria
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 9, overflowX: 'auto', padding: '0 16px 4px', scrollbarWidth: 'none' }}>
-          {CATEGORY_SHORTCUTS.map(c => (
-            <button
-              key={c.id}
-              onClick={() => goToCatalog({ ship: null, category: c.id })}
-              style={{
-                flexShrink: 0,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                background: 'var(--card)', border: '1px solid var(--border)',
-                borderRadius: 16, padding: '14px 12px', cursor: 'pointer',
-                fontFamily: 'inherit', minWidth: 66,
-                transition: 'border-color .15s, background .15s',
-              }}
-            >
-              <span style={{ fontSize: '1.65rem' }}>{c.emoji}</span>
-              <span style={{ fontSize: '.7rem', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>{c.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ═══════════ MEETUP — banda compatta ═══════════ */}
-      <div style={{ margin: '20px 16px 0' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '12px 14px', borderRadius: 14,
-          background: meetupActive ? 'rgba(139,92,246,.07)' : 'rgba(60,60,80,.06)',
-          border: meetupActive ? '1px solid rgba(139,92,246,.22)' : '1px solid rgba(100,100,130,.15)',
-        }}>
-          <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>{meetupActive ? '🤝' : '😴'}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: '.82rem', fontWeight: 700, color: meetupActive ? '#c084fc' : 'var(--muted)' }}>
-              Meetup{!meetupActive ? ' sospeso' : ''}
-            </span>
-            {meetupActive
-              ? <span style={{ fontSize: '.69rem', color: 'var(--muted)', marginLeft: 8 }}>ritiro a mano · {daysLeft}g {hoursLeft}h rimasti</span>
-              : <span style={{ fontSize: '.69rem', color: 'var(--muted)', marginLeft: 8 }}>solo spedizione per questo periodo</span>
-            }
-          </div>
-          {meetupActive && (
-            <span style={{
-              background: 'rgba(139,92,246,.2)', border: '1px solid rgba(139,92,246,.32)',
-              borderRadius: 20, padding: '3px 9px',
-              fontSize: '.62rem', color: '#d8b4fe', fontWeight: 700, flexShrink: 0,
-            }}>LIVE</span>
-          )}
-        </div>
-      </div>
-
-      {/* ═══════════ QUICK LINKS ═══════════ */}
-      <div style={{ margin: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* ═══════════ COMMUNITY: Telegram + Affiliati ═══════════ */}
+      <SectionHead title="Community" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px' }}>
+        <button
+          onClick={() => {
+            const url = 'https://t.me/+sOAYXTsv7qRmMTQ0'
+            const tg = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp
+            if (tg?.openTelegramLink) tg.openTelegramLink(url)
+            else window.open(url, '_blank')
+          }}
+          style={{
+            textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text)',
+            background: 'linear-gradient(160deg, rgba(34,158,217,.14) 0%, var(--card) 60%)',
+            border: '1px solid rgba(34,158,217,.32)', borderRadius: 18, padding: '13px 13px 12px',
+          }}
+        >
+          <div style={{ fontSize: '1.4rem' }}>📢</div>
+          <div style={{ fontWeight: 800, fontSize: '.84rem', color: '#6cc6f0', marginTop: 6 }}>Canale Telegram</div>
+          <div style={{ fontSize: '.64rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.35 }}>Novità, restock e promo in tempo reale</div>
+        </button>
         <button
           onClick={() => setView('affiliates')}
           style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.2)',
-            borderRadius: 14, padding: '13px 16px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text)',
+            background: 'linear-gradient(160deg, rgba(245,200,66,.12) 0%, var(--card) 60%)',
+            border: '1px solid rgba(245,200,66,.3)', borderRadius: 18, padding: '13px 13px 12px',
           }}
         >
-          <span style={{ fontSize: '1.3rem' }}>🤝</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--text)' }}>Programma Affiliati</div>
-            <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 1 }}>Invita amici e guadagna credito</div>
-          </div>
-          <span style={{ fontSize: '.82rem', color: 'rgba(245,200,66,.5)', fontWeight: 700 }}>›</span>
+          <div style={{ fontSize: '1.4rem' }}>🎁</div>
+          <div style={{ fontWeight: 800, fontSize: '.84rem', color: 'var(--gold)', marginTop: 6 }}>Invita un amico</div>
+          <div style={{ fontSize: '.64rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.35 }}>Guadagni credito su ogni suo ordine</div>
         </button>
       </div>
 
+    </div>
+  )
+}
+
+// Titolo di sezione unico per tutta la home
+function SectionHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', margin: '26px 0 10px' }}>
+      <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.08rem', color: 'var(--text)', letterSpacing: '.2px' }}>{title}</span>
+      {action && (
+        <button onClick={onAction} style={{
+          background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          fontSize: '.74rem', fontWeight: 700, color: 'var(--green)', padding: 0,
+        }}>{action} ›</button>
+      )}
     </div>
   )
 }
@@ -431,7 +344,7 @@ const NEW_DAYS = 14
 
 function NewArrivals() {
   const { products, isLoading } = useProducts()
-  const { setDetailProduct } = useUIStore()
+  const { setDetailProduct, goToCatalog } = useUIStore()
 
   const items = React.useMemo(() => (
     [...products]
@@ -445,13 +358,8 @@ function NewArrivals() {
   const now = Date.now()
 
   return (
-    <div style={{ marginTop: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', marginBottom: 12 }}>
-        <div style={{ width: 3, height: 16, background: 'var(--green)', borderRadius: 2, boxShadow: 'var(--led-green)' }} />
-        <span style={{ fontSize: '.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.7px', fontWeight: 700 }}>
-          Nuovi arrivi
-        </span>
-      </div>
+    <div>
+      <SectionHead title="Nuovi arrivi" action="Vedi tutti" onAction={() => goToCatalog({ ship: null })} />
       <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '0 16px 4px', scrollbarWidth: 'none' }}>
         {items.map(p => {
           const minPrice = p.variants?.length ? Math.min(...p.variants.map(v => v.price)) : 0

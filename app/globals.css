@@ -36,7 +36,7 @@ html, body {
   -webkit-user-select: none;
 }
 
-/* Ambient orb glow behind everything */
+/* Sfondo: un'unica aurora verde in alto che sfuma nel nero, niente orb multicolore */
 body::before {
   content: '';
   position: fixed;
@@ -44,39 +44,22 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background:
-    /* Logo halo — forte, pulsa via CSS */
-    radial-gradient(ellipse 100% 70% at 50% -6%,  rgba(61,255,110,.26) 0%, transparent 55%),
-    /* Verde sinistra */
-    radial-gradient(ellipse 65% 55% at -8%  22%,   rgba(61,255,110,.12) 0%, transparent 52%),
-    /* Viola destra — accento psichedelico */
-    radial-gradient(ellipse 65% 55% at 108% 42%,   rgba(139,92,246,.10) 0%, transparent 52%),
-    /* Verde basso-sinistra */
-    radial-gradient(ellipse 70% 45% at 18%  92%,   rgba(61,255,110,.07) 0%, transparent 50%),
-    /* Oro basso-destra */
-    radial-gradient(ellipse 65% 42% at 82%  96%,   rgba(245,200,66,.06) 0%, transparent 48%),
-    /* Viola centro-fondo */
-    radial-gradient(ellipse 80% 60% at 50%  105%,  rgba(139,92,246,.05) 0%, transparent 55%),
-    /* Base sfumata verso blu notte */
-    linear-gradient(170deg, #040f07 0%, #060c08 42%, #07090e 100%);
-  animation: bgGlowPulse 9s ease-in-out infinite;
+    radial-gradient(120% 55% at 50% -12%, rgba(61,255,110,.16) 0%, rgba(61,255,110,.05) 38%, transparent 62%),
+    radial-gradient(90% 40% at 100% 0%, rgba(245,200,66,.05) 0%, transparent 60%),
+    linear-gradient(180deg, #07100a 0%, #060907 40%, #050706 100%);
 }
 
-/* Grain texture + dot grid */
+/* Grana leggerissima (solo texture, niente griglia di puntini) */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  /* Rumore SVG per texture grana/street-art */
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"),
-    radial-gradient(rgba(61,255,110,.05) 1px, transparent 1px);
-  background-size: 250px 250px, 28px 28px;
-  opacity: 0.22;
-  mix-blend-mode: screen;
-  mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 20%, transparent 90%);
-  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, black 20%, transparent 90%);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  opacity: .06;
+  mix-blend-mode: overlay;
 }
 
 /* Every child of body sits above the bg */
@@ -278,3 +261,10 @@ html::after {
   50%      { opacity: .45; transform: scale(.8); }
 }
 .pulse-dot { animation: pulseDot 1.6s ease-in-out infinite; }
+
+/* Tasto centrale "Offerte": leggero respiro luminoso */
+@keyframes offersGlow {
+  0%, 100% { box-shadow: 0 8px 20px rgba(255,90,42,.4); }
+  50%      { box-shadow: 0 8px 28px rgba(255,90,42,.7), 0 0 0 4px rgba(255,154,61,.12); }
+}
+.offers-glow { animation: offersGlow 2.8s ease-in-out infinite; }

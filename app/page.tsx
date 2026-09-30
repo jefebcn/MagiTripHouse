@@ -6,6 +6,7 @@ import HubView from '@/components/home/HubView'
 import FaqView from '@/components/home/FaqView'
 import CatalogView from '@/components/catalog/CatalogView'
 import OrdersView from '@/components/home/OrdersView'
+import OffersView from '@/components/home/OffersView'
 import CartDrawer from '@/components/panels/CartDrawer'
 import ProductDetail from '@/components/panels/ProductDetail'
 import Lightbox from '@/components/panels/Lightbox'
@@ -91,6 +92,10 @@ export default function Home() {
             <AuthView />
           </div>
         )}
+      </div>
+
+      <div style={{ display: view === 'offers' ? 'block' : 'none' }}>
+        {gated(<OffersView />)}
       </div>
 
       <div style={{ display: view === 'orders' ? 'block' : 'none' }}>

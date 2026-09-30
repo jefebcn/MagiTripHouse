@@ -242,7 +242,7 @@ export default function CartDrawer() {
 
             {!confirmedOrder.isMeetup && (
               <div style={{ fontSize: '.72rem', color: 'rgba(245,200,66,.85)', background: 'rgba(245,200,66,.06)', border: '1px solid rgba(245,200,66,.2)', borderRadius: 10, padding: '9px 12px', lineHeight: 1.5 }}>
-                📍 Trovi lo stato e il tracking nella scheda <strong>📦 Ordini</strong>
+                📍 Trovi lo stato e il tracking in <strong>Account → I miei ordini</strong>
               </div>
             )}
 

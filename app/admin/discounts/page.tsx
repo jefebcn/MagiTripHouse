@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 interface DiscountCode {
-  code: string; percent: number; firstOrderOnly: boolean; origins: string[]; active: boolean
+  code: string; percent: number; firstOrderOnly: boolean; showInOffers: boolean; origins: string[]; active: boolean
   expiresAt: string | null; maxUses: number | null; uses: number; note: string | null; createdAt: string
 }
 
@@ -19,6 +19,7 @@ export default function AdminDiscounts() {
   const [code, setCode] = useState('')
   const [percent, setPercent] = useState('10')
   const [firstOrderOnly, setFirstOrderOnly] = useState(false)
+  const [showInOffers, setShowInOffers] = useState(false)
   const [origins, setOrigins] = useState<string[]>([])
   const [expiresAt, setExpiresAt] = useState('')
   const [maxUses, setMaxUses] = useState('')
@@ -43,7 +44,7 @@ export default function AdminDiscounts() {
   }
 
   function edit(c: DiscountCode) {
-    setCode(c.code); setPercent(String(c.percent)); setFirstOrderOnly(c.firstOrderOnly)
+    setCode(c.code); setPercent(String(c.percent)); setFirstOrderOnly(c.firstOrderOnly); setShowInOffers(!!c.showInOffers)
     setOrigins(c.origins); setExpiresAt(c.expiresAt ? c.expiresAt.slice(0, 10) : '')
     setMaxUses(c.maxUses != null ? String(c.maxUses) : ''); setNote(c.note ?? '')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -56,7 +57,7 @@ export default function AdminDiscounts() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        code, percent: Number(percent), firstOrderOnly, origins,
+        code, percent: Number(percent), firstOrderOnly, showInOffers, origins,
         // fine giornata: il codice vale per tutto il giorno di scadenza
         expiresAt: expiresAt ? `${expiresAt}T23:59:59` : null,
         maxUses: maxUses || null, note,
@@ -66,7 +67,7 @@ export default function AdminDiscounts() {
     setSaving(false)
     if (res.ok) {
       setResult(`✅ Codice ${data.code} salvato`)
-      setCode(''); setPercent('10'); setFirstOrderOnly(false); setOrigins([]); setExpiresAt(''); setMaxUses(''); setNote('')
+      setCode(''); setPercent('10'); setFirstOrderOnly(false); setShowInOffers(false); setOrigins([]); setExpiresAt(''); setMaxUses(''); setNote('')
       load()
     } else {
       setResult(`❌ ${data.error ?? 'Errore'}`)
@@ -138,6 +139,10 @@ export default function AdminDiscounts() {
           <input type="checkbox" checked={firstOrderOnly} onChange={e => setFirstOrderOnly(e.target.checked)} />
           Solo primo ordine
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem', cursor: 'pointer' }}>
+          <input type="checkbox" checked={showInOffers} onChange={e => setShowInOffers(e.target.checked)} />
+          🔥 Mostra a tutti nella scheda Offerte
+        </label>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <label style={{ flex: 1, minWidth: 150, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: 'var(--muted)' }}>
@@ -195,6 +200,7 @@ export default function AdminDiscounts() {
               <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 6, lineHeight: 1.6 }}>
                 {c.origins.length ? c.origins.map(o => ORIGINS.find(x => x.key === o)?.label ?? o).join(' · ') : 'Tutte le spedizioni'}
                 {c.firstOrderOnly && ' · solo primo ordine'}
+                {c.showInOffers && ' · 🔥 visibile in Offerte'}
                 {c.expiresAt && ` · scade il ${new Date(c.expiresAt).toLocaleDateString('it-IT')}`}
                 {c.note && <div style={{ fontStyle: 'italic' }}>{c.note}</div>}
               </div>

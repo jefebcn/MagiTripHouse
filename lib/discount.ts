@@ -40,6 +40,24 @@ export async function validateDiscount(rawCode: unknown, origin: string, userHan
   return { ok: true, code, percent: rule.percent }
 }
 
+// Codici da mostrare nella scheda Offerte (solo quelli attivi e segnati come pubblici)
+export async function publicDiscounts() {
+  const now = new Date()
+  const rows = await prisma.discountCode.findMany({
+    where: { active: true, showInOffers: true, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+    orderBy: { percent: 'desc' },
+  })
+  const list = rows
+    .filter(r => r.maxUses == null || r.uses < r.maxUses)
+    .map(r => ({ code: r.code, percent: r.percent, firstOrderOnly: r.firstOrderOnly, origins: r.origins, expiresAt: r.expiresAt }))
+  // Il codice di benvenuto integrato resta visibile finché non viene ridefinito da admin
+  const overridden = await prisma.discountCode.findMany({ where: { code: { in: Object.keys(BUILTIN) } }, select: { code: true } })
+  for (const [code, rule] of Object.entries(BUILTIN)) {
+    if (!overridden.some(o => o.code === code)) list.push({ code, ...rule, expiresAt: null })
+  }
+  return list
+}
+
 // Conta un utilizzo (solo per i codici salvati nel DB)
 export async function registerDiscountUse(code: string) {
   await prisma.discountCode.updateMany({ where: { code }, data: { uses: { increment: 1 } } })

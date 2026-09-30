@@ -126,6 +126,7 @@ model DiscountCode {
   maxUses        Int?
   uses           Int       @default(0)
   note           String?
+  showInOffers   Boolean   @default(false)  // visibile a tutti nella scheda Offerte
   createdAt      DateTime  @default(now())
 }
 
