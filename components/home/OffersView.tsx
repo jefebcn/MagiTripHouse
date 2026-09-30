@@ -48,7 +48,14 @@ export default function OffersView() {
         Codici sconto da inserire nel carrello. Ogni codice ha uno <strong style={{ color: 'var(--text)' }}>sconto massimo in €</strong>. Ogni codice si usa <strong style={{ color: 'var(--text)' }}>una sola volta</strong>, un codice per ordine.
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 18 }}>
+      {/* Premio personale per chi compra su KratosLabs: in evidenza in cima */}
+      <div style={{ marginTop: 18 }}>
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', color: '#c7d2fe', marginBottom: 8 }}>🎁 Coupon KratosLabs</div>
+        <PartnerReward compact />
+      </div>
+
+      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', color: 'var(--gold)', marginTop: 22 }}>🎟️ Codici sconto</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
         {visible.map(c => {
           const isCopied = copied === c.code
           const isUsed = used.includes(c.code)
@@ -110,8 +117,6 @@ export default function OffersView() {
           </div>
         )}
 
-        {/* Premio personale per chi compra su KratosLabs */}
-        <PartnerReward compact />
       </div>
 
       {visible.length > 0 && (

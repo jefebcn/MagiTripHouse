@@ -10,7 +10,8 @@ interface State {
 // Premio partner: acquisto su KratosLabs → coupon personale più alto su MagicTripHouse (verificato dall'admin)
 export default function PartnerReward({ compact = false }: { compact?: boolean }) {
   const { sessionToken, view } = useUIStore()
-  const [data, setData] = useState<State | null>(null)
+  // Stato iniziale = invito: la card è visibile subito, poi si aggiorna con la risposta del server
+  const [data, setData] = useState<State>({ reward: { percent: 15, maxDiscount: 50, validDays: 30 }, claim: null })
   const [open, setOpen] = useState(false)
   const [order, setOrder] = useState('')
   const [sending, setSending] = useState(false)
@@ -40,7 +41,6 @@ export default function PartnerReward({ compact = false }: { compact?: boolean }
     setOpen(false); setOrder(''); load()
   }
 
-  if (!data) return null
   const { reward, claim } = data
   if (claim?.status === 'approved' && claim.used) return null
 
