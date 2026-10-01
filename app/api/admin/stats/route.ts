@@ -22,14 +22,17 @@ export async function GET() {
   const monthStart = new Date(todayStart); monthStart.setDate(todayStart.getDate() - 30)
   const yearStart = new Date(todayStart); yearStart.setFullYear(todayStart.getFullYear() - 1)
 
-  const [orders, users, affiliates, payouts, products, warehousePayments] = await Promise.all([
+  const [allOrders, users, affiliates, payouts, products, warehousePayments, partnerPending] = await Promise.all([
     prisma.order.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.user.findMany({ select: { createdAt: true } }),
     prisma.affiliate.findMany({ orderBy: { joinedAt: 'desc' } }),
     prisma.commissionPayout.findMany({ orderBy: { requestedAt: 'desc' } }),
     prisma.product.findMany({ select: { id: true, name: true, category: true, variants: true } }),
     prisma.warehousePayment.findMany({ select: { total: true } }),
+    prisma.partnerClaim.count({ where: { status: 'pending' } }),
   ])
+  // Gli ordini annullati non contano in fatturato, grammi e profitto
+  const orders = allOrders.filter(o => o.status !== 'cancelled')
 
   // Lookup costo d'acquisto per prodotto+taglio (per id e per nome, come fallback)
   const costByIdLabel = new Map<string, number>()
@@ -200,7 +203,44 @@ export async function GET() {
     }
   }
 
+  // ── Andamento: ultimi 14 giorni (giorni italiani) ──
+  const DAY = 86_400_000
+  const daily = Array.from({ length: 14 }, (_, i) => {
+    const start = new Date(todayStart.getTime() - (13 - i) * DAY)
+    const end = new Date(start.getTime() + DAY)
+    const dayOrders = orders.filter(o => o.createdAt >= start && o.createdAt < end)
+    return { date: start.toISOString(), revenue: round2(dayOrders.reduce((s, o) => s + o.total, 0)), orders: dayOrders.length }
+  })
+
+  // ── Periodi a confronto (stessa durata, subito prima) ──
+  const windowStats = (from: Date, to: Date) => {
+    const list = orders.filter(o => o.createdAt >= from && o.createdAt < to)
+    const rev = list.reduce((s, o) => s + o.total, 0)
+    return { revenue: round2(rev), orders: list.length, avg: list.length ? round2(rev / list.length) : 0 }
+  }
+  const end = new Date(now.getTime() + 1000)
+  const periods = {
+    today: { cur: windowStats(todayStart, end), prev: windowStats(new Date(todayStart.getTime() - DAY), new Date(now.getTime() - DAY)) },
+    week:  { cur: windowStats(weekStart, end),  prev: windowStats(new Date(weekStart.getTime() - 7 * DAY), weekStart) },
+    month: { cur: windowStats(monthStart, end), prev: windowStats(new Date(monthStart.getTime() - 30 * DAY), monthStart) },
+    total: { cur: windowStats(new Date(0), end), prev: null },
+  }
+
+  // ── Cose da fare ──
+  const STALE_DAYS = 21
+  const staleLimit = new Date(now.getTime() - STALE_DAYS * DAY)
+  const todo = {
+    awaitingPayment: allOrders.filter(o => o.status === 'pending' && o.createdAt >= staleLimit).length,
+    toShip: allOrders.filter(o => o.status === 'paid').length,
+    stalePending: allOrders.filter(o => o.status === 'pending' && o.createdAt < staleLimit).length,
+    partnerClaims: partnerPending,
+    payouts: payouts.filter(p => p.status === 'pending').length,
+  }
+
   return NextResponse.json({
+    daily,
+    periods,
+    todo,
     revenue: {
       today: revenue(todayStart),
       week: revenue(weekStart),
@@ -210,6 +250,8 @@ export async function GET() {
     orders: {
       total: orders.length,
       pending: orders.filter(o => o.status === 'pending').length,
+      paid: orders.filter(o => o.status === 'paid').length,
+      cancelled: allOrders.length - orders.length,
       shipped: orders.filter(o => o.status === 'shipped').length,
       delivered: orders.filter(o => o.status === 'delivered').length,
     },
@@ -218,7 +260,7 @@ export async function GET() {
       today: users.filter(u => new Date(u.createdAt) >= todayStart).length,
       week: users.filter(u => new Date(u.createdAt) >= weekStart).length,
     },
-    recentOrders: orders.slice(0, 5).map(o => ({
+    recentOrders: allOrders.slice(0, 6).map(o => ({
       id: o.id,
       userId: o.userId,
       total: o.total,

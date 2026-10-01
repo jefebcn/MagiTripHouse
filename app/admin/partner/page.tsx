@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { PageHeader } from '@/components/admin/ui'
 
 interface Claim {
   id: string; userHandle: string; partnerOrder: string; note: string | null
@@ -72,10 +72,7 @@ export default function AdminPartner() {
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-        <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>🏆 Premi partner</span>
-      </div>
+      <PageHeader icon="🏆" title="Premi partner" subtitle="Acquisti su KratosLabs da verificare" />
       <div style={{ fontSize: '.8rem', color: 'var(--muted)', lineHeight: 1.5, marginBottom: 18 }}>
         I clienti inseriscono il numero d’ordine fatto su KratosLabs. Controlla che l’ordine esista e sia pagato, poi approva:
         il cliente riceve un coupon personale −15% (max €50), monouso, valido 30 giorni. Ogni ordine KratosLabs vale una sola volta e ogni cliente ha un solo premio.

@@ -885,8 +885,7 @@ function AdminProductsInner() {
   return (
     <div style={{ maxWidth: 'min(1000px, 100%)', margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>
+        <span className="adm-head-title">
           {comboMode ? '🔥 Combo' : '📦 Prodotti'}
         </span>
         {!comboMode && !bulkMode && (

@@ -1,316 +1,259 @@
 'use client'
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import ManualOrderForm from './ManualOrderForm'
+import { PageHeader, Card, Segmented, Pill, Empty, ORDER_STATUS, eur } from '@/components/admin/ui'
 
-interface OrderItem {
-  id: string
-  name?: string
-  emoji?: string
-  label: string
-  price: number
-  qty: number
-}
+interface OrderItem { id: string; name?: string; emoji?: string; label: string; price: number; qty: number }
+interface Order { id: string; userId: string; status: string; total: number; items: OrderItem[]; note?: string | null; tracking?: string | null; createdAt: string }
 
-interface Order {
-  id: string
-  userId: string
-  status: string
-  total: number
-  items: OrderItem[]
-  note?: string
-  tracking?: string | null
-  createdAt: string
-}
+type Tab = 'pending' | 'paid' | 'shipped' | 'delivered' | 'stale' | 'cancelled' | 'all'
+const STALE_MS = 21 * 86_400_000
+const isStale = (o: Order) => o.status === 'pending' && Date.now() - new Date(o.createdAt).getTime() > STALE_MS
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending:   { label: '🟡 In attesa pag.', color: 'var(--orange)' },
-  paid:      { label: '💚 Pagato',         color: 'var(--green)'  },
-  shipped:   { label: '🔵 Spedito',        color: 'var(--blue)'   },
-  delivered: { label: '🟢 Consegnato',     color: 'var(--green)'  },
-}
-
-const TABS = [
-  { key: 'all',       label: 'Tutti'      },
-  { key: 'pending',   label: 'In attesa'  },
-  { key: 'paid',      label: 'Pagati'     },
-  { key: 'shipped',   label: 'Spediti'    },
-  { key: 'delivered', label: 'Consegnati' },
+const TABS: { value: Tab; label: string; test: (o: Order) => boolean }[] = [
+  { value: 'pending',   label: '💳 Da incassare', test: o => o.status === 'pending' && !isStale(o) },
+  { value: 'paid',      label: '📦 Da spedire',   test: o => o.status === 'paid' },
+  { value: 'shipped',   label: '🚚 Spediti',      test: o => o.status === 'shipped' },
+  { value: 'delivered', label: '✅ Consegnati',   test: o => o.status === 'delivered' },
+  { value: 'stale',     label: '🗂️ Vecchi in attesa', test: isStale },
+  { value: 'cancelled', label: '✕ Annullati',     test: o => o.status === 'cancelled' },
+  { value: 'all',       label: 'Tutti',           test: () => true },
 ]
 
-function TrackingInput({ initial, onSave }: { initial: string; onSave: (v: string) => Promise<void> }) {
-  const [val, setVal] = useState(initial)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const dirty = val.trim() !== (initial ?? '').trim()
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: '.7rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px' }}>📍 Numero di tracciamento</label>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input
-          value={val}
-          onChange={e => { setVal(e.target.value); setSaved(false) }}
-          placeholder="Inserisci tracking…"
-          style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', color: 'var(--text)', fontSize: '.8rem', fontFamily: 'monospace', outline: 'none' }}
-        />
-        <button
-          disabled={!dirty || saving}
-          onClick={async () => { setSaving(true); await onSave(val.trim()); setSaving(false); setSaved(true) }}
-          style={{
-            borderRadius: 8, padding: '8px 14px', fontSize: '.74rem', fontWeight: 700, fontFamily: 'inherit',
-            cursor: dirty && !saving ? 'pointer' : 'default', border: '1px solid',
-            background: saved ? 'rgba(61,255,110,.15)' : dirty ? 'rgba(59,130,246,.15)' : 'var(--bg)',
-            color: saved ? 'var(--green)' : dirty ? 'var(--blue)' : 'var(--muted)',
-            borderColor: saved ? 'rgba(61,255,110,.4)' : dirty ? 'rgba(59,130,246,.4)' : 'var(--border)',
-            opacity: !dirty && !saved ? .5 : 1,
-          }}
-        >{saving ? '…' : saved ? '✓' : '💾'}</button>
-      </div>
-    </div>
-  )
+// Passo successivo naturale per ogni stato
+const NEXT: Record<string, { to: string; label: string } | undefined> = {
+  pending: { to: 'paid', label: '💳 Segna pagato' },
+  paid: { to: 'shipped', label: '🚚 Segna spedito' },
+  shipped: { to: 'delivered', label: '✅ Segna consegnato' },
+}
+
+// Etichette leggibili dalla nota: [Spagna] [Crypto] [Solo di persona] …
+function noteTags(note?: string | null): { tags: string[]; text: string } {
+  if (!note) return { tags: [], text: '' }
+  const tags = Array.from(note.matchAll(/\[([^\]]+)\]/g)).map(m => m[1])
+  return { tags, text: note.replace(/\[[^\]]+\]/g, '').trim() }
 }
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([])
-  const [products, setProducts] = useState<Record<string, { name: string; emoji: string }>>({})
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('all')
+  const [tab, setTab] = useState<Tab>('pending')
   const [search, setSearch] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [showNew, setShowNew] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState('')
 
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/orders').then(r => r.json()),
-      fetch('/api/products').then(r => r.json()),
-    ]).then(([ordersData, productsData]) => {
-      setOrders(ordersData)
-      const map: Record<string, { name: string; emoji: string }> = {}
-      for (const p of productsData) map[p.id] = { name: p.name, emoji: p.emoji }
-      setProducts(map)
-      setLoading(false)
-    }).catch(() => setLoading(false))
+  const load = useCallback(() => {
+    fetch('/api/orders').then(r => r.json()).then(d => { setOrders(Array.isArray(d) ? d : []); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
-  async function updateStatus(id: string, status: string) {
-    await fetch('/api/orders', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status }),
-    })
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
+  useEffect(() => {
+    // Parametri dalla dashboard: ?tab=paid · ?q=MTH-… · ?new=1
+    const sp = new URLSearchParams(window.location.search)
+    const t = sp.get('tab') as Tab | null
+    if (t && TABS.some(x => x.value === t)) setTab(t)
+    if (sp.get('q')) { setSearch(sp.get('q')!); setTab('all'); setOpen(sp.get('q')) }
+    if (sp.get('new')) setShowNew(true)
+    load()
+  }, [load])
+
+  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 3000) }
+
+  async function setStatus(ids: string[], status: string) {
+    setBusy(true)
+    const res = await fetch('/api/orders', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ids.length === 1 ? { id: ids[0], status } : { ids, status }),
+    }).catch(() => null)
+    setBusy(false)
+    if (!res?.ok) return flash('❌ Aggiornamento non riuscito')
+    setOrders(prev => prev.map(o => ids.includes(o.id) ? { ...o, status } : o))
+    setSelected(new Set())
+    flash(`✅ ${ids.length === 1 ? 'Ordine aggiornato' : `${ids.length} ordini aggiornati`}: ${ORDER_STATUS[status]?.short ?? status}`)
   }
 
-  async function saveTracking(id: string, tracking: string) {
-    await fetch('/api/orders', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, tracking }),
-    })
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, tracking } : o))
+  async function saveTracking(id: string, tracking: string, alsoShip: boolean) {
+    const res = await fetch('/api/orders', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(alsoShip ? { id, tracking, status: 'shipped' } : { id, tracking }),
+    }).catch(() => null)
+    if (!res?.ok) return flash('❌ Salvataggio non riuscito')
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, tracking, ...(alsoShip ? { status: 'shipped' } : {}) } : o))
+    flash(alsoShip ? '✅ Spedito · il cliente riceve la notifica' : '✅ Tracking salvato')
   }
 
-  const counts: Record<string, number> = {
-    all:       orders.length,
-    pending:   orders.filter(o => o.status === 'pending').length,
-    paid:      orders.filter(o => o.status === 'paid').length,
-    shipped:   orders.filter(o => o.status === 'shipped').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
-  }
-
-  const filtered = orders.filter(o => {
-    if (tab !== 'all' && o.status !== tab) return false
-    if (search) {
-      const q = search.toLowerCase()
-      return o.userId.toLowerCase().includes(q) || o.id.toLowerCase().includes(q)
-    }
-    return true
-  })
-
-  const totalRevenue = filtered.reduce((sum, o) => sum + o.total, 0)
+  const counts = useMemo(() => Object.fromEntries(TABS.map(t => [t.value, orders.filter(t.test).length])) as Record<Tab, number>, [orders])
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const t = TABS.find(x => x.value === tab)!
+    return orders.filter(o => (q ? true : t.test(o)) && (!q || o.userId.toLowerCase().includes(q) || o.id.toLowerCase().includes(q)))
+  }, [orders, tab, search])
+  const sum = filtered.filter(o => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0)
+  const toggle = (id: string) => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const allSelected = filtered.length > 0 && filtered.every(o => selected.has(o.id))
 
   return (
-    <div style={{ maxWidth: 880, margin: '0 auto' }}>
+    <div>
+      <PageHeader
+        icon="🧾" title="Ordini"
+        subtitle={loading ? 'Caricamento…' : `${filtered.length} ordini · ${eur(sum)}`}
+        actions={<button className={`adm-btn ${showNew ? '' : 'primary'}`} onClick={() => setShowNew(v => !v)}>{showNew ? 'Chiudi' : '＋ Ordine manuale'}</button>}
+      />
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>📋 Ordini</span>
-        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color: 'var(--gold)' }}>€{totalRevenue.toFixed(2)}</div>
-          <div style={{ fontSize: '.6rem', color: 'var(--muted)' }}>{filtered.length} ordini</div>
-        </div>
-      </div>
+      {showNew && <ManualOrderForm onClose={() => setShowNew(false)} onCreated={(o) => { setOrders(prev => [o as Order, ...prev]); flash('✅ Ordine registrato') }} />}
 
-      <ManualOrderForm onCreated={(o) => setOrders(prev => [o as Order, ...prev])} />
-
-      {/* Search */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        background: 'var(--bg3)', border: '1px solid var(--border)',
-        borderRadius: 10, padding: '8px 12px', marginBottom: 10,
-      }}>
-        <span style={{ opacity: .5, fontSize: '.85rem' }}>🔍</span>
-        <input
-          placeholder="Cerca utente o ID ordine..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: '.82rem', fontFamily: 'inherit' }}
-        />
-        {search && (
-          <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 0, fontSize: '.85rem' }}>✕</button>
+      {/* Filtri */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+        <input className="adm-input" placeholder="🔍 Cerca cliente o numero ordine…" value={search} onChange={e => setSearch(e.target.value)} />
+        {!search && (
+          <Segmented value={tab} onChange={(v) => { setTab(v); setSelected(new Set()) }}
+            options={TABS.map(t => ({ value: t.value, label: t.label, count: counts[t.value] }))} />
+        )}
+        {tab === 'stale' && !search && counts.stale > 0 && (
+          <div style={{ fontSize: '.76rem', color: 'var(--a-dim)', lineHeight: 1.5 }}>
+            Ordini rimasti “in attesa di pagamento” da più di 21 giorni. Se non sono mai stati pagati, selezionali e premi <strong>Annulla</strong>:
+            escono dal fatturato. Se invece sono stati pagati, segnali come consegnati.
+          </div>
         )}
       </div>
 
-      {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto', paddingBottom: 2 }}>
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              flexShrink: 0, borderRadius: 20, padding: '5px 12px',
-              fontSize: '.74rem', fontWeight: 700, cursor: 'pointer',
-              fontFamily: 'inherit', border: '1px solid',
-              background: tab === t.key ? 'rgba(61,255,110,.12)' : 'var(--bg3)',
-              color: tab === t.key ? 'var(--green)' : 'var(--muted)',
-              borderColor: tab === t.key ? 'rgba(61,255,110,.35)' : 'var(--border)',
-            }}
-          >
-            {t.label}{counts[t.key] > 0 && <span style={{ opacity: .65, marginLeft: 4 }}>({counts[t.key]})</span>}
-          </button>
-        ))}
-      </div>
+      {filtered.length > 0 && (
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: '.76rem', color: 'var(--a-dim)', marginBottom: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={allSelected} onChange={() => setSelected(allSelected ? new Set() : new Set(filtered.map(o => o.id)))} />
+          Seleziona tutti ({filtered.length})
+        </label>
+      )}
 
-      {loading ? (
-        <div style={{ color: 'var(--muted)', textAlign: 'center', padding: 32 }}>Caricamento...</div>
-      ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 48, fontSize: '.85rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: 8 }}>📭</div>
-          Nessun ordine trovato
-        </div>
+      {loading ? <Card><Empty icon="⏳">Caricamento…</Empty></Card> : filtered.length === 0 ? (
+        <Card><Empty icon={tab === 'paid' ? '🎉' : '📭'}>{tab === 'paid' ? 'Niente da spedire' : 'Nessun ordine qui'}</Empty></Card>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(o => {
-            const isExpanded = expandedId === o.id
-            const items: OrderItem[] = Array.isArray(o.items) ? o.items : []
+            const st = isStale(o) ? { ...ORDER_STATUS.pending, short: 'Vecchio in attesa', color: '#8aa58c' } : (ORDER_STATUS[o.status] ?? ORDER_STATUS.pending)
+            const items = Array.isArray(o.items) ? o.items : []
+            const { tags, text } = noteTags(o.note)
+            const next = NEXT[o.status]
+            const isOpen = open === o.id
+            const sel = selected.has(o.id)
             return (
-              <div
-                key={o.id}
-                style={{
-                  background: 'var(--bg3)', border: `1px solid ${isExpanded ? 'rgba(61,255,110,.3)' : 'var(--border)'}`,
-                  borderRadius: 12, overflow: 'hidden',
-                  transition: 'border-color .2s',
-                }}
-              >
-                {/* Clickable header row */}
-                <div
-                  onClick={() => setExpandedId(isExpanded ? null : o.id)}
-                  style={{ padding: 14, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6 }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontFamily: 'monospace', fontSize: '.78rem', color: 'var(--green)', fontWeight: 700 }}>{o.id}</div>
-                      <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>
-                        👤 {o.userId && o.userId !== 'anonymous' ? `@${o.userId}` : 'Anonimo'} · {new Date(o.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                      </div>
+              <div key={o.id} className="adm-card" style={{ padding: 0, overflow: 'hidden', borderColor: sel ? 'rgba(61,255,110,.45)' : isOpen ? 'var(--a-line-2)' : undefined }}>
+                <div style={{ display: 'flex', gap: 10, padding: '12px 12px 10px' }}>
+                  <input type="checkbox" checked={sel} onChange={() => toggle(o.id)} style={{ marginTop: 3, flexShrink: 0 }} aria-label="Seleziona" />
+                  <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setOpen(isOpen ? null : o.id)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <strong style={{ fontSize: '.9rem' }}>@{o.userId}</strong>
+                      <Pill color={st.color}>{st.icon} {st.short}</Pill>
+                      <strong style={{ marginLeft: 'auto', fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: o.status === 'cancelled' ? 'var(--a-faint)' : 'var(--a-text)', textDecoration: o.status === 'cancelled' ? 'line-through' : 'none' }}>{eur(o.total)}</strong>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.2rem', color: 'var(--gold)' }}>
-                        €{o.total.toFixed(2)}
-                      </div>
-                      <span style={{ color: 'var(--muted)', fontSize: '.8rem', transition: 'transform .2s', display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                    <div style={{ fontSize: '.7rem', color: 'var(--a-dim)', marginTop: 3 }}>
+                      {new Date(o.createdAt).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · <span style={{ fontFamily: 'monospace' }}>{o.id}</span>
                     </div>
-                  </div>
-
-                  {/* Compact items summary (always visible) */}
-                  <div style={{ fontSize: '.74rem', color: 'var(--muted)' }}>
-                    {items.map(x => `${products[x.id]?.emoji ?? x.emoji ?? ''} ${products[x.id]?.name ?? x.name ?? x.id} ${x.label} ×${x.qty}`.trim()).join(' · ') || String(o.items)}
-                  </div>
-
-                  {/* Status badge */}
-                  <div style={{ fontSize: '.7rem', fontWeight: 700, color: STATUS_LABELS[o.status]?.color ?? 'var(--muted)' }}>
-                    {STATUS_LABELS[o.status]?.label ?? o.status}
+                    <div style={{ fontSize: '.76rem', marginTop: 6, color: 'rgba(233,245,234,.85)', whiteSpace: isOpen ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {items.map(x => `${x.emoji ?? ''} ${x.name ?? x.id} ${x.label} ×${x.qty}`.trim()).join(' · ')}
+                    </div>
+                    {tags.length > 0 && (
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
+                        {tags.map(t => <span key={t} className="adm-pill" style={{ background: 'var(--a-surface-2)', border: '1px solid var(--a-line-2)', color: t.startsWith('⚠') ? 'var(--a-red)' : 'var(--a-dim)' }}>{t}</span>)}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Expanded detail */}
-                {isExpanded && (
-                  <div style={{ borderTop: '1px solid var(--border)', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-                    {/* Item breakdown */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {items.map((x, i) => (
-                        <div key={i} style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          background: 'var(--bg)', borderRadius: 8, padding: '8px 10px',
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: '1.2rem' }}>{products[x.id]?.emoji ?? x.emoji ?? '🌿'}</span>
-                            <div>
-                              <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--text)' }}>
-                                {products[x.id]?.name ?? x.name ?? x.id}
-                              </div>
-                              <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>
-                                {x.label} · €{x.price.toFixed(2)}/u · ×{x.qty}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--gold)', flexShrink: 0 }}>
-                            €{(x.price * x.qty).toFixed(2)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Total */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderTop: '1px solid var(--border)' }}>
-                      <span style={{ fontSize: '.82rem', color: 'var(--muted)', fontWeight: 700 }}>TOTALE</span>
-                      <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: 'var(--gold)' }}>€{o.total.toFixed(2)}</span>
-                    </div>
-
-                    {/* Note */}
-                    {o.note && (
-                      <div style={{ fontSize: '.75rem', color: 'var(--muted)', background: 'var(--bg)', borderRadius: 7, padding: '8px 10px', borderLeft: '3px solid var(--gold)' }}>
-                        📝 {o.note}
-                      </div>
-                    )}
-
-                    {/* Tracking */}
-                    <TrackingInput initial={o.tracking ?? ''} onSave={(v) => saveTracking(o.id, v)} />
-
-                    {/* Actions */}
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {Object.entries(STATUS_LABELS).map(([s, { label, color }]) => (
-                        <button
-                          key={s}
-                          onClick={() => updateStatus(o.id, s)}
-                          style={{
-                            borderRadius: 20, padding: '6px 12px', fontSize: '.72rem', fontWeight: 700,
-                            cursor: 'pointer', fontFamily: 'inherit', border: '1px solid',
-                            background: o.status === s ? `${color}22` : 'var(--bg)',
-                            color: o.status === s ? color : 'var(--muted)',
-                            borderColor: o.status === s ? color : 'var(--border)',
-                          }}
-                        >{label}</button>
-                      ))}
-                      <a
-                        href={`https://t.me/${o.userId}`}
-                        target="_blank"
-                        rel="noopener"
-                        style={{
-                          borderRadius: 20, padding: '6px 12px', fontSize: '.72rem', fontWeight: 700,
-                          background: 'rgba(59,130,246,.1)', border: '1px solid rgba(59,130,246,.3)',
-                          color: 'var(--blue)', textDecoration: 'none',
-                        }}
-                      >💬 Contatta</a>
-                    </div>
+                {/* Azione principale sempre visibile */}
+                {(next || o.tracking) && !isOpen && (
+                  <div style={{ display: 'flex', gap: 8, padding: '0 12px 12px 38px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {next && o.status !== 'paid' && <button className="adm-btn sm soft" disabled={busy} onClick={() => setStatus([o.id], next.to)}>{next.label}</button>}
+                    {o.status === 'paid' && <button className="adm-btn sm soft" onClick={() => setOpen(o.id)}>🚚 Spedisci (aggiungi tracking)</button>}
+                    {o.tracking && <span style={{ fontSize: '.7rem', color: 'var(--a-blue)' }}>📍 {o.tracking}</span>}
                   </div>
+                )}
+
+                {isOpen && (
+                  <OrderDetail order={o} text={text} busy={busy}
+                    onStatus={(s) => setStatus([o.id], s)}
+                    onTracking={(t, ship) => saveTracking(o.id, t, ship)} />
                 )}
               </div>
             )
           })}
         </div>
       )}
+
+      {/* Barra azioni multiple */}
+      {selected.size > 0 && (
+        <div style={{
+          position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))', zIndex: 70,
+          width: 'min(640px, calc(100% - 20px))', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: 10,
+          background: 'var(--a-surface-2)', border: '1px solid var(--a-line-2)', borderRadius: 16, boxShadow: '0 12px 30px rgba(0,0,0,.6)',
+        }}>
+          <strong style={{ fontSize: '.8rem', marginRight: 4 }}>{selected.size} selezionati</strong>
+          <button className="adm-btn sm" disabled={busy} onClick={() => setStatus(Array.from(selected), 'paid')}>💳 Pagati</button>
+          <button className="adm-btn sm" disabled={busy} onClick={() => setStatus(Array.from(selected), 'shipped')}>🚚 Spediti</button>
+          <button className="adm-btn sm" disabled={busy} onClick={() => setStatus(Array.from(selected), 'delivered')}>✅ Consegnati</button>
+          <button className="adm-btn sm danger" disabled={busy} onClick={() => { if (confirm(`Annullare ${selected.size} ordini? Non conteranno più nel fatturato.`)) setStatus(Array.from(selected), 'cancelled') }}>✕ Annulla</button>
+          <button className="adm-btn sm" style={{ marginLeft: 'auto' }} onClick={() => setSelected(new Set())}>Deseleziona</button>
+        </div>
+      )}
+
+      {toast && (
+        <div style={{
+          position: 'fixed', left: '50%', transform: 'translateX(-50%)', top: 70, zIndex: 95, padding: '10px 16px', borderRadius: 12,
+          background: 'var(--a-surface-2)', border: '1px solid var(--a-line-2)', fontSize: '.82rem', fontWeight: 700, boxShadow: '0 10px 30px rgba(0,0,0,.6)',
+        }}>{toast}</div>
+      )}
+    </div>
+  )
+}
+
+function OrderDetail({ order: o, text, busy, onStatus, onTracking }: {
+  order: Order; text: string; busy: boolean
+  onStatus: (s: string) => void; onTracking: (t: string, ship: boolean) => void
+}) {
+  const [tracking, setTracking] = useState(o.tracking ?? '')
+  const items = Array.isArray(o.items) ? o.items : []
+  const subtotal = items.reduce((s, x) => s + x.price * x.qty, 0)
+  return (
+    <div style={{ borderTop: '1px solid var(--a-line)', padding: 12, display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,.15)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {items.map((x, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, fontSize: '.8rem' }}>
+            <span>{x.emoji ?? '📦'}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>{x.name ?? x.id} <span style={{ color: 'var(--a-gold)' }}>[{x.label}]</span> <span style={{ color: 'var(--a-dim)' }}>×{x.qty}</span></span>
+            <span style={{ color: 'var(--a-dim)' }}>{eur(x.price * x.qty)}</span>
+          </div>
+        ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.78rem', color: 'var(--a-dim)', borderTop: '1px dashed var(--a-line-2)', paddingTop: 6, marginTop: 2 }}>
+          <span>Prodotti {eur(subtotal)}{Math.abs(subtotal - o.total) > 0.01 ? ` · differenza ${eur(o.total - subtotal)} (spedizione/sconti)` : ''}</span>
+          <strong style={{ color: 'var(--a-text)' }}>Totale {eur(o.total)}</strong>
+        </div>
+      </div>
+
+      {text && <div style={{ fontSize: '.76rem', color: 'var(--a-dim)', borderLeft: '3px solid var(--a-gold)', paddingLeft: 10 }}>📝 {text}</div>}
+
+      <div>
+        <div style={{ fontSize: '.7rem', fontWeight: 800, color: 'var(--a-dim)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>📍 Tracking</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input className="adm-input" style={{ flex: 1, minWidth: 180, fontFamily: 'monospace' }} placeholder="Numero di tracciamento" value={tracking} onChange={e => setTracking(e.target.value)} />
+          {o.status === 'paid' || o.status === 'pending'
+            ? <button className="adm-btn soft" disabled={busy} onClick={() => onTracking(tracking.trim(), true)}>🚚 Salva e segna spedito</button>
+            : <button className="adm-btn" disabled={busy || tracking.trim() === (o.tracking ?? '')} onClick={() => onTracking(tracking.trim(), false)}>💾 Salva</button>}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: '.7rem', fontWeight: 800, color: 'var(--a-dim)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Stato</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {Object.entries(ORDER_STATUS).map(([s, m]) => (
+            <button key={s} className="adm-btn sm" disabled={busy || o.status === s}
+              onClick={() => { if (s !== 'cancelled' || confirm('Annullare questo ordine? Non conterà nel fatturato.')) onStatus(s) }}
+              style={o.status === s ? { color: m.color, borderColor: m.color, opacity: 1 } : undefined}>
+              {m.icon} {m.short}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

@@ -21,8 +21,10 @@ const nowLocal = () => toLocalInput(new Date())
 // Confronto nomi senza emoji/punteggiatura
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, ' ').trim()
 
-export default function ManualOrderForm({ onCreated }: { onCreated: (order: unknown) => void }) {
-  const [open, setOpen] = useState(false)
+export default function ManualOrderForm({ onCreated, onClose }: { onCreated: (order: unknown) => void; onClose?: () => void }) {
+  // Aperto dalla pagina Ordini (pulsante "＋ Ordine manuale"): il form si mostra subito
+  const [open, setOpenState] = useState(!!onClose)
+  const setOpen = (v: boolean) => { setOpenState(v); if (!v) onClose?.() }
   const [products, setProducts] = useState<Product[]>([])
   const [userId, setUserId] = useState('')
   const [status, setStatus] = useState('paid')
@@ -99,7 +101,7 @@ export default function ManualOrderForm({ onCreated }: { onCreated: (order: unkn
   }
 
   return (
-    <div style={{ background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.25)', borderRadius: 14, padding: 14, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="adm-card" style={{ borderColor: 'rgba(61,255,110,.3)', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', flex: 1 }}>➕ Registra ordine manuale</span>
         <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>

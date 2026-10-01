@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { PageHeader } from '@/components/admin/ui'
 
 interface NewsItem { id: string; title: string; content: string; emoji: string; imageUrl?: string; productLink?: string; createdAt: string }
 
@@ -55,10 +56,7 @@ export default function AdminNews() {
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>📢 Pubblica nel Canale</span>
-      </div>
+      <PageHeader icon="📢" title="Novità e push" subtitle="Pubblica un aggiornamento: arriva ai clienti come notifica push" />
 
       <form onSubmit={handlePublish} style={{
         background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.2)',

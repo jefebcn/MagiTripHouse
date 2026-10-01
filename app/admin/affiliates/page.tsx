@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { PageHeader } from '@/components/admin/ui'
 
 interface AffiliateRow {
   id: string
@@ -68,13 +68,7 @@ export default function AdminAffiliates() {
     <div style={{ maxWidth: 880, margin: '0 auto' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>🤝 Affiliati</span>
-        <div style={{ marginLeft: 'auto', fontFamily: "'Fredoka One', cursive", fontSize: '1.1rem', color: 'var(--muted)' }}>
-          {loading ? '—' : affiliates.length}
-        </div>
-      </div>
+      <PageHeader icon="🤝" title="Affiliati" subtitle={loading ? 'Caricamento…' : `${affiliates.length} affiliati · commissioni e richieste di prelievo`} />
 
       {/* Commission summary */}
       {commissions && (

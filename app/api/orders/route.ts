@@ -118,13 +118,33 @@ async function creditReferralCommission(orderId: string) {
   })
 }
 
+const ORDER_STATUSES = ['pending', 'paid', 'shipped', 'delivered', 'cancelled']
+
 export async function PATCH(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id, status, tracking } = await req.json()
+  const body = await req.json()
+  const { status, tracking } = body
+  if (status !== undefined && !ORDER_STATUSES.includes(status)) return NextResponse.json({ error: 'Stato non valido' }, { status: 400 })
 
+  // Aggiornamento multiplo: { ids: [...], status }
+  if (Array.isArray(body.ids)) {
+    const ids = body.ids.filter((x: unknown) => typeof x === 'string').slice(0, 500)
+    if (!ids.length || typeof status !== 'string') return NextResponse.json({ error: 'Richiesta non valida' }, { status: 400 })
+    const updated: unknown[] = []
+    for (const id of ids) updated.push(await applyOrderUpdate(id, { status }))
+    return NextResponse.json({ ok: true, count: updated.filter(Boolean).length })
+  }
+
+  const order = await applyOrderUpdate(body.id, { status, tracking })
+  if (!order) return NextResponse.json({ error: 'Ordine non trovato' }, { status: 404 })
+  return NextResponse.json(order)
+}
+
+async function applyOrderUpdate(id: string, { status, tracking }: { status?: string; tracking?: string | null }) {
   const prev = await prisma.order.findUnique({ where: { id } })
+  if (!prev) return null
   const data: { status?: string; tracking?: string | null } = {}
   if (typeof status === 'string') data.status = status
   if (tracking !== undefined) data.tracking = tracking || null
@@ -137,7 +157,7 @@ export async function PATCH(req: Request) {
   }
 
   // Notifica push al cliente quando l'ordine passa a "spedito"
-  if (prev && order.userId && status === 'shipped' && prev.status !== 'shipped') {
+  if (order.userId && status === 'shipped' && prev.status !== 'shipped') {
     sendPushToUser(order.userId, {
       title: '📦 Ordine spedito!',
       body: order.tracking
@@ -147,6 +167,5 @@ export async function PATCH(req: Request) {
       emoji: '📦',
     }).catch(() => {})
   }
-
-  return NextResponse.json(order)
+  return order
 }

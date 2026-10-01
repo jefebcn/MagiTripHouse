@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { PageHeader } from '@/components/admin/ui'
 import Image from 'next/image'
 
 interface Product { id: string; name: string; imageUrl?: string; emoji: string; category: string }
@@ -136,10 +137,7 @@ export default function BulkImagesPage() {
   return (
     <div style={{ maxWidth: 620, margin: '0 auto', fontFamily: 'DM Sans, sans-serif', color: 'var(--text)' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-        <Link href="/admin/products" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>🖼️ Bulk Image Upload</span>
-      </div>
+      <PageHeader icon="🖼️" title="Immagini" subtitle="Carica più foto insieme e abbinale ai prodotti" actions={<Link className="adm-btn" href="/admin/products">‹ Prodotti</Link>} />
 
       {/* Instructions */}
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, fontSize: '.78rem', color: 'var(--muted)', lineHeight: 1.6 }}>

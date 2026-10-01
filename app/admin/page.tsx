@@ -1,481 +1,334 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { PageHeader, Card, Segmented, Pill, Empty, ORDER_STATUS, eur } from '@/components/admin/ui'
 
+type PeriodKey = 'today' | 'week' | 'month' | 'total'
+interface Win { revenue: number; orders: number; avg: number }
 interface Stats {
-  revenue: { today: number; week: number; month: number; total: number }
-  orders: { total: number; pending: number; shipped: number; delivered: number }
+  daily: { date: string; revenue: number; orders: number }[]
+  periods: Record<PeriodKey, { cur: Win; prev: Win | null }>
+  todo: { awaitingPayment: number; toShip: number; stalePending: number; partnerClaims: number; payouts: number }
+  orders: { total: number; pending: number; paid: number; shipped: number; delivered: number; cancelled: number }
   users: { total: number; today: number; week: number }
-  recentOrders: Array<{ id: string; userId: string; total: number; status: string; createdAt: string }>
-  topProducts: Array<{ name: string; count: number }>
+  recentOrders: { id: string; userId: string; total: number; status: string; createdAt: string }[]
   grams: { total: number; today: number; week: number; month: number; year: number }
-  productStats: Array<{ name: string; grams: number; revenue: number; qty: number; ordersCount: number; avgPricePerGram: number; cost: number; profit: number; costKnown: boolean; margin: number | null }>
-  profit: { cost: number; profit: number; revenueWithKnownCost: number; margin: number | null; coverage: number; warehouseRent: number; shippingOrders: number; shippingLoss: number; net: number }
+  productStats: { name: string; grams: number; revenue: number; qty: number; ordersCount: number; avgPricePerGram: number; cost: number; profit: number; costKnown: boolean; margin: number | null }[]
+  profit: { cost: number; profit: number; margin: number | null; warehouseRent: number; shippingOrders: number; shippingLoss: number; net: number }
 }
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending:   { label: 'In attesa',  color: 'var(--orange)', bg: 'rgba(255,107,53,.12)'  },
-  shipped:   { label: 'Spedito',    color: 'var(--blue)',   bg: 'rgba(59,130,246,.12)'  },
-  delivered: { label: 'Consegnato', color: 'var(--green)',  bg: 'rgba(61,255,110,.12)'  },
-}
-
-const QUICK_ACTIONS = [
-  { href: '/admin/products',                icon: '➕', label: 'Nuovo prodotto' },
-  { href: '/admin/products?category=combo', icon: '🔥', label: 'Crea combo'     },
-  { href: '/admin/news',                    icon: '📢', label: 'Pubblica novità' },
-  { href: '/admin/orders',                  icon: '📋', label: 'Gestisci ordini' },
-  { href: '/admin/warehouse',               icon: '🏭', label: 'Magazzino'       },
+const PERIODS: { value: PeriodKey; label: string; vs: string }[] = [
+  { value: 'today', label: 'Oggi',     vs: 'ieri alla stessa ora' },
+  { value: 'week',  label: '7 giorni', vs: '7 giorni prima' },
+  { value: 'month', label: '30 giorni', vs: '30 giorni prima' },
+  { value: 'total', label: 'Sempre',   vs: '' },
 ]
+const gramsFor: Record<PeriodKey, keyof Stats['grams']> = { today: 'today', week: 'week', month: 'month', total: 'total' }
+const fmtG = (n: number) => n >= 1000 ? `${(n / 1000).toLocaleString('it-IT', { maximumFractionDigits: 2 })} kg` : `${Math.round(n)} g`
 
-function fmt(n: number) {
-  if (n >= 1000) return `€${(n / 1000).toFixed(1)}k`
-  return `€${n.toFixed(2)}`
+function Delta({ cur, prev }: { cur: number; prev: number }) {
+  if (!prev && !cur) return null
+  if (!prev) return <span style={{ fontSize: '.7rem', fontWeight: 800, color: 'var(--a-green)' }}>nuovo</span>
+  const d = ((cur - prev) / prev) * 100
+  const up = d >= 0
+  return <span style={{ fontSize: '.7rem', fontWeight: 800, color: up ? 'var(--a-green)' : 'var(--a-red)' }}>{up ? '▲' : '▼'} {Math.abs(d).toFixed(0)}%</span>
 }
 
-function fmtG(n: number) {
-  if (n >= 1000) return `${(n / 1000).toFixed(2)} kg`
-  return `${n % 1 === 0 ? n : n.toFixed(1)} g`
+// Grafico a barre degli ultimi 14 giorni (SVG, nessuna libreria)
+function RevenueChart({ data }: { data: Stats['daily'] }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const max = Math.max(1, ...data.map(d => d.revenue))
+  const W = 700, H = 170, pad = 4, bw = W / data.length
+  const sel = hover ?? data.length - 1
+  const d = data[sel]
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
+        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', color: 'var(--a-green)' }}>{eur(d.revenue)}</span>
+        <span style={{ fontSize: '.74rem', color: 'var(--a-dim)' }}>
+          {new Date(d.date).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Rome' })} · {d.orders} ordin{d.orders === 1 ? 'e' : 'i'}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H + 18}`} style={{ width: '100%', height: 'auto', display: 'block' }} onMouseLeave={() => setHover(null)}>
+        {[0.5, 1].map(f => <line key={f} x1={0} x2={W} y1={H - H * f + 1} y2={H - H * f + 1} stroke="var(--a-line)" strokeDasharray="3 5" />)}
+        {data.map((x, i) => {
+          const h = Math.max(x.revenue > 0 ? 3 : 1, (x.revenue / max) * (H - 8))
+          const on = i === sel
+          return (
+            <g key={x.date} onMouseEnter={() => setHover(i)} onClick={() => setHover(i)} style={{ cursor: 'pointer' }}>
+              <rect x={i * bw} y={0} width={bw} height={H + 18} fill="transparent" />
+              <rect x={i * bw + pad} y={H - h} width={bw - pad * 2} height={h} rx={5}
+                fill={on ? 'var(--a-green)' : 'rgba(61,255,110,.35)'} />
+              {(i % 2 === 1 || data.length <= 7) && (
+                <text x={i * bw + bw / 2} y={H + 14} textAnchor="middle" fontSize="11" fill="var(--a-faint)">
+                  {new Date(x.date).toLocaleDateString('it-IT', { day: 'numeric', timeZone: 'Europe/Rome' })}
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
 }
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
-  const [importState, setImportState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
-  const [importResult, setImportResult] = useState<{ created: number; skipped: number } | null>(null)
+  const [error, setError] = useState(false)
+  const [period, setPeriod] = useState<PeriodKey>('today')
   const [pushTitle, setPushTitle] = useState('')
   const [pushBody, setPushBody] = useState('')
-  const [pushState, setPushState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
-  const [pushResult, setPushResult] = useState<{ sent: number } | null>(null)
+  const [pushMsg, setPushMsg] = useState('')
+  const [importMsg, setImportMsg] = useState('')
 
-  useEffect(() => {
-    fetch('/api/admin/stats').then(r => r.json()).then(setStats).catch(() => {})
+  const load = useCallback(() => {
+    setError(false)
+    fetch('/api/admin/stats').then(r => r.ok ? r.json() : Promise.reject()).then(setStats).catch(() => setError(true))
   }, [])
+  useEffect(() => { load() }, [load])
 
   async function sendBroadcast() {
     if (!pushTitle.trim() || !pushBody.trim()) return
-    setPushState('sending')
-    try {
-      const res = await fetch('/api/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: pushTitle.trim(), body: pushBody.trim(), url: '/', emoji: '📢' }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setPushResult({ sent: data.sent ?? 0 })
-        setPushState('done')
-        setPushTitle(''); setPushBody('')
-        setTimeout(() => setPushState('idle'), 4000)
-      } else { setPushState('error') }
-    } catch { setPushState('error') }
+    setPushMsg('Invio…')
+    const res = await fetch('/api/push/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: pushTitle.trim(), body: pushBody.trim(), url: '/', emoji: '📢' }),
+    }).catch(() => null)
+    const d = res ? await res.json().catch(() => ({})) : {}
+    setPushMsg(res?.ok ? `✅ Inviata a ${d.sent ?? 0} dispositivi` : '❌ Invio non riuscito')
+    if (res?.ok) { setPushTitle(''); setPushBody('') }
   }
 
   async function runImport() {
-    setImportState('loading')
-    try {
-      const res = await fetch('/api/admin/import-catalog', { method: 'POST' })
-      const data = await res.json()
-      if (data.ok) {
-        setImportResult({ created: data.created, skipped: data.skipped })
-        setImportState('done')
-      } else {
-        setImportState('error')
-      }
-    } catch {
-      setImportState('error')
-    }
+    if (!confirm('Importare il catalogo base? I prodotti già presenti vengono saltati.')) return
+    setImportMsg('Importazione…')
+    const d = await fetch('/api/admin/import-catalog', { method: 'POST' }).then(r => r.json()).catch(() => null)
+    setImportMsg(d?.ok ? `✅ ${d.created} creati · ${d.skipped} già presenti` : '❌ Errore importazione')
   }
 
+  const hour = new Date().getHours()
+  const hello = hour < 13 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'
   const today = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
 
+  if (error) return (
+    <>
+      <PageHeader icon="📊" title="Dashboard" subtitle={today} />
+      <Card><Empty icon="⚠️">Impossibile caricare i dati. <button className="adm-btn sm" onClick={load}>Riprova</button></Empty></Card>
+    </>
+  )
+  if (!stats) return (
+    <>
+      <PageHeader icon="📊" title="Dashboard" subtitle={today} />
+      <Card><Empty icon="⏳">Caricamento…</Empty></Card>
+    </>
+  )
+
+  const p = stats.periods[period]
+  const pm = PERIODS.find(x => x.value === period)!
+  const todo = [
+    { n: stats.todo.toShip, icon: '📦', label: 'Da spedire', hint: 'pagati, in attesa di spedizione', href: '/admin/orders?tab=paid', color: 'var(--a-gold)' },
+    { n: stats.todo.awaitingPayment, icon: '💳', label: 'Da incassare', hint: 'ordini recenti non ancora pagati', href: '/admin/orders?tab=pending', color: 'var(--a-orange)' },
+    { n: stats.todo.partnerClaims, icon: '🏆', label: 'Premi da verificare', hint: 'ordini KratosLabs dichiarati', href: '/admin/partner', color: 'var(--a-violet)' },
+    { n: stats.todo.payouts, icon: '💸', label: 'Prelievi affiliati', hint: 'richieste di pagamento', href: '/admin/affiliates', color: 'var(--a-blue)' },
+    { n: stats.todo.stalePending, icon: '🗂️', label: 'Ordini vecchi in attesa', hint: 'più di 21 giorni: archiviali', href: '/admin/orders?tab=stale', color: 'var(--a-dim)' },
+  ].filter(t => t.n > 0)
+
+  const topProducts = [...stats.productStats].sort((a, b) => b.revenue - a.revenue).slice(0, 5)
+  const topMax = Math.max(1, ...topProducts.map(t => t.revenue))
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <PageHeader
+        title={`${hello} 👋`}
+        subtitle={<span style={{ textTransform: 'capitalize' }}>{today}</span>}
+        actions={<>
+          <button className="adm-btn" onClick={load}>↻ Aggiorna</button>
+          <Link className="adm-btn primary" href="/admin/orders?new=1">＋ Ordine manuale</Link>
+        </>}
+      />
 
-      {/* Page header */}
-      <div>
-        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.5rem' }}>📊 Dashboard</div>
-        <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 4, textTransform: 'capitalize' }}>{today}</div>
-      </div>
-
-      {/* Revenue KPIs — 4 tiles responsive */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-        {([
-          { label: 'Oggi',      value: stats ? fmt(stats.revenue.today) : '—', accent: 'var(--green)' },
-          { label: 'Settimana', value: stats ? fmt(stats.revenue.week)  : '—', accent: 'var(--green)' },
-          { label: 'Mese',      value: stats ? fmt(stats.revenue.month) : '—', accent: 'var(--green)' },
-          { label: 'Fatturato totale', value: stats ? fmt(stats.revenue.total) : '—', accent: 'var(--gold)' },
-        ] as const).map(k => (
-          <div key={k.label} style={{
-            background: 'var(--card)', border: '1px solid var(--border)',
-            borderRadius: 14, padding: '16px 18px',
-          }}>
-            <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.4px' }}>{k.label}</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: k.accent, fontFamily: "'Fredoka One', cursive" }}>{k.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Operational stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
-        {([
-          { icon: '🟡', value: stats?.orders.pending, label: 'Ordini in attesa', color: 'var(--orange)', bg: 'rgba(255,107,53,.08)', border: 'rgba(255,107,53,.22)' },
-          { icon: '🔵', value: stats?.orders.shipped, label: 'Spediti',          color: 'var(--blue)',   bg: 'rgba(59,130,246,.08)', border: 'rgba(59,130,246,.22)' },
-          { icon: '🟢', value: stats?.orders.delivered, label: 'Consegnati',     color: 'var(--green)',  bg: 'rgba(61,255,110,.08)', border: 'rgba(61,255,110,.22)' },
-          { icon: '👤', value: stats?.users.week,     label: 'Nuovi utenti (7g)', color: 'var(--text)',   bg: 'var(--bg3)',           border: 'var(--border)' },
-        ] as const).map(s => (
-          <div key={s.label} style={{
-            background: s.bg, border: `1px solid ${s.border}`,
-            borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
-          }}>
-            <span style={{ fontSize: '1.4rem' }}>{s.icon}</span>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: '1.3rem', color: s.color, lineHeight: 1 }}>{s.value ?? '—'}</div>
-              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginTop: 3 }}>{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Profitto stimato */}
-      {stats && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(61,255,110,.08), rgba(245,200,66,.05))',
-          border: '1px solid rgba(61,255,110,.28)', borderRadius: 16, padding: '18px 20px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem' }}>💰 Profitto stimato</div>
-            <div style={{ fontSize: '.66rem', color: 'var(--muted)', textAlign: 'right' }}>
-              costo automatico: Cali €4,2/g · Dry €3,4/g · Frozen €5,5/g · Vapepen €18/pz
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
-            <div>
-              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Profitto prodotti</div>
-              <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--green)', fontFamily: "'Fredoka One', cursive" }}>{fmt(stats.profit.profit)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Margine</div>
-              <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--gold)', fontFamily: "'Fredoka One', cursive" }}>
-                {stats.profit.margin != null ? `${stats.profit.margin.toFixed(1)}%` : '—'}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '.66rem', color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.4px' }}>Costo merce</div>
-              <div style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--text)', fontFamily: "'Fredoka One', cursive" }}>{fmt(stats.profit.cost)}</div>
-            </div>
-          </div>
-
-          {/* Breakdown profitto NETTO */}
-          <div style={{ marginTop: 16, background: 'rgba(0,0,0,.18)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: '.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
-                <span>Profitto prodotti</span><span style={{ color: 'var(--green)', fontWeight: 700 }}>{fmt(stats.profit.profit)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
-                <span>🏭 Affitto magazzino</span><span style={{ color: 'var(--orange)', fontWeight: 700 }}>−{fmt(stats.profit.warehouseRent)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)' }}>
-                <span>🚚 Perdite spedizione <span style={{ fontSize: '.66rem', opacity: .7 }}>({stats.profit.shippingOrders} ordini × €10)</span></span>
-                <span style={{ color: 'var(--orange)', fontWeight: 700 }}>−{fmt(stats.profit.shippingLoss)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 2 }}>
-                <span style={{ fontWeight: 700 }}>💰 Profitto NETTO</span>
-                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.7rem', color: stats.profit.net >= 0 ? 'var(--green)' : 'var(--red)', textShadow: stats.profit.net >= 0 ? 'var(--led-green)' : 'none' }}>{fmt(stats.profit.net)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
-            💡 Cali/Dry/Frozen usano un costo automatico per grammo. Il netto sottrae affitto magazzino (rate pagate) e perdita spedizione (€10/ordine spedito).
-          </div>
-        </div>
-      )}
-
-      {/* Quick actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
-        {QUICK_ACTIONS.map(a => (
-          <Link key={a.label} href={a.href} style={{ textDecoration: 'none' }}>
-            <div style={{
-              background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.25)',
-              borderRadius: 12, padding: '13px 15px', display: 'flex', alignItems: 'center', gap: 10,
-              cursor: 'pointer', color: 'var(--text)',
-            }}>
-              <span style={{ fontSize: '1.15rem' }}>{a.icon}</span>
-              <span style={{ fontSize: '.84rem', fontWeight: 700 }}>{a.label}</span>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* Two-column analytics on desktop */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18, alignItems: 'start' }}>
-
-      {/* Recent orders */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', letterSpacing: '.3px' }}>📋 Ultimi ordini</div>
-          <Link href="/admin/orders" style={{ fontSize: '.74rem', color: 'var(--green)', textDecoration: 'none', fontWeight: 700 }}>Tutti →</Link>
-        </div>
-        {!stats ? (
-          <div style={{ color: 'var(--muted)', fontSize: '.8rem' }}>Caricamento...</div>
-        ) : stats.recentOrders.length === 0 ? (
-          <div style={{ color: 'var(--muted)', fontSize: '.8rem' }}>Nessun ordine ancora</div>
+      {/* ── Da fare ── */}
+      <Card title="Da fare" icon="✅">
+        {todo.length === 0 ? (
+          <div style={{ fontSize: '.84rem', color: 'var(--a-dim)' }}>🎉 Tutto in ordine: niente in sospeso.</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {stats.recentOrders.map(o => {
-              const meta = STATUS_META[o.status] ?? STATUS_META.pending
-              return (
-                <div key={o.id} style={{
-                  background: 'var(--bg3)', border: '1px solid var(--border)',
-                  borderRadius: 10, padding: '10px 12px',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--green)', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.id}</div>
-                    <div style={{ fontSize: '.62rem', color: 'var(--muted)', marginTop: 1 }}>
-                      {o.userId && o.userId !== 'anonymous' ? `@${o.userId}` : 'Anonimo'} · {new Date(o.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '.9rem', fontWeight: 800, color: 'var(--gold)', fontFamily: "'Fredoka One', cursive", whiteSpace: 'nowrap' }}>€{o.total.toFixed(2)}</div>
-                  <div style={{
-                    fontSize: '.6rem', fontWeight: 700,
-                    background: meta.bg, color: meta.color,
-                    border: `1px solid ${meta.color}55`,
-                    borderRadius: 20, padding: '2px 8px', whiteSpace: 'nowrap',
-                  }}>{meta.label}</div>
-                </div>
-              )
-            })}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
+            {todo.map(t => (
+              <Link key={t.label} href={t.href} style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '12px', borderRadius: 13, textDecoration: 'none', color: 'var(--a-text)',
+                background: 'var(--a-surface-2)', border: '1px solid var(--a-line)',
+              }}>
+                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', color: t.color, minWidth: 34, textAlign: 'center' }}>{t.n}</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontWeight: 800, fontSize: '.84rem' }}>{t.icon} {t.label}</span>
+                  <span style={{ display: 'block', fontSize: '.66rem', color: 'var(--a-dim)', marginTop: 1 }}>{t.hint}</span>
+                </span>
+                <span style={{ marginLeft: 'auto', color: 'var(--a-faint)' }}>›</span>
+              </Link>
+            ))}
           </div>
         )}
+      </Card>
+
+      {/* ── Numeri del periodo ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
+        <Segmented value={period} onChange={setPeriod} options={PERIODS.map(x => ({ value: x.value, label: x.label }))} />
+        {pm.vs && <span style={{ fontSize: '.7rem', color: 'var(--a-faint)' }}>confronto con {pm.vs}</span>}
+      </div>
+      <div className="adm-grid k4">
+        {[
+          { label: 'Fatturato', value: eur(p.cur.revenue, true), cur: p.cur.revenue, prev: p.prev?.revenue, color: 'var(--a-green)' },
+          { label: 'Ordini', value: String(p.cur.orders), cur: p.cur.orders, prev: p.prev?.orders, color: 'var(--a-text)' },
+          { label: 'Scontrino medio', value: p.cur.orders ? eur(p.cur.avg) : '—', cur: p.cur.avg, prev: p.prev?.avg, color: 'var(--a-gold)' },
+          { label: 'Grammi venduti', value: fmtG(stats.grams[gramsFor[period]]), cur: 0, prev: undefined, color: 'var(--a-blue)' },
+        ].map(k => (
+          <div key={k.label} className="adm-card" style={{ padding: '14px 14px 12px' }}>
+            <div style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--a-dim)', textTransform: 'uppercase', letterSpacing: '.5px' }}>{k.label}</div>
+            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', color: k.color, marginTop: 4, lineHeight: 1.1 }}>{k.value}</div>
+            <div style={{ minHeight: 16, marginTop: 4 }}>{k.prev != null && <Delta cur={k.cur} prev={k.prev} />}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Top products */}
-      {stats && stats.topProducts.length > 0 && (
-        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px' }}>
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.92rem', letterSpacing: '.3px', marginBottom: 12 }}>🏆 Top prodotti</div>
-          <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-            {stats.topProducts.map((p, i) => (
-              <div key={p.name} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 13px',
-                borderBottom: i < stats.topProducts.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <div style={{ fontSize: '.75rem', fontWeight: 800, color: i === 0 ? 'var(--gold)' : 'var(--muted)', width: 16, textAlign: 'center' }}>{i + 1}</div>
-                <div style={{ flex: 1, fontSize: '.78rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                <div style={{ fontSize: '.7rem', color: 'var(--muted)', fontWeight: 700 }}>×{p.count}</div>
+      <div className="adm-grid two">
+        {/* ── Andamento ── */}
+        <Card title="Ultimi 14 giorni" icon="📈">
+          <RevenueChart data={stats.daily} />
+        </Card>
+
+        {/* ── Profitto ── */}
+        <Card title="Profitto stimato (sempre)" icon="💰">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '.84rem' }}>
+            {[
+              { l: 'Profitto sui prodotti', v: eur(stats.profit.profit), c: 'var(--a-green)' },
+              { l: '🏭 Affitto magazzino', v: `−${eur(stats.profit.warehouseRent)}`, c: 'var(--a-orange)' },
+              { l: `🚚 Spedizioni a carico (${stats.profit.shippingOrders} × €10)`, v: `−${eur(stats.profit.shippingLoss)}`, c: 'var(--a-orange)' },
+            ].map(r => (
+              <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--a-dim)' }}>
+                <span>{r.l}</span><strong style={{ color: r.c }}>{r.v}</strong>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      </div>{/* /two-column analytics */}
-
-      {/* Grams & Revenue per product */}
-      {stats && (
-        <div>
-
-          {/* Header + totals */}
-          <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px', marginBottom: 8 }}>⚖️ PRODOTTI VENDUTI</div>
-
-          {/* 4 grams KPI chips */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-            {([
-              { label: 'Oggi',  g: stats.grams.today,  },
-              { label: '7 gg',  g: stats.grams.week,   },
-              { label: '30 gg', g: stats.grams.month,  },
-              { label: 'Anno',  g: stats.grams.year,   },
-            ]).map(k => (
-              <div key={k.label} style={{
-                background: 'rgba(61,255,110,.04)', border: '1px solid rgba(61,255,110,.15)',
-                borderRadius: 10, padding: '8px 4px', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: '.8rem', fontWeight: 800, color: 'var(--green)', fontFamily: "'Fredoka One', cursive", lineHeight: 1.1 }}>{fmtG(k.g)}</div>
-                <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 2 }}>{k.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Summary bar: total grams + total revenue */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8,
-          }}>
-            <div style={{
-              background: 'rgba(61,255,110,.05)', border: '1px solid rgba(61,255,110,.2)',
-              borderRadius: 10, padding: '10px 12px',
-              display: 'flex', flexDirection: 'column', gap: 2,
-            }}>
-              <div style={{ fontSize: '.58rem', color: 'var(--muted)' }}>Totale grammi mossi</div>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color: 'var(--green)' }}>{fmtG(stats.grams.total)}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid var(--a-line)', paddingTop: 10, marginTop: 2 }}>
+              <strong>Profitto netto</strong>
+              <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', color: stats.profit.net >= 0 ? 'var(--a-green)' : 'var(--a-red)' }}>{eur(stats.profit.net, true)}</span>
             </div>
-            <div style={{
-              background: 'rgba(245,200,66,.05)', border: '1px solid rgba(245,200,66,.2)',
-              borderRadius: 10, padding: '10px 12px',
-              display: 'flex', flexDirection: 'column', gap: 2,
-            }}>
-              <div style={{ fontSize: '.58rem', color: 'var(--muted)' }}>Fatturato prodotti</div>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color: 'var(--gold)' }}>
-                {fmt(stats.productStats.reduce((s, p) => s + p.revenue, 0))}
-              </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Pill color="#f5c842">Margine {stats.profit.margin != null ? `${stats.profit.margin.toFixed(1)}%` : '—'}</Pill>
+              <Pill color="#8aa58c">Costo merce {eur(stats.profit.cost, true)}</Pill>
+            </div>
+            <div style={{ fontSize: '.66rem', color: 'var(--a-faint)', lineHeight: 1.5 }}>
+              Costo automatico se non impostato: Cali €4,2/g · Dry €3,4/g · Frozen €5,5/g · Vapepen €18/pz. Gli ordini annullati non contano.
             </div>
           </div>
+        </Card>
+      </div>
 
-          {/* Per-product cards */}
-          {stats.productStats.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {stats.productStats.map((p, i) => {
-                const gramPct = stats.grams.total > 0 ? (p.grams / stats.grams.total) * 100 : 0
-                const totalRev = stats.productStats.reduce((s, x) => s + x.revenue, 0)
-                const revPct = totalRev > 0 ? (p.revenue / totalRev) * 100 : 0
-                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
+      <div className="adm-grid two">
+        {/* ── Ultimi ordini ── */}
+        <Card title="Ultimi ordini" icon="🧾" more={<Link className="more" href="/admin/orders">Tutti ›</Link>}>
+          {stats.recentOrders.length === 0 ? <Empty>Nessun ordine</Empty> : (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {stats.recentOrders.map((o, i) => {
+                const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.pending
                 return (
-                  <div key={p.name} style={{
-                    background: 'var(--card)',
-                    border: i === 0 ? '1px solid rgba(245,200,66,.35)' : '1px solid var(--border)',
-                    borderRadius: 12, padding: '11px 13px',
+                  <Link key={o.id} href={`/admin/orders?q=${encodeURIComponent(o.id)}`} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 2px', textDecoration: 'none', color: 'var(--a-text)',
+                    borderTop: i ? '1px solid var(--a-line)' : 'none',
                   }}>
-                    {/* Product name row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
-                      <div style={{ fontSize: '.72rem', fontWeight: 800, color: i < 3 ? 'var(--gold)' : 'var(--muted)', minWidth: 18 }}>{medal ?? `${i + 1}`}</div>
-                      <div style={{ flex: 1, fontSize: '.8rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                      <div style={{ fontSize: '.62rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{p.ordersCount} ordini</div>
-                    </div>
-
-                    {/* 4 metrics row */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '.78rem', fontWeight: 800, color: 'var(--green)' }}>{fmtG(p.grams)}</div>
-                        <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 1 }}>grammi</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '.78rem', fontWeight: 800, color: 'var(--gold)' }}>{fmt(p.revenue)}</div>
-                        <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 1 }}>fatturato</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '.78rem', fontWeight: 800, color: 'var(--text)' }}>×{p.qty}</div>
-                        <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 1 }}>venduti</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '.78rem', fontWeight: 800, color: 'rgba(150,220,255,.9)' }}>
-                          {p.avgPricePerGram > 0 ? `€${p.avgPricePerGram.toFixed(2)}` : '—'}
-                        </div>
-                        <div style={{ fontSize: '.52rem', color: 'var(--muted)', marginTop: 1 }}>€/g</div>
-                      </div>
-                    </div>
-
-                    {/* Profitto / margine se costo impostato */}
-                    {p.costKnown && (
-                      <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        background: 'rgba(61,255,110,.06)', border: '1px solid rgba(61,255,110,.2)',
-                        borderRadius: 8, padding: '6px 10px', marginBottom: 8,
-                      }}>
-                        <span style={{ fontSize: '.62rem', color: 'var(--muted)' }}>💰 Profitto</span>
-                        <span style={{ fontSize: '.78rem', fontWeight: 800, color: 'var(--green)' }}>
-                          {fmt(p.profit)} {p.margin != null && <span style={{ fontSize: '.62rem', color: 'var(--gold)', fontWeight: 700 }}>· {p.margin.toFixed(0)}%</span>}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Dual progress bars */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ fontSize: '.5rem', color: 'var(--muted)', width: 30 }}>⚖️ {gramPct.toFixed(0)}%</div>
-                        <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2 }}>
-                          <div style={{ height: '100%', width: `${gramPct}%`, background: 'linear-gradient(90deg,var(--green),var(--green2))', borderRadius: 2, transition: 'width .4s' }} />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ fontSize: '.5rem', color: 'var(--muted)', width: 30 }}>💶 {revPct.toFixed(0)}%</div>
-                        <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2 }}>
-                          <div style={{ height: '100%', width: `${revPct}%`, background: 'linear-gradient(90deg,var(--gold),#f5c842cc)', borderRadius: 2, transition: 'width .4s' }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    <span style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--a-surface-2)' }}>{st.icon}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontWeight: 700, fontSize: '.84rem' }}>@{o.userId}</span>
+                      <span style={{ display: 'block', fontSize: '.68rem', color: 'var(--a-dim)' }}>
+                        {new Date(o.createdAt).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · <span style={{ color: st.color }}>{st.short}</span>
+                      </span>
+                    </span>
+                    <strong style={{ fontSize: '.9rem' }}>{eur(o.total)}</strong>
+                  </Link>
                 )
               })}
             </div>
           )}
-        </div>
-      )}
+        </Card>
 
-      {/* Strumenti */}
-      <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.85rem', color: 'var(--muted)', letterSpacing: '.5px' }}>🛠️ STRUMENTI</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: 14, alignItems: 'start' }}>
-
-      {/* Push broadcast */}
-      <div style={{
-        background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: 14, padding: '16px 18px',
-      }}>
-        <div style={{ fontSize: '.85rem', fontWeight: 700, marginBottom: 4 }}>📢 Invia notifica push</div>
-        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: 12 }}>
-          Notifica a tutti gli utenti con le notifiche attive (nuovi arrivi, offerte, annunci).
-        </div>
-        <input
-          value={pushTitle}
-          onChange={e => setPushTitle(e.target.value)}
-          placeholder="Titolo (es. 🔥 Nuovo arrivo)"
-          maxLength={50}
-          style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none', marginBottom: 8, boxSizing: 'border-box' }}
-        />
-        <textarea
-          value={pushBody}
-          onChange={e => setPushBody(e.target.value)}
-          placeholder="Messaggio…"
-          rows={2}
-          maxLength={140}
-          style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', color: 'var(--text)', fontSize: '.85rem', fontFamily: 'inherit', outline: 'none', marginBottom: 10, resize: 'none', boxSizing: 'border-box' }}
-        />
-        <button
-          onClick={sendBroadcast}
-          disabled={pushState === 'sending' || !pushTitle.trim() || !pushBody.trim()}
-          style={{
-            width: '100%', padding: '10px', borderRadius: 10,
-            fontFamily: 'inherit', fontWeight: 700, fontSize: '.85rem',
-            cursor: pushState === 'sending' || !pushTitle.trim() || !pushBody.trim() ? 'not-allowed' : 'pointer',
-            background: pushState === 'done' ? 'rgba(61,255,110,.12)' : pushState === 'error' ? 'rgba(255,80,80,.12)' : 'rgba(59,130,246,.12)',
-            border: pushState === 'done' ? '1.5px solid rgba(61,255,110,.5)' : pushState === 'error' ? '1.5px solid rgba(255,80,80,.5)' : '1.5px solid rgba(59,130,246,.4)',
-            color: pushState === 'done' ? 'var(--green)' : pushState === 'error' ? '#ff5050' : 'var(--blue)',
-            opacity: !pushTitle.trim() || !pushBody.trim() ? .6 : 1,
-          }}
-        >
-          {pushState === 'sending' ? '⏳ Invio…' :
-           pushState === 'done' ? `✅ Inviata a ${pushResult?.sent ?? 0} utenti` :
-           pushState === 'error' ? '❌ Errore — riprova' :
-           '📢 Invia a tutti'}
-        </button>
+        {/* ── Prodotti top ── */}
+        <Card title="Prodotti più venduti" icon="🏅">
+          {topProducts.length === 0 ? <Empty>Ancora nessuna vendita</Empty> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+              {topProducts.map((t, i) => (
+                <div key={t.name}>
+                  <div style={{ display: 'flex', gap: 8, fontSize: '.8rem', marginBottom: 5 }}>
+                    <span style={{ color: 'var(--a-faint)', fontWeight: 800 }}>{i + 1}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{t.name}</span>
+                    <strong>{eur(t.revenue, true)}</strong>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 3, background: 'var(--a-surface-2)', overflow: 'hidden' }}>
+                    <div style={{ width: `${(t.revenue / topMax) * 100}%`, height: '100%', borderRadius: 3, background: 'linear-gradient(90deg, #2fb344, var(--a-green))' }} />
+                  </div>
+                  <div style={{ fontSize: '.64rem', color: 'var(--a-faint)', marginTop: 3 }}>
+                    {t.grams > 0 ? fmtG(t.grams) : `${t.qty} pz`} · {t.ordersCount} ordini{t.margin != null ? ` · margine ${t.margin.toFixed(0)}%` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
 
-      {/* Import catalog */}
-      <div style={{
-        background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: 14, padding: '16px 18px',
-      }}>
-        <div style={{ fontSize: '.85rem', fontWeight: 700, marginBottom: 4 }}>📥 Importa catalogo GFZ</div>
-        <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginBottom: 10 }}>
-          Aggiunge ~45 prodotti dal catalogo fornitore come bozze nascoste. Sicuro da rieseguire (salta i duplicati).
+      {/* ── Dettagli e strumenti (chiusi di default) ── */}
+      <details className="adm-card adm-details">
+        <summary>📦 Dettaglio vendite per prodotto <span style={{ fontSize: '.7rem', color: 'var(--a-faint)', fontWeight: 600 }}>({stats.productStats.length})</span></summary>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.78rem', minWidth: 560 }}>
+            <thead>
+              <tr style={{ color: 'var(--a-faint)', textAlign: 'right' }}>
+                {['Prodotto', 'Venduto', 'Ordini', 'Fatturato', '€/g', 'Profitto', 'Margine'].map((h, i) => (
+                  <th key={h} style={{ padding: '6px 8px', fontWeight: 700, textAlign: i ? 'right' : 'left', borderBottom: '1px solid var(--a-line)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[...stats.productStats].sort((a, b) => b.revenue - a.revenue).map(t => (
+                <tr key={t.name} style={{ textAlign: 'right' }}>
+                  <td style={{ padding: '7px 8px', textAlign: 'left', borderBottom: '1px solid var(--a-line)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)' }}>{t.grams > 0 ? fmtG(t.grams) : `${t.qty} pz`}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)' }}>{t.ordersCount}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)', color: 'var(--a-green)', fontWeight: 700 }}>{eur(t.revenue)}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)' }}>{t.avgPricePerGram ? eur(t.avgPricePerGram) : '—'}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)' }}>{t.costKnown ? eur(t.profit) : '—'}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)', color: 'var(--a-gold)' }}>{t.margin != null ? `${t.margin.toFixed(0)}%` : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <button
-          onClick={runImport}
-          disabled={importState === 'loading'}
-          style={{
-            width: '100%', padding: '10px', borderRadius: 10,
-            fontFamily: 'inherit', fontWeight: 700, fontSize: '.85rem', cursor: importState === 'loading' ? 'not-allowed' : 'pointer',
-            background: importState === 'done' ? 'rgba(61,255,110,.12)' : importState === 'error' ? 'rgba(255,80,80,.12)' : 'rgba(245,200,66,.1)',
-            border: importState === 'done' ? '1.5px solid rgba(61,255,110,.5)' : importState === 'error' ? '1.5px solid rgba(255,80,80,.5)' : '1.5px solid rgba(245,200,66,.4)',
-            color: importState === 'done' ? 'var(--green)' : importState === 'error' ? '#ff5050' : 'var(--gold)',
-          }}
-        >
-          {importState === 'loading' ? '⏳ Importazione...' :
-           importState === 'done' ? `✅ Fatto — ${importResult?.created} creati, ${importResult?.skipped} saltati` :
-           importState === 'error' ? '❌ Errore — riprova' :
-           '📥 Avvia importazione'}
-        </button>
-      </div>
+      </details>
 
-      </div>{/* /strumenti grid */}
+      <details className="adm-card adm-details">
+        <summary>🛠️ Strumenti</summary>
+        <div className="adm-grid two" style={{ alignItems: 'start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontWeight: 800, fontSize: '.84rem' }}>📣 Notifica push a tutti</div>
+            <input className="adm-input" placeholder="Titolo" value={pushTitle} onChange={e => setPushTitle(e.target.value)} maxLength={60} />
+            <textarea className="adm-input" placeholder="Messaggio" value={pushBody} onChange={e => setPushBody(e.target.value)} rows={2} maxLength={180} style={{ resize: 'vertical' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button className="adm-btn soft" onClick={sendBroadcast} disabled={!pushTitle.trim() || !pushBody.trim()}>Invia push</button>
+              <span style={{ fontSize: '.74rem', color: 'var(--a-dim)' }}>{pushMsg}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontWeight: 800, fontSize: '.84rem' }}>📥 Importa catalogo base</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--a-dim)', lineHeight: 1.5 }}>Aggiunge i prodotti del catalogo iniziale. Quelli già presenti vengono saltati.</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button className="adm-btn" onClick={runImport}>Importa</button>
+              <span style={{ fontSize: '.74rem', color: 'var(--a-dim)' }}>{importMsg}</span>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div style={{ fontSize: '.68rem', color: 'var(--a-faint)', textAlign: 'center' }}>
+        {stats.orders.total} ordini · {stats.users.total} clienti ({stats.users.week} nuovi in 7 giorni){stats.orders.cancelled ? ` · ${stats.orders.cancelled} annullati` : ''}
+      </div>
     </div>
   )
 }

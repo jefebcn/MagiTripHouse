@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { PageHeader } from '@/components/admin/ui'
 
 interface DiscountCode {
   code: string; percent: number; firstOrderOnly: boolean; maxDiscount: number | null; minOrder: number | null; showInOffers: boolean; origins: string[]; active: boolean
@@ -107,10 +107,7 @@ export default function AdminDiscounts() {
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>🎟️ Codici sconto</span>
-      </div>
+      <PageHeader icon="🎟️" title="Codici sconto" subtitle="Ogni codice ha un tetto in € e si usa una sola volta per cliente" />
 
       <form onSubmit={handleSave} style={{
         background: 'var(--bg2)', border: '1px solid rgba(61,255,110,.2)',

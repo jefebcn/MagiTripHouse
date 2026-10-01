@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
+import { PageHeader } from '@/components/admin/ui'
 
 interface UserRow {
   id: string
@@ -137,10 +137,7 @@ export default function AdminMembers() {
   return (
     <div style={{ maxWidth: 980, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.3rem' }}>👥 Utenti</span>
-      </div>
+      <PageHeader icon="👥" title="Membri" subtitle="Clienti registrati, attività e password" />
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>

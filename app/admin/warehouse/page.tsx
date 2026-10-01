@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { PageHeader } from '@/components/admin/ui'
 
 interface Payment {
   id: string; seq: number; receiptNo: string
@@ -151,10 +151,7 @@ export default function AdminWarehouse() {
     <div style={{ maxWidth: 820, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Link href="/admin" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '1.2rem' }}>‹</Link>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.4rem' }}>🏭 Magazzino</span>
-      </div>
+      <PageHeader icon="🏭" title="Magazzino" subtitle="Affitto, rate pagate e giorni di ferie" />
 
       {/* Info affitto */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
