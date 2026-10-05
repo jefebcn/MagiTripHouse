@@ -8,6 +8,7 @@ import { useTelegram } from '@/hooks/useTelegram'
 import { track } from '@vercel/analytics'
 import { discountAmount as calcDiscount } from '@/lib/discount-math'
 import { submitOrder, flushOutbox, type SaveResult } from '@/lib/order-outbox'
+import { useProducts } from '@/hooks/useProducts'
 
 function haptic(pattern: number | number[] = 50) {
   try { if (navigator.vibrate) navigator.vibrate(pattern) } catch { /* noop */ }
@@ -18,11 +19,16 @@ const ORIGINS: ShipOrigin[] = ['spain', 'italy', 'pharma', 'meetup']
 const MEETUP_MIN = 100      // ordine minimo € per prodotti meetup / ritiro in loco
 const MEETUP_MIN_VAPE = 50  // minimo ridotto se l'ordine meetup è solo vape pen
 const isVape = (name?: string) => (name ?? '').toLowerCase().includes('vape')
+// Prodotti meetup ordinabili anche in piccole quantità (es. Squama da 1g): niente ordine minimo.
+// Per aggiungerne altri basta il tag "senza-minimo" sul prodotto dal pannello admin.
+const NO_MIN_TAG = 'senza-minimo'
+const NO_MIN_NAMES = ['squama']
 
 export default function CartDrawer() {
   const { cartOpen, setCartOpen, userHandle, userName, isLoggedIn, setView, sessionToken, logout } = useUIStore()
   const authH: Record<string, string> = sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}
   const { items, changeQty, clearOrigin, itemsByOrigin, totalByOrigin } = useCartStore()
+  const { products } = useProducts()
   const { user: tgUser } = useTelegram()
   const panelRef = useRef<HTMLDivElement>(null)
   const [note, setNote] = useState<Record<ShipOrigin, string>>({ spain: '', italy: '', pharma: '', meetup: '' })
@@ -83,9 +89,13 @@ export default function CartDrawer() {
     setDiscountChecking(null)
   }
 
-  // Minimo meetup: €50 se il carrello meetup è solo vape pen, altrimenti €100
+  // Minimo meetup: nessuno se ci sono solo prodotti "senza minimo", €50 se solo vape pen, altrimenti €100
   function meetupMin(): number {
     const its = itemsByOrigin('meetup')
+    const noMin = (id: string, name: string) =>
+      NO_MIN_NAMES.some(n => name.toLowerCase().includes(n)) ||
+      !!products.find(p => p.id === id)?.tags?.some(t => t.toLowerCase() === NO_MIN_TAG)
+    if (its.length && its.every(i => noMin(i.id, i.productName))) return 0
     return its.length && its.every(i => isVape(i.productName)) ? MEETUP_MIN_VAPE : MEETUP_MIN
   }
 
@@ -448,7 +458,7 @@ export default function CartDrawer() {
                       <div style={{ marginTop: 5, fontWeight: 700, color: subtotal < mMin ? '#ff8c66' : '#c9f7d4' }}>
                         {subtotal < mMin
                           ? `⚠️ Ordine minimo €${mMin}${mMin === MEETUP_MIN_VAPE ? ' (vape pen)' : ''} · aggiungi ancora €${(mMin - subtotal).toFixed(2)}`
-                          : `✓ Ordine minimo €${mMin} raggiunto`}
+                          : mMin === 0 ? '✓ Nessun ordine minimo per questo prodotto' : `✓ Ordine minimo €${mMin} raggiunto`}
                       </div>
                     </div>
                   )}
