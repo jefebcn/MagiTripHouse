@@ -167,8 +167,34 @@ export default function HubView() {
       {/* ═══════════ BENVENUTO (nuovo utente) / ORDINE IN CORSO ═══════════ */}
       <HomeOrderCard />
 
-      {/* ═══════════ SPEDIZIONE: da dove arriva ═══════════ */}
-      <SectionHead title="Scegli da dove spedire" />
+      {/* ═══════════ 1) RITIRO DI PERSONA (separato dalle spedizioni) ═══════════ */}
+      {countByOrigin('meetup') > 0 && (
+        <>
+          <SectionHead title="🤝 Ritiro di persona" sub="Prodotti solo a mano al meetup · nessuna spedizione" />
+          <div style={{ padding: '0 16px' }}>
+            <button
+              onClick={() => goToCatalog({ ship: 'meetup' })}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                background: 'linear-gradient(135deg, rgba(192,132,252,.16) 0%, var(--card) 65%)',
+                border: '1.5px solid rgba(192,132,252,.4)', borderRadius: 18, padding: '14px 14px', color: 'var(--text)',
+              }}
+            >
+              <span style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', background: 'rgba(192,132,252,.15)' }}>🤝</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.02rem', color: '#d8b4fe' }}>Disponibili al meetup</div>
+                <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>Luogo e orario si concordano in chat dopo l’ordine</div>
+              </div>
+              <span style={{ flexShrink: 0, fontSize: '.72rem', fontWeight: 800, color: '#d8b4fe', background: 'rgba(192,132,252,.14)', border: '1px solid rgba(192,132,252,.35)', borderRadius: 999, padding: '5px 10px' }}>
+                {countByOrigin('meetup')} prodott{countByOrigin('meetup') === 1 ? 'o' : 'i'} ›
+              </span>
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ═══════════ 2) SPEDIZIONE: Spagna / Italia ═══════════ */}
+      <SectionHead title="📦 Spedizione a casa o in locker" sub="Scegli da dove parte il tuo pacco · tracking incluso" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px' }}>
         {(['spain', 'italy'] as ShipOrigin[]).map((o) => {
           const sm = SHIP_META[o]
@@ -184,42 +210,17 @@ export default function HubView() {
                 display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--text)',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '1.9rem', lineHeight: 1 }}>{sm.flag}</span>
-                <span style={{ fontSize: '.64rem', fontWeight: 800, color: sm.color, background: `${sm.color}18`, borderRadius: 999, padding: '3px 8px' }}>
-                  {isLoading ? '…' : n}
-                </span>
-              </div>
+              <span style={{ fontSize: '1.9rem', lineHeight: 1 }}>{sm.flag}</span>
               <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.12rem', color: sm.color, marginTop: 4 }}>{sm.label}</div>
               <div style={{ fontSize: '.64rem', color: 'var(--muted)', lineHeight: 1.35 }}>{SHIP_DESC[o]}</div>
               <div style={{ fontSize: '.66rem', color: 'rgba(237,250,238,.75)', marginTop: 4 }}>🚚 {sm.delivery}</div>
+              <span style={{ alignSelf: 'flex-start', marginTop: 6, fontSize: '.68rem', fontWeight: 800, color: sm.color, background: `${sm.color}18`, border: `1px solid ${sm.color}40`, borderRadius: 999, padding: '4px 10px' }}>
+                {isLoading ? '…' : `${n} prodott${n === 1 ? 'o' : 'i'}`} ›
+              </span>
             </button>
           )
         })}
       </div>
-
-      {/* Meetup: solo se ci sono prodotti da ritirare di persona */}
-      {countByOrigin('meetup') > 0 && (
-        <div style={{ padding: '10px 16px 0' }}>
-          <button
-            onClick={() => goToCatalog({ ship: 'meetup' })}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-              background: 'linear-gradient(135deg, rgba(192,132,252,.12) 0%, var(--card) 60%)',
-              border: '1px solid rgba(192,132,252,.3)', borderRadius: 16, padding: '12px 14px', color: 'var(--text)',
-            }}
-          >
-            <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🤝</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '.95rem', color: '#d8b4fe' }}>Ritiro di persona</div>
-              <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 1 }}>
-                {countByOrigin('meetup')} prodott{countByOrigin('meetup') === 1 ? 'o' : 'i'} disponibili solo al meetup
-              </div>
-            </div>
-            <span style={{ fontSize: '.9rem', color: 'rgba(192,132,252,.7)', fontWeight: 700 }}>›</span>
-          </button>
-        </div>
-      )}
 
       {/* ═══════════ NUOVI ARRIVI ═══════════ */}
       <NewArrivals />
@@ -299,10 +300,13 @@ export default function HubView() {
 }
 
 // Titolo di sezione unico per tutta la home
-function SectionHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+function SectionHead({ title, sub, action, onAction }: { title: string; sub?: string; action?: string; onAction?: () => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', margin: '26px 0 10px' }}>
-      <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.08rem', color: 'var(--text)', letterSpacing: '.2px' }}>{title}</span>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '0 16px', margin: '28px 0 10px' }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.08rem', color: 'var(--text)', letterSpacing: '.2px' }}>{title}</div>
+        {sub && <div style={{ fontSize: '.7rem', color: 'var(--muted)', marginTop: 2 }}>{sub}</div>}
+      </div>
       {action && (
         <button onClick={onAction} style={{
           background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
