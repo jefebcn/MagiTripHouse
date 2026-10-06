@@ -8,6 +8,7 @@ interface Win { revenue: number; orders: number; avg: number; cost: number; ship
 interface Stats {
   daily: { date: string; revenue: number; profit: number; orders: number }[]
   missingCost: { name: string; revenue: number }[]
+  monthly: ({ month: string } & Win)[]
   periods: Record<PeriodKey, { cur: Win; prev: Win | null }>
   todo: { awaitingPayment: number; toShip: number; stalePending: number; partnerClaims: number; payouts: number }
   orders: { total: number; pending: number; paid: number; shipped: number; delivered: number; cancelled: number }
@@ -257,6 +258,8 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
+      <MonthlyCard months={stats.monthly} />
+
       <Card title="Ultimi ordini" icon="🧾" more={<Link className="more" href="/admin/orders">Tutti ›</Link>}>
         {stats.recentOrders.length === 0 ? <Empty>Nessun ordine</Empty> : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -333,5 +336,49 @@ export default function AdminDashboard() {
         </div>
       </details>
     </div>
+  )
+}
+
+// Riepilogo mese per mese dal primo ordine (mese in corso in cima)
+function MonthlyCard({ months }: { months: ({ month: string } & Win)[] }) {
+  const [showAll, setShowAll] = useState(false)
+  if (!months?.length) return null
+  const max = Math.max(1, ...months.map(m => Math.abs(m.net)))
+  const list = showAll ? months : months.slice(0, 6)
+  const tot = months.reduce((a, m) => ({ revenue: a.revenue + m.revenue, net: a.net + m.net, orders: a.orders + m.orders }), { revenue: 0, net: 0, orders: 0 })
+  const label = (key: string) => {
+    const [y, m] = key.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString('it-IT', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  }
+  return (
+    <Card title="Mese per mese" icon="🗓️" more={<span className="more" style={{ color: 'var(--a-dim)' }}>{months.length} mesi</span>}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {list.map((m, i) => (
+          <div key={m.month} style={{ padding: '10px 0', borderTop: i ? '1px solid var(--a-line)' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <strong style={{ fontSize: '.86rem', textTransform: 'capitalize' }}>{label(m.month)}</strong>
+              {i === 0 && <span style={{ fontSize: '.62rem', fontWeight: 800, color: 'var(--a-gold)' }}>IN CORSO</span>}
+              <span style={{ marginLeft: 'auto', fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', color: m.net >= 0 ? 'var(--a-green)' : 'var(--a-red)' }}>{eur(m.net)}</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 3, background: 'var(--a-surface-2)', overflow: 'hidden', margin: '6px 0 5px' }}>
+              <div style={{ width: `${(Math.abs(m.net) / max) * 100}%`, height: '100%', borderRadius: 3, background: m.net >= 0 ? 'linear-gradient(90deg, #2fb344, var(--a-green))' : 'var(--a-red)' }} />
+            </div>
+            <div style={{ fontSize: '.66rem', color: 'var(--a-dim)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <span>incassato <strong style={{ color: 'var(--a-text)' }}>{eur(m.revenue)}</strong></span>
+              <span>costi <strong style={{ color: 'var(--a-orange)' }}>−{eur(m.cost + m.shipCost + m.rent)}</strong></span>
+              <span>margine <strong style={{ color: 'var(--a-gold)' }}>{m.margin != null ? `${m.margin.toFixed(0)}%` : '—'}</strong></span>
+              <span>{m.orders} ordini</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      {months.length > 6 && (
+        <button className="adm-btn sm" style={{ marginTop: 6 }} onClick={() => setShowAll(v => !v)}>{showAll ? 'Mostra meno' : `Mostra tutti i ${months.length} mesi`}</button>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, borderTop: '1px solid var(--a-line-2)', marginTop: 10, paddingTop: 10, fontSize: '.8rem' }}>
+        <span style={{ color: 'var(--a-dim)' }}>Dall’inizio · {tot.orders} ordini · incassato {eur(tot.revenue)}</span>
+        <strong style={{ color: tot.net >= 0 ? 'var(--a-green)' : 'var(--a-red)' }}>utile {eur(tot.net)}</strong>
+      </div>
+    </Card>
   )
 }

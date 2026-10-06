@@ -304,8 +304,32 @@ export async function GET() {
     payouts: payouts.filter(p => p.status === 'pending').length,
   }
 
+  // ── Mese per mese (mesi italiani) dal primo ordine a oggi ──
+  const romeMonthStart = (y: number, m: number) => {
+    // Mezzanotte del giorno 1 a Roma: offset reale di quel giorno (ora solare/legale)
+    const probe = new Date(Date.UTC(y, m, 1, 12))
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Rome', hour12: false, hour: '2-digit' }).formatToParts(probe)
+    const romeHour = +(parts.find(x => x.type === 'hour')?.value ?? 12) % 24
+    return new Date(Date.UTC(y, m, 1) - (romeHour - 12) * 3_600_000)
+  }
+  const monthly: Array<{ month: string } & ReturnType<typeof windowStats>> = []
+  const firstAt = orderEcon.reduce<Date | null>((min, o) => (!min || o.at < min ? o.at : min), null)
+  if (firstAt) {
+    const nowRome = new Date(now.getTime() + romeOffsetMin * 60000)
+    let y = new Date(firstAt.getTime() + romeOffsetMin * 60000).getUTCFullYear()
+    let m = new Date(firstAt.getTime() + romeOffsetMin * 60000).getUTCMonth()
+    while (y < nowRome.getUTCFullYear() || (y === nowRome.getUTCFullYear() && m <= nowRome.getUTCMonth())) {
+      const from = romeMonthStart(y, m)
+      const ny = m === 11 ? y + 1 : y, nm = (m + 1) % 12
+      const to = new Date(Math.min(romeMonthStart(ny, nm).getTime(), end.getTime()))
+      monthly.push({ month: `${y}-${String(m + 1).padStart(2, '0')}`, ...windowStats(from, to) })
+      y = ny; m = nm
+    }
+  }
+
   return NextResponse.json({
     daily,
+    monthly: monthly.reverse(),
     periods,
     todo,
     revenue: {
