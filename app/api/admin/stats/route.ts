@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { parseGrams } from '@/lib/units'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,9 +98,6 @@ export async function GET() {
       .filter(o => !from || new Date(o.createdAt) >= from)
       .reduce((sum, o) => sum + o.total, 0)
 
-  function parseGrams(label: string): number {
-    return parseFloat(label.replace(/[^0-9.]/g, '')) || 0
-  }
   const round2 = (n: number) => Math.round(n * 100) / 100
 
   // Per-product aggregation: grams, revenue, qty, orders count, cost, profit

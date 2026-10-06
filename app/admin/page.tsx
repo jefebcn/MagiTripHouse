@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { PageHeader, Card, Segmented, Pill, Empty, ORDER_STATUS, eur } from '@/components/admin/ui'
+import { PageHeader, Card, Segmented, Empty, ORDER_STATUS, eur } from '@/components/admin/ui'
 
 type PeriodKey = 'today' | 'week' | 'month' | 'total'
 interface Win { revenue: number; orders: number; avg: number; cost: number; shipCost: number; discounts: number; rent: number; grossProfit: number; net: number; margin: number | null; unknownRevenue: number }
@@ -24,7 +24,6 @@ const PERIODS: { value: PeriodKey; label: string; vs: string }[] = [
   { value: 'month', label: '30 giorni', vs: '30 giorni prima' },
   { value: 'total', label: 'Sempre',   vs: '' },
 ]
-const gramsFor: Record<PeriodKey, keyof Stats['grams']> = { today: 'today', week: 'week', month: 'month', total: 'total' }
 const fmtG = (n: number) => n >= 1000 ? `${(n / 1000).toLocaleString('it-IT', { maximumFractionDigits: 2 })} kg` : `${Math.round(n)} g`
 
 function Delta({ cur, prev }: { cur: number; prev: number }) {
@@ -132,15 +131,17 @@ export default function AdminDashboard() {
   const p = stats.periods[period]
   const pm = PERIODS.find(x => x.value === period)!
   const todo = [
-    { n: stats.todo.toShip, icon: '📦', label: 'Da spedire', hint: 'pagati, in attesa di spedizione', href: '/admin/orders?tab=paid', color: 'var(--a-gold)' },
-    { n: stats.todo.awaitingPayment, icon: '💳', label: 'Da incassare', hint: 'ordini recenti non ancora pagati', href: '/admin/orders?tab=pending', color: 'var(--a-orange)' },
-    { n: stats.todo.partnerClaims, icon: '🏆', label: 'Premi da verificare', hint: 'ordini KratosLabs dichiarati', href: '/admin/partner', color: 'var(--a-violet)' },
-    { n: stats.todo.payouts, icon: '💸', label: 'Prelievi affiliati', hint: 'richieste di pagamento', href: '/admin/affiliates', color: 'var(--a-blue)' },
-    { n: stats.todo.stalePending, icon: '🗂️', label: 'Ordini vecchi in attesa', hint: 'più di 21 giorni: archiviali', href: '/admin/orders?tab=stale', color: 'var(--a-dim)' },
+    { n: stats.todo.toShip, icon: '📦', label: 'da spedire', href: '/admin/orders?tab=paid', color: 'var(--a-gold)' },
+    { n: stats.todo.awaitingPayment, icon: '💳', label: 'da incassare', href: '/admin/orders?tab=pending', color: 'var(--a-orange)' },
+    { n: stats.todo.partnerClaims, icon: '🏆', label: 'premi da verificare', href: '/admin/partner', color: 'var(--a-violet)' },
+    { n: stats.todo.payouts, icon: '💸', label: 'prelievi affiliati', href: '/admin/affiliates', color: 'var(--a-blue)' },
+    { n: stats.todo.stalePending, icon: '🗂️', label: 'vecchi in attesa', href: '/admin/orders?tab=stale', color: 'var(--a-dim)' },
   ].filter(t => t.n > 0)
 
-  const topProducts = [...stats.productStats].sort((a, b) => b.revenue - a.revenue).slice(0, 5)
-  const topMax = Math.max(1, ...topProducts.map(t => t.revenue))
+  // Cosa ti fa guadagnare: prodotti ordinati per utile (sempre)
+  const earners = stats.productStats.filter(t => t.costKnown && t.profit > 0).sort((a, b) => b.profit - a.profit).slice(0, 5)
+  const earnMax = Math.max(1, ...earners.map(t => t.profit))
+  const costs = p.cur.cost + p.cur.shipCost + p.cur.rent
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -148,174 +149,159 @@ export default function AdminDashboard() {
         title={`${hello} 👋`}
         subtitle={<span style={{ textTransform: 'capitalize' }}>{today}</span>}
         actions={<>
-          <button className="adm-btn" onClick={load}>↻ Aggiorna</button>
-          <Link className="adm-btn primary" href="/admin/orders?new=1">＋ Ordine manuale</Link>
+          <button className="adm-btn" onClick={load} aria-label="Aggiorna">↻</button>
+          <Link className="adm-btn primary" href="/admin/orders?new=1">＋ Ordine</Link>
         </>}
       />
 
-      {/* ── Da fare ── */}
-      <Card title="Da fare" icon="✅">
-        {todo.length === 0 ? (
-          <div style={{ fontSize: '.84rem', color: 'var(--a-dim)' }}>🎉 Tutto in ordine: niente in sospeso.</div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
-            {todo.map(t => (
-              <Link key={t.label} href={t.href} style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '12px', borderRadius: 13, textDecoration: 'none', color: 'var(--a-text)',
-                background: 'var(--a-surface-2)', border: '1px solid var(--a-line)',
-              }}>
-                <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.45rem', color: t.color, minWidth: 34, textAlign: 'center' }}>{t.n}</span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontWeight: 800, fontSize: '.84rem' }}>{t.icon} {t.label}</span>
-                  <span style={{ display: 'block', fontSize: '.66rem', color: 'var(--a-dim)', marginTop: 1 }}>{t.hint}</span>
-                </span>
-                <span style={{ marginLeft: 'auto', color: 'var(--a-faint)' }}>›</span>
-              </Link>
+      {/* ── Da fare: una riga di pillole, solo se c'è qualcosa ── */}
+      {todo.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {todo.map(t => (
+            <Link key={t.label} href={t.href} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 12px', borderRadius: 999, textDecoration: 'none',
+              background: 'var(--a-surface)', border: '1px solid var(--a-line-2)', color: 'var(--a-text)', fontSize: '.8rem', fontWeight: 700,
+            }}>
+              <span>{t.icon}</span>
+              <span style={{ fontFamily: "'Fredoka One', cursive", color: t.color, fontSize: '.95rem' }}>{t.n}</span>
+              <span style={{ color: 'var(--a-dim)' }}>{t.label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* ── Risultato del periodo: un solo numero principale ── */}
+      <div className="adm-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '12px 14px 0' }}>
+          <Segmented value={period} onChange={setPeriod} options={PERIODS.map(x => ({ value: x.value, label: x.label }))} />
+        </div>
+        <div style={{ padding: '16px 16px 14px' }}>
+          <div style={{ fontSize: '.72rem', fontWeight: 800, color: 'var(--a-dim)', textTransform: 'uppercase', letterSpacing: '.6px' }}>Utile netto</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+            <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '2.4rem', lineHeight: 1.05, color: p.cur.net >= 0 ? 'var(--a-green)' : 'var(--a-red)' }}>{eur(p.cur.net)}</span>
+            {p.prev && <Delta cur={p.cur.net} prev={p.prev.net} />}
+            {pm.vs && p.prev && <span style={{ fontSize: '.66rem', color: 'var(--a-faint)' }}>vs {pm.vs}</span>}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 14 }}>
+            {[
+              { l: 'Incassato', v: eur(p.cur.revenue, true), c: 'var(--a-text)', s: `${p.cur.orders} ordini` },
+              { l: 'Costi', v: `−${eur(costs, true)}`, c: 'var(--a-orange)', s: 'merce, spedizioni, affitto' },
+              { l: 'Margine', v: p.cur.margin != null ? `${p.cur.margin.toFixed(0)}%` : '—', c: 'var(--a-gold)', s: 'su ogni € incassato' },
+            ].map(k => (
+              <div key={k.l} style={{ background: 'var(--a-surface-2)', borderRadius: 12, padding: '10px 10px 9px' }}>
+                <div style={{ fontSize: '.64rem', color: 'var(--a-dim)', fontWeight: 700 }}>{k.l}</div>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.15rem', color: k.c, marginTop: 2 }}>{k.v}</div>
+                <div style={{ fontSize: '.58rem', color: 'var(--a-faint)', marginTop: 1 }}>{k.s}</div>
+              </div>
             ))}
+          </div>
+        </div>
+        {/* Conto dettagliato, chiuso di default */}
+        <details className="adm-details" style={{ borderTop: '1px solid var(--a-line)', padding: '11px 16px' }}>
+          <summary style={{ fontSize: '.8rem', color: 'var(--a-dim)' }}>Come si arriva all’utile</summary>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: '.82rem' }}>
+            {[
+              { l: 'Incassato', v: eur(p.cur.revenue), c: 'var(--a-text)', note: p.cur.discounts > 0 ? `già al netto di ${eur(p.cur.discounts)} di sconti` : '' },
+              { l: '− Costo d’acquisto merce', v: `−${eur(p.cur.cost)}`, c: 'var(--a-orange)', note: '' },
+              { l: '− Spedizioni pagate al corriere', v: `−${eur(p.cur.shipCost)}`, c: 'var(--a-orange)', note: p.cur.shipCost ? '€20 a pacco (i €10 del cliente sono nell’incasso)' : '' },
+              { l: '− Affitto magazzino', v: `−${eur(p.cur.rent)}`, c: 'var(--a-orange)', note: 'rate pagate nel periodo' },
+            ].map(r => (
+              <div key={r.l}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--a-dim)' }}><span>{r.l}</span><strong style={{ color: r.c }}>{r.v}</strong></div>
+                {r.note && <div style={{ fontSize: '.62rem', color: 'var(--a-faint)' }}>{r.note}</div>}
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--a-line)', paddingTop: 8 }}>
+              <strong>= Utile netto</strong><strong style={{ color: p.cur.net >= 0 ? 'var(--a-green)' : 'var(--a-red)' }}>{eur(p.cur.net)}</strong>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {p.cur.unknownRevenue > 0 && (
+        <div style={{ fontSize: '.74rem', lineHeight: 1.5, color: '#ffb199', background: 'rgba(255,100,100,.07)', border: '1px solid rgba(255,100,100,.3)', borderRadius: 12, padding: '10px 12px' }}>
+          ⚠️ {eur(p.cur.unknownRevenue)} di vendite senza costo d’acquisto (utile sovrastimato): {stats.missingCost.slice(0, 4).map(m => m.name).join(', ')}.{' '}
+          <Link href="/admin/products" style={{ color: '#ffb199', fontWeight: 800 }}>Imposta i costi ›</Link>
+        </div>
+      )}
+
+      <div className="adm-grid two">
+        <Card title="Ultimi 14 giorni" icon="📈">
+          <RevenueChart data={stats.daily} />
+          <div style={{ display: 'flex', gap: 14, fontSize: '.66rem', color: 'var(--a-dim)', marginTop: 8 }}>
+            <span><span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 3, background: 'rgba(233,245,234,.3)', marginRight: 5 }} />Incasso</span>
+            <span><span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 3, background: 'var(--a-green)', marginRight: 5 }} />Utile</span>
+          </div>
+        </Card>
+
+        <Card title="Cosa ti fa guadagnare" icon="💰">
+          {earners.length === 0 ? <Empty>Ancora nessun dato</Empty> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+              {earners.map(t => (
+                <div key={t.name}>
+                  <div style={{ display: 'flex', gap: 8, fontSize: '.8rem', marginBottom: 5 }}>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{t.name}</span>
+                    <strong style={{ color: 'var(--a-green)' }}>{eur(t.profit, true)}</strong>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 3, background: 'var(--a-surface-2)', overflow: 'hidden' }}>
+                    <div style={{ width: `${(t.profit / earnMax) * 100}%`, height: '100%', borderRadius: 3, background: 'linear-gradient(90deg, #2fb344, var(--a-green))' }} />
+                  </div>
+                  <div style={{ fontSize: '.62rem', color: 'var(--a-faint)', marginTop: 3 }}>
+                    incassato {eur(t.revenue, true)} · margine {t.margin != null ? `${t.margin.toFixed(0)}%` : '—'} · {t.grams > 0 ? fmtG(t.grams) : `${t.qty} pz`}
+                  </div>
+                </div>
+              ))}
+              <div style={{ fontSize: '.62rem', color: 'var(--a-faint)' }}>Utile sui prodotti di sempre, prima di spedizioni e affitto.</div>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <Card title="Ultimi ordini" icon="🧾" more={<Link className="more" href="/admin/orders">Tutti ›</Link>}>
+        {stats.recentOrders.length === 0 ? <Empty>Nessun ordine</Empty> : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {stats.recentOrders.slice(0, 4).map((o, i) => {
+              const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.pending
+              return (
+                <Link key={o.id} href={`/admin/orders?q=${encodeURIComponent(o.id)}`} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 2px', textDecoration: 'none', color: 'var(--a-text)',
+                  borderTop: i ? '1px solid var(--a-line)' : 'none',
+                }}>
+                  <span style={{ fontSize: '1.05rem' }}>{st.icon}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '.82rem' }}>
+                    <strong>@{o.userId}</strong>
+                    <span style={{ color: 'var(--a-dim)', fontSize: '.7rem' }}> · {new Date(o.createdAt).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · </span>
+                    <span style={{ color: st.color, fontSize: '.7rem' }}>{st.short}</span>
+                  </span>
+                  <strong style={{ fontSize: '.86rem' }}>{eur(o.total)}</strong>
+                </Link>
+              )
+            })}
           </div>
         )}
       </Card>
 
-      {/* ── Numeri del periodo ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
-        <Segmented value={period} onChange={setPeriod} options={PERIODS.map(x => ({ value: x.value, label: x.label }))} />
-        {pm.vs && <span style={{ fontSize: '.7rem', color: 'var(--a-faint)' }}>confronto con {pm.vs}</span>}
-      </div>
-      <div className="adm-grid k4">
-        {[
-          { label: 'Incassato (lordo)', value: eur(p.cur.revenue, true), cur: p.cur.revenue, prev: p.prev?.revenue, color: 'var(--a-text)', hint: `${p.cur.orders} ordini` },
-          { label: 'Costo merce', value: `−${eur(p.cur.cost, true)}`, cur: 0, prev: undefined, color: 'var(--a-orange)', hint: 'prezzo d’acquisto dei prodotti' },
-          { label: 'Utile netto', value: eur(p.cur.net, true), cur: p.cur.net, prev: p.prev?.net, color: p.cur.net >= 0 ? 'var(--a-green)' : 'var(--a-red)', hint: 'quello che ti resta' },
-          { label: 'Margine', value: p.cur.margin != null ? `${p.cur.margin.toFixed(0)}%` : '—', cur: 0, prev: undefined, color: 'var(--a-gold)', hint: 'utile su ogni € incassato' },
-        ].map(k => (
-          <div key={k.label} className="adm-card" style={{ padding: '14px 14px 12px' }}>
-            <div style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--a-dim)', textTransform: 'uppercase', letterSpacing: '.5px' }}>{k.label}</div>
-            <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', color: k.color, marginTop: 4, lineHeight: 1.1 }}>{k.value}</div>
-            <div style={{ minHeight: 16, marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              {k.prev != null && <Delta cur={k.cur} prev={k.prev} />}
-              <span style={{ fontSize: '.64rem', color: 'var(--a-faint)' }}>{k.hint}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="adm-grid two">
-        {/* ── Andamento ── */}
-        <Card title="Ultimi 14 giorni" icon="📈">
-          <RevenueChart data={stats.daily} />
-          <div style={{ display: 'flex', gap: 14, fontSize: '.68rem', color: 'var(--a-dim)', marginTop: 8 }}>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: 'rgba(233,245,234,.3)', marginRight: 5, verticalAlign: -1 }} />Incasso</span>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: 'var(--a-green)', marginRight: 5, verticalAlign: -1 }} />Utile (dopo costo merce e spedizioni)</span>
-          </div>
-        </Card>
-
-        {/* ── Conto economico del periodo scelto ── */}
-        <Card title={`Da dove viene l’utile · ${pm.label.toLowerCase()}`} icon="💰">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '.84rem' }}>
-            {[
-              { l: `Incassato (${p.cur.orders} ordini)`, v: eur(p.cur.revenue), c: 'var(--a-text)', note: p.cur.discounts > 0 ? `già al netto di ${eur(p.cur.discounts)} di sconti e crediti` : '' },
-              { l: '📦 Costo d’acquisto merce', v: `−${eur(p.cur.cost)}`, c: 'var(--a-orange)', note: '' },
-              { l: '🚚 Spedizioni pagate al corriere', v: `−${eur(p.cur.shipCost)}`, c: 'var(--a-orange)', note: p.cur.shipCost ? `€20 a pacco; i €10 pagati dal cliente sono nell’incasso` : '' },
-              { l: '🏭 Affitto magazzino', v: `−${eur(p.cur.rent)}`, c: 'var(--a-orange)', note: 'rate pagate nel periodo' },
-            ].map(r => (
-              <div key={r.l}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--a-dim)' }}>
-                  <span>{r.l}</span><strong style={{ color: r.c, whiteSpace: 'nowrap' }}>{r.v}</strong>
-                </div>
-                {r.note && <div style={{ fontSize: '.64rem', color: 'var(--a-faint)', marginTop: 1 }}>{r.note}</div>}
-              </div>
-            ))}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid var(--a-line)', paddingTop: 10, marginTop: 2 }}>
-              <strong>= Utile netto</strong>
-              <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', color: p.cur.net >= 0 ? 'var(--a-green)' : 'var(--a-red)' }}>{eur(p.cur.net)}</span>
-            </div>
-            {p.cur.unknownRevenue > 0 ? (
-              <div style={{ fontSize: '.72rem', lineHeight: 1.5, color: '#ffb199', background: 'rgba(255,100,100,.07)', border: '1px solid rgba(255,100,100,.3)', borderRadius: 10, padding: '9px 11px' }}>
-                ⚠️ <strong>{eur(p.cur.unknownRevenue)}</strong> di vendite sono di prodotti <strong>senza costo d’acquisto</strong>: per quelli l’intero incasso risulta guadagno, quindi l’utile è più alto del reale.
-                {stats.missingCost.length > 0 && <> Imposta il costo in <Link href="/admin/products" style={{ color: '#ffb199', fontWeight: 800 }}>Prodotti</Link>: {stats.missingCost.slice(0, 5).map(m => m.name).join(', ')}{stats.missingCost.length > 5 ? ` e altri ${stats.missingCost.length - 5}` : ''}.</>}
-              </div>
-            ) : (
-              <div style={{ fontSize: '.68rem', color: 'var(--a-faint)' }}>✓ Tutti i prodotti venduti nel periodo hanno un costo d’acquisto.</div>
-            )}
-            <div style={{ fontSize: '.64rem', color: 'var(--a-faint)', lineHeight: 1.5 }}>
-              Se il costo di un formato non è impostato si usa quello automatico: Cali €4,2/g · Dry €3,4/g · Frozen €5,5/g · Vapepen €18/pz. Gli ordini annullati non contano.
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="adm-grid two">
-        {/* ── Ultimi ordini ── */}
-        <Card title="Ultimi ordini" icon="🧾" more={<Link className="more" href="/admin/orders">Tutti ›</Link>}>
-          {stats.recentOrders.length === 0 ? <Empty>Nessun ordine</Empty> : (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {stats.recentOrders.map((o, i) => {
-                const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.pending
-                return (
-                  <Link key={o.id} href={`/admin/orders?q=${encodeURIComponent(o.id)}`} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 2px', textDecoration: 'none', color: 'var(--a-text)',
-                    borderTop: i ? '1px solid var(--a-line)' : 'none',
-                  }}>
-                    <span style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--a-surface-2)' }}>{st.icon}</span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontWeight: 700, fontSize: '.84rem' }}>@{o.userId}</span>
-                      <span style={{ display: 'block', fontSize: '.68rem', color: 'var(--a-dim)' }}>
-                        {new Date(o.createdAt).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · <span style={{ color: st.color }}>{st.short}</span>
-                      </span>
-                    </span>
-                    <strong style={{ fontSize: '.9rem' }}>{eur(o.total)}</strong>
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* ── Prodotti top ── */}
-        <Card title="Prodotti più venduti" icon="🏅">
-          {topProducts.length === 0 ? <Empty>Ancora nessuna vendita</Empty> : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-              {topProducts.map((t, i) => (
-                <div key={t.name}>
-                  <div style={{ display: 'flex', gap: 8, fontSize: '.8rem', marginBottom: 5 }}>
-                    <span style={{ color: 'var(--a-faint)', fontWeight: 800 }}>{i + 1}</span>
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{t.name}</span>
-                    <strong>{eur(t.revenue, true)}</strong>
-                  </div>
-                  <div style={{ height: 6, borderRadius: 3, background: 'var(--a-surface-2)', overflow: 'hidden' }}>
-                    <div style={{ width: `${(t.revenue / topMax) * 100}%`, height: '100%', borderRadius: 3, background: 'linear-gradient(90deg, #2fb344, var(--a-green))' }} />
-                  </div>
-                  <div style={{ fontSize: '.64rem', color: 'var(--a-faint)', marginTop: 3 }}>
-                    {t.grams > 0 ? fmtG(t.grams) : `${t.qty} pz`} · {t.ordersCount} ordini{t.margin != null ? ` · margine ${t.margin.toFixed(0)}%` : ''}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* ── Dettagli e strumenti (chiusi di default) ── */}
+      {/* ── Approfondimenti e strumenti (chiusi) ── */}
       <details className="adm-card adm-details">
-        <summary>📦 Dettaglio vendite per prodotto <span style={{ fontSize: '.7rem', color: 'var(--a-faint)', fontWeight: 600 }}>({stats.productStats.length})</span></summary>
+        <summary>📦 Tabella vendite per prodotto</summary>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.78rem', minWidth: 560 }}>
             <thead>
-              <tr style={{ color: 'var(--a-faint)', textAlign: 'right' }}>
-                {['Prodotto', 'Venduto', 'Ordini', 'Fatturato', '€/g', 'Profitto', 'Margine'].map((h, i) => (
+              <tr style={{ color: 'var(--a-faint)' }}>
+                {['Prodotto', 'Venduto', 'Ordini', 'Incassato', 'Costo', 'Utile', 'Margine'].map((h, i) => (
                   <th key={h} style={{ padding: '6px 8px', fontWeight: 700, textAlign: i ? 'right' : 'left', borderBottom: '1px solid var(--a-line)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {[...stats.productStats].sort((a, b) => b.revenue - a.revenue).map(t => (
+              {[...stats.productStats].sort((a, b) => b.profit - a.profit).map(t => (
                 <tr key={t.name} style={{ textAlign: 'right' }}>
-                  <td style={{ padding: '7px 8px', textAlign: 'left', borderBottom: '1px solid var(--a-line)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</td>
+                  <td style={{ padding: '7px 8px', textAlign: 'left', borderBottom: '1px solid var(--a-line)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</td>
                   <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)' }}>{t.grams > 0 ? fmtG(t.grams) : `${t.qty} pz`}</td>
                   <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)' }}>{t.ordersCount}</td>
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)', color: 'var(--a-green)', fontWeight: 700 }}>{eur(t.revenue)}</td>
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)' }}>{t.avgPricePerGram ? eur(t.avgPricePerGram) : '—'}</td>
-                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)' }}>{t.costKnown ? eur(t.profit) : '—'}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)' }}>{eur(t.revenue)}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)', color: 'var(--a-orange)' }}>{t.costKnown ? eur(t.cost) : '—'}</td>
+                  <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)', color: 'var(--a-green)', fontWeight: 700 }}>{t.costKnown ? eur(t.profit) : '—'}</td>
                   <td style={{ padding: '7px 8px', borderBottom: '1px solid var(--a-line)', color: 'var(--a-gold)' }}>{t.margin != null ? `${t.margin.toFixed(0)}%` : '—'}</td>
                 </tr>
               ))}
@@ -346,10 +332,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       </details>
-
-      <div style={{ fontSize: '.68rem', color: 'var(--a-faint)', textAlign: 'center' }}>
-        {stats.orders.total} ordini · {stats.users.total} clienti ({stats.users.week} nuovi in 7 giorni){stats.orders.cancelled ? ` · ${stats.orders.cancelled} annullati` : ''}
-      </div>
     </div>
   )
 }

@@ -6,14 +6,12 @@ import { useCartStore, SHIP_META, type ShipOrigin } from '@/store/cartStore'
 import { useSwipeToClose } from '@/hooks/useSwipeToClose'
 import type { Variant } from '@/hooks/useProducts'
 import { track } from '@vercel/analytics'
+import { parseGrams } from '@/lib/units'
 
 function haptic(ms = 50) {
   try { if (navigator.vibrate) navigator.vibrate(ms) } catch { /* noop */ }
 }
 
-function parseGrams(label: string): number {
-  return parseFloat(label.replace(/[^0-9.]/g, '')) || 0
-}
 
 // Returns the highest tier whose gram threshold is ≤ requested grams
 function getActiveTier(grams: number, variants: Variant[]): Variant | null {
