@@ -203,7 +203,7 @@ export default function AdminDashboard() {
             {[
               { l: 'Incassato', v: eur(p.cur.revenue), c: 'var(--a-text)', note: p.cur.discounts > 0 ? `già al netto di ${eur(p.cur.discounts)} di sconti` : '' },
               { l: '− Costo d’acquisto merce', v: `−${eur(p.cur.cost)}`, c: 'var(--a-orange)', note: '' },
-              { l: '− Spedizioni pagate al corriere', v: `−${eur(p.cur.shipCost)}`, c: 'var(--a-orange)', note: p.cur.shipCost ? '€20 a pacco (i €10 del cliente sono nell’incasso)' : '' },
+              { l: '− Spedizioni', v: `−${eur(p.cur.shipCost)}`, c: 'var(--a-orange)', note: p.cur.shipCost ? 'gestite da te: coperte dai €10 pagati dal cliente (già nell’incasso)' : '' },
               { l: '− Affitto magazzino', v: `−${eur(p.cur.rent)}`, c: 'var(--a-orange)', note: 'quota dei giorni del periodo (rate ripartite giorno per giorno)' },
             ].map(r => (
               <div key={r.l}>

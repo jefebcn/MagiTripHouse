@@ -106,8 +106,9 @@ export async function GET() {
   const productCounts: Record<string, number> = {}
   let gramsTotal = 0, gramsToday = 0, gramsWeek = 0, gramsMonth = 0, gramsYear = 0
   let costTotal = 0, profitTotal = 0, revenueWithKnownCost = 0
-  // Spedizione Spagna/Italia: €10 addebitati al cliente (già nel totale), ~€20 pagati dal negozio
-  const SHIP_FEE_CHARGED = 10, SHIP_COST_PAID = 20
+  // Spedizione Spagna/Italia: €10 addebitati al cliente (già nel totale).
+  // Le spedizioni le gestisce il titolare: quei €10 coprono il costo, nessuna perdita a pacco.
+  const SHIP_FEE_CHARGED = 10, SHIP_COST_PAID = 10
   type OrderEcon = { at: Date; total: number; items: number; cost: number; unknown: number; shipCost: number; discount: number }
   const orderEcon: OrderEcon[] = []
   const missingCost: Record<string, number> = {}
@@ -193,7 +194,7 @@ export async function GET() {
   }
 
   // Perdita netta spedizione: il negozio paga ~€20 e incassa €10 → −€10 per ordine spedito (Spagna/Italia)
-  const SHIP_NET_LOSS = 10
+  const SHIP_NET_LOSS = 0
   const shippingLossOrders = orders.filter(o => {
     const n = o.note ?? ''
     return n.includes('[Spagna]') || n.includes('[Italia]')
