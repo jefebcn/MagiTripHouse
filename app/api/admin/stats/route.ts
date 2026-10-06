@@ -29,7 +29,7 @@ export async function GET() {
     prisma.affiliate.findMany({ orderBy: { joinedAt: 'desc' } }),
     prisma.commissionPayout.findMany({ orderBy: { requestedAt: 'desc' } }),
     prisma.product.findMany({ select: { id: true, name: true, category: true, variants: true } }),
-    prisma.warehousePayment.findMany({ select: { total: true, paidAt: true } }),
+    prisma.warehousePayment.findMany({ select: { total: true, base: true, paidAt: true, periodStart: true, periodEnd: true }, orderBy: { periodEnd: 'asc' } }),
     prisma.partnerClaim.count({ where: { status: 'pending' } }),
   ])
   // Gli ordini annullati non contano in fatturato, grammi e profitto
@@ -247,6 +247,24 @@ export async function GET() {
   })
 
   // ── Periodi a confronto (stessa durata, subito prima) ──
+  // Affitto magazzino ripartito sui giorni coperti da ogni rata (non tutto nel giorno del pagamento).
+  // Dopo l'ultima rata pagata, il periodo in corso è stimato con l'ultima rata piena.
+  const overlapDays = (aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) =>
+    Math.max(0, Math.min(aEnd.getTime(), bEnd.getTime()) - Math.max(aStart.getTime(), bStart.getTime())) / DAY
+  const rentInWindow = (from: Date, to: Date) => {
+    let sum = 0
+    for (const w of warehousePayments) {
+      const days = Math.max(1, (w.periodEnd.getTime() - w.periodStart.getTime()) / DAY)
+      sum += (w.total / days) * overlapDays(w.periodStart, w.periodEnd, from, to)
+    }
+    const last = warehousePayments[warehousePayments.length - 1]
+    if (last && last.periodEnd < now) {
+      const days = Math.max(1, (last.periodEnd.getTime() - last.periodStart.getTime()) / DAY)
+      sum += (last.base / days) * overlapDays(last.periodEnd, now, from, to)
+    }
+    return sum
+  }
+
   // Conto economico di un periodo: incasso − costo merce − spedizioni pagate − affitto = utile netto
   const windowStats = (from: Date, to: Date) => {
     const list = orderEcon.filter(o => o.at >= from && o.at < to)
@@ -254,14 +272,15 @@ export async function GET() {
     const revenue = sum(o => o.total)
     const cost = sum(o => o.cost)
     const shipCost = sum(o => o.shipCost)
-    const rent = warehousePayments.filter(w => w.paidAt >= from && w.paidAt < to).reduce((s, w) => s + w.total, 0)
+    const rent = rentInWindow(from, to)
     const grossProfit = revenue - cost - shipCost
     const net = grossProfit - rent
     return {
       revenue: round2(revenue), orders: list.length, avg: list.length ? round2(revenue / list.length) : 0,
       cost: round2(cost), shipCost: round2(shipCost), discounts: round2(sum(o => o.discount)), rent: round2(rent),
       grossProfit: round2(grossProfit), net: round2(net),
-      margin: revenue > 0 ? round2((grossProfit / revenue) * 100) : null,
+      // Margine netto: quanto resta di ogni € incassato dopo merce, spedizioni e affitto
+      margin: revenue > 0 ? round2((net / revenue) * 100) : null,
       unknownRevenue: round2(sum(o => o.unknown)),
     }
   }

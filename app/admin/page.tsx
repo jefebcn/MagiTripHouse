@@ -186,7 +186,7 @@ export default function AdminDashboard() {
             {[
               { l: 'Incassato', v: eur(p.cur.revenue, true), c: 'var(--a-text)', s: `${p.cur.orders} ordini` },
               { l: 'Costi', v: `−${eur(costs, true)}`, c: 'var(--a-orange)', s: 'merce, spedizioni, affitto' },
-              { l: 'Margine', v: p.cur.margin != null ? `${p.cur.margin.toFixed(0)}%` : '—', c: 'var(--a-gold)', s: 'su ogni € incassato' },
+              { l: 'Margine', v: p.cur.margin != null ? `${p.cur.margin.toFixed(0)}%` : '—', c: 'var(--a-gold)', s: 'netto, dopo tutti i costi' },
             ].map(k => (
               <div key={k.l} style={{ background: 'var(--a-surface-2)', borderRadius: 12, padding: '10px 10px 9px' }}>
                 <div style={{ fontSize: '.64rem', color: 'var(--a-dim)', fontWeight: 700 }}>{k.l}</div>
@@ -204,7 +204,7 @@ export default function AdminDashboard() {
               { l: 'Incassato', v: eur(p.cur.revenue), c: 'var(--a-text)', note: p.cur.discounts > 0 ? `già al netto di ${eur(p.cur.discounts)} di sconti` : '' },
               { l: '− Costo d’acquisto merce', v: `−${eur(p.cur.cost)}`, c: 'var(--a-orange)', note: '' },
               { l: '− Spedizioni pagate al corriere', v: `−${eur(p.cur.shipCost)}`, c: 'var(--a-orange)', note: p.cur.shipCost ? '€20 a pacco (i €10 del cliente sono nell’incasso)' : '' },
-              { l: '− Affitto magazzino', v: `−${eur(p.cur.rent)}`, c: 'var(--a-orange)', note: 'rate pagate nel periodo' },
+              { l: '− Affitto magazzino', v: `−${eur(p.cur.rent)}`, c: 'var(--a-orange)', note: 'quota dei giorni del periodo (rate ripartite giorno per giorno)' },
             ].map(r => (
               <div key={r.l}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--a-dim)' }}><span>{r.l}</span><strong style={{ color: r.c }}>{r.v}</strong></div>
