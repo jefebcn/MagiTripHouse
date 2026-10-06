@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { PageHeader, Card, Segmented, Pill, Empty, ORDER_STATUS, eur } from '@/components/admin/ui'
 
 type PeriodKey = 'today' | 'week' | 'month' | 'total'
-interface Win { revenue: number; orders: number; avg: number }
+interface Win { revenue: number; orders: number; avg: number; cost: number; shipCost: number; discounts: number; rent: number; grossProfit: number; net: number; margin: number | null; unknownRevenue: number }
 interface Stats {
-  daily: { date: string; revenue: number; orders: number }[]
+  daily: { date: string; revenue: number; profit: number; orders: number }[]
+  missingCost: { name: string; revenue: number }[]
   periods: Record<PeriodKey, { cur: Win; prev: Win | null }>
   todo: { awaitingPayment: number; toShip: number; stalePending: number; partnerClaims: number; payouts: number }
   orders: { total: number; pending: number; paid: number; shipped: number; delivered: number; cancelled: number }
@@ -44,7 +45,8 @@ function RevenueChart({ data }: { data: Stats['daily'] }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
-        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', color: 'var(--a-green)' }}>{eur(d.revenue)}</span>
+        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.35rem', color: 'var(--a-text)' }}>{eur(d.revenue)}</span>
+        <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.05rem', color: d.profit >= 0 ? 'var(--a-green)' : 'var(--a-red)' }}>utile {eur(d.profit)}</span>
         <span style={{ fontSize: '.74rem', color: 'var(--a-dim)' }}>
           {new Date(d.date).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Rome' })} · {d.orders} ordin{d.orders === 1 ? 'e' : 'i'}
         </span>
@@ -58,7 +60,11 @@ function RevenueChart({ data }: { data: Stats['daily'] }) {
             <g key={x.date} onMouseEnter={() => setHover(i)} onClick={() => setHover(i)} style={{ cursor: 'pointer' }}>
               <rect x={i * bw} y={0} width={bw} height={H + 18} fill="transparent" />
               <rect x={i * bw + pad} y={H - h} width={bw - pad * 2} height={h} rx={5}
-                fill={on ? 'var(--a-green)' : 'rgba(61,255,110,.35)'} />
+                fill={on ? 'rgba(233,245,234,.35)' : 'rgba(233,245,234,.14)'} />
+              {x.profit > 0 && (() => {
+                const ph = Math.max(2, (x.profit / max) * (H - 8))
+                return <rect x={i * bw + pad} y={H - ph} width={bw - pad * 2} height={ph} rx={5} fill={on ? 'var(--a-green)' : 'rgba(61,255,110,.55)'} />
+              })()}
               {(i % 2 === 1 || data.length <= 7) && (
                 <text x={i * bw + bw / 2} y={H + 14} textAnchor="middle" fontSize="11" fill="var(--a-faint)">
                   {new Date(x.date).toLocaleDateString('it-IT', { day: 'numeric', timeZone: 'Europe/Rome' })}
@@ -177,15 +183,18 @@ export default function AdminDashboard() {
       </div>
       <div className="adm-grid k4">
         {[
-          { label: 'Fatturato', value: eur(p.cur.revenue, true), cur: p.cur.revenue, prev: p.prev?.revenue, color: 'var(--a-green)' },
-          { label: 'Ordini', value: String(p.cur.orders), cur: p.cur.orders, prev: p.prev?.orders, color: 'var(--a-text)' },
-          { label: 'Scontrino medio', value: p.cur.orders ? eur(p.cur.avg) : '—', cur: p.cur.avg, prev: p.prev?.avg, color: 'var(--a-gold)' },
-          { label: 'Grammi venduti', value: fmtG(stats.grams[gramsFor[period]]), cur: 0, prev: undefined, color: 'var(--a-blue)' },
+          { label: 'Incassato (lordo)', value: eur(p.cur.revenue, true), cur: p.cur.revenue, prev: p.prev?.revenue, color: 'var(--a-text)', hint: `${p.cur.orders} ordini` },
+          { label: 'Costo merce', value: `−${eur(p.cur.cost, true)}`, cur: 0, prev: undefined, color: 'var(--a-orange)', hint: 'prezzo d’acquisto dei prodotti' },
+          { label: 'Utile netto', value: eur(p.cur.net, true), cur: p.cur.net, prev: p.prev?.net, color: p.cur.net >= 0 ? 'var(--a-green)' : 'var(--a-red)', hint: 'quello che ti resta' },
+          { label: 'Margine', value: p.cur.margin != null ? `${p.cur.margin.toFixed(0)}%` : '—', cur: 0, prev: undefined, color: 'var(--a-gold)', hint: 'utile su ogni € incassato' },
         ].map(k => (
           <div key={k.label} className="adm-card" style={{ padding: '14px 14px 12px' }}>
             <div style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--a-dim)', textTransform: 'uppercase', letterSpacing: '.5px' }}>{k.label}</div>
             <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', color: k.color, marginTop: 4, lineHeight: 1.1 }}>{k.value}</div>
-            <div style={{ minHeight: 16, marginTop: 4 }}>{k.prev != null && <Delta cur={k.cur} prev={k.prev} />}</div>
+            <div style={{ minHeight: 16, marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              {k.prev != null && <Delta cur={k.cur} prev={k.prev} />}
+              <span style={{ fontSize: '.64rem', color: 'var(--a-faint)' }}>{k.hint}</span>
+            </div>
           </div>
         ))}
       </div>
@@ -194,30 +203,42 @@ export default function AdminDashboard() {
         {/* ── Andamento ── */}
         <Card title="Ultimi 14 giorni" icon="📈">
           <RevenueChart data={stats.daily} />
+          <div style={{ display: 'flex', gap: 14, fontSize: '.68rem', color: 'var(--a-dim)', marginTop: 8 }}>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: 'rgba(233,245,234,.3)', marginRight: 5, verticalAlign: -1 }} />Incasso</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: 'var(--a-green)', marginRight: 5, verticalAlign: -1 }} />Utile (dopo costo merce e spedizioni)</span>
+          </div>
         </Card>
 
-        {/* ── Profitto ── */}
-        <Card title="Profitto stimato (sempre)" icon="💰">
+        {/* ── Conto economico del periodo scelto ── */}
+        <Card title={`Da dove viene l’utile · ${pm.label.toLowerCase()}`} icon="💰">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '.84rem' }}>
             {[
-              { l: 'Profitto sui prodotti', v: eur(stats.profit.profit), c: 'var(--a-green)' },
-              { l: '🏭 Affitto magazzino', v: `−${eur(stats.profit.warehouseRent)}`, c: 'var(--a-orange)' },
-              { l: `🚚 Spedizioni a carico (${stats.profit.shippingOrders} × €10)`, v: `−${eur(stats.profit.shippingLoss)}`, c: 'var(--a-orange)' },
+              { l: `Incassato (${p.cur.orders} ordini)`, v: eur(p.cur.revenue), c: 'var(--a-text)', note: p.cur.discounts > 0 ? `già al netto di ${eur(p.cur.discounts)} di sconti e crediti` : '' },
+              { l: '📦 Costo d’acquisto merce', v: `−${eur(p.cur.cost)}`, c: 'var(--a-orange)', note: '' },
+              { l: '🚚 Spedizioni pagate al corriere', v: `−${eur(p.cur.shipCost)}`, c: 'var(--a-orange)', note: p.cur.shipCost ? `€20 a pacco; i €10 pagati dal cliente sono nell’incasso` : '' },
+              { l: '🏭 Affitto magazzino', v: `−${eur(p.cur.rent)}`, c: 'var(--a-orange)', note: 'rate pagate nel periodo' },
             ].map(r => (
-              <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--a-dim)' }}>
-                <span>{r.l}</span><strong style={{ color: r.c }}>{r.v}</strong>
+              <div key={r.l}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--a-dim)' }}>
+                  <span>{r.l}</span><strong style={{ color: r.c, whiteSpace: 'nowrap' }}>{r.v}</strong>
+                </div>
+                {r.note && <div style={{ fontSize: '.64rem', color: 'var(--a-faint)', marginTop: 1 }}>{r.note}</div>}
               </div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid var(--a-line)', paddingTop: 10, marginTop: 2 }}>
-              <strong>Profitto netto</strong>
-              <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', color: stats.profit.net >= 0 ? 'var(--a-green)' : 'var(--a-red)' }}>{eur(stats.profit.net, true)}</span>
+              <strong>= Utile netto</strong>
+              <span style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.6rem', color: p.cur.net >= 0 ? 'var(--a-green)' : 'var(--a-red)' }}>{eur(p.cur.net)}</span>
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Pill color="#f5c842">Margine {stats.profit.margin != null ? `${stats.profit.margin.toFixed(1)}%` : '—'}</Pill>
-              <Pill color="#8aa58c">Costo merce {eur(stats.profit.cost, true)}</Pill>
-            </div>
-            <div style={{ fontSize: '.66rem', color: 'var(--a-faint)', lineHeight: 1.5 }}>
-              Costo automatico se non impostato: Cali €4,2/g · Dry €3,4/g · Frozen €5,5/g · Vapepen €18/pz. Gli ordini annullati non contano.
+            {p.cur.unknownRevenue > 0 ? (
+              <div style={{ fontSize: '.72rem', lineHeight: 1.5, color: '#ffb199', background: 'rgba(255,100,100,.07)', border: '1px solid rgba(255,100,100,.3)', borderRadius: 10, padding: '9px 11px' }}>
+                ⚠️ <strong>{eur(p.cur.unknownRevenue)}</strong> di vendite sono di prodotti <strong>senza costo d’acquisto</strong>: per quelli l’intero incasso risulta guadagno, quindi l’utile è più alto del reale.
+                {stats.missingCost.length > 0 && <> Imposta il costo in <Link href="/admin/products" style={{ color: '#ffb199', fontWeight: 800 }}>Prodotti</Link>: {stats.missingCost.slice(0, 5).map(m => m.name).join(', ')}{stats.missingCost.length > 5 ? ` e altri ${stats.missingCost.length - 5}` : ''}.</>}
+              </div>
+            ) : (
+              <div style={{ fontSize: '.68rem', color: 'var(--a-faint)' }}>✓ Tutti i prodotti venduti nel periodo hanno un costo d’acquisto.</div>
+            )}
+            <div style={{ fontSize: '.64rem', color: 'var(--a-faint)', lineHeight: 1.5 }}>
+              Se il costo di un formato non è impostato si usa quello automatico: Cali €4,2/g · Dry €3,4/g · Frozen €5,5/g · Vapepen €18/pz. Gli ordini annullati non contano.
             </div>
           </div>
         </Card>

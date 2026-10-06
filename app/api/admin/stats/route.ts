@@ -28,7 +28,7 @@ export async function GET() {
     prisma.affiliate.findMany({ orderBy: { joinedAt: 'desc' } }),
     prisma.commissionPayout.findMany({ orderBy: { requestedAt: 'desc' } }),
     prisma.product.findMany({ select: { id: true, name: true, category: true, variants: true } }),
-    prisma.warehousePayment.findMany({ select: { total: true } }),
+    prisma.warehousePayment.findMany({ select: { total: true, paidAt: true } }),
     prisma.partnerClaim.count({ where: { status: 'pending' } }),
   ])
   // Gli ordini annullati non contano in fatturato, grammi e profitto
@@ -96,6 +96,11 @@ export async function GET() {
   const productCounts: Record<string, number> = {}
   let gramsTotal = 0, gramsToday = 0, gramsWeek = 0, gramsMonth = 0, gramsYear = 0
   let costTotal = 0, profitTotal = 0, revenueWithKnownCost = 0
+  // Spedizione Spagna/Italia: €10 addebitati al cliente (già nel totale), ~€20 pagati dal negozio
+  const SHIP_FEE_CHARGED = 10, SHIP_COST_PAID = 20
+  type OrderEcon = { at: Date; total: number; items: number; cost: number; unknown: number; shipCost: number; discount: number }
+  const orderEcon: OrderEcon[] = []
+  const missingCost: Record<string, number> = {}
 
   for (const order of orders) {
     const items = Array.isArray(order.items)
@@ -103,6 +108,7 @@ export async function GET() {
       : []
     const orderDate = new Date(order.createdAt)
     const seenProducts = new Set<string>()
+    let oItems = 0, oCost = 0, oUnknown = 0
     for (const item of items) {
       const key = item.label ?? item.id ?? '?'
       const qty = item.qty ?? 1
@@ -138,6 +144,9 @@ export async function GET() {
       productStats[productName].grams   += g
       productStats[productName].revenue += rev
       productStats[productName].qty     += qty
+      oItems += rev
+      if (hasCost) oCost += lineCost
+      else { oUnknown += rev; missingCost[productName] = (missingCost[productName] ?? 0) + rev }
       if (hasCost) {
         productStats[productName].cost   += lineCost
         productStats[productName].profit += rev - lineCost
@@ -158,6 +167,14 @@ export async function GET() {
         if (orderDate >= yearStart)   gramsYear  += g
       }
     }
+    const shipped = (order.note ?? '').includes('[Spagna]') || (order.note ?? '').includes('[Italia]')
+    const shipFee = shipped ? SHIP_FEE_CHARGED : 0
+    orderEcon.push({
+      at: orderDate, total: order.total, items: oItems, cost: oCost, unknown: oUnknown,
+      shipCost: shipped ? SHIP_COST_PAID : 0,
+      // Sconti e credito affiliato: differenza fra prodotti + spedizione addebitata e totale pagato
+      discount: Math.max(0, oItems + shipFee - order.total),
+    })
   }
 
   // Perdita netta spedizione: il negozio paga ~€20 e incassa €10 → −€10 per ordine spedito (Spagna/Italia)
@@ -208,15 +225,30 @@ export async function GET() {
   const daily = Array.from({ length: 14 }, (_, i) => {
     const start = new Date(todayStart.getTime() - (13 - i) * DAY)
     const end = new Date(start.getTime() + DAY)
-    const dayOrders = orders.filter(o => o.createdAt >= start && o.createdAt < end)
-    return { date: start.toISOString(), revenue: round2(dayOrders.reduce((s, o) => s + o.total, 0)), orders: dayOrders.length }
+    const d = orderEcon.filter(o => o.at >= start && o.at < end)
+    const revenue = d.reduce((s, o) => s + o.total, 0)
+    const profit = d.reduce((s, o) => s + o.total - o.cost - o.shipCost, 0)
+    return { date: start.toISOString(), revenue: round2(revenue), profit: round2(profit), orders: d.length }
   })
 
   // ── Periodi a confronto (stessa durata, subito prima) ──
+  // Conto economico di un periodo: incasso − costo merce − spedizioni pagate − affitto = utile netto
   const windowStats = (from: Date, to: Date) => {
-    const list = orders.filter(o => o.createdAt >= from && o.createdAt < to)
-    const rev = list.reduce((s, o) => s + o.total, 0)
-    return { revenue: round2(rev), orders: list.length, avg: list.length ? round2(rev / list.length) : 0 }
+    const list = orderEcon.filter(o => o.at >= from && o.at < to)
+    const sum = (f: (o: OrderEcon) => number) => list.reduce((s, o) => s + f(o), 0)
+    const revenue = sum(o => o.total)
+    const cost = sum(o => o.cost)
+    const shipCost = sum(o => o.shipCost)
+    const rent = warehousePayments.filter(w => w.paidAt >= from && w.paidAt < to).reduce((s, w) => s + w.total, 0)
+    const grossProfit = revenue - cost - shipCost
+    const net = grossProfit - rent
+    return {
+      revenue: round2(revenue), orders: list.length, avg: list.length ? round2(revenue / list.length) : 0,
+      cost: round2(cost), shipCost: round2(shipCost), discounts: round2(sum(o => o.discount)), rent: round2(rent),
+      grossProfit: round2(grossProfit), net: round2(net),
+      margin: revenue > 0 ? round2((grossProfit / revenue) * 100) : null,
+      unknownRevenue: round2(sum(o => o.unknown)),
+    }
   }
   const end = new Date(now.getTime() + 1000)
   const periods = {
@@ -276,6 +308,8 @@ export async function GET() {
       year: gramsYear,
     },
     productStats: productStatsList,
+    // Prodotti venduti senza costo d'acquisto: il loro incasso è contato tutto come guadagno
+    missingCost: Object.entries(missingCost).sort((a, b) => b[1] - a[1]).map(([name, revenue]) => ({ name, revenue: round2(revenue) })),
     profit: {
       cost: costTotal,
       profit: profitTotal,
