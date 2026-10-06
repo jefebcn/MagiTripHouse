@@ -74,6 +74,18 @@ export async function GET() {
     return null
   }
   // Costo di default per pezzo: vapepen €18/pezzo
+  // Costi d'acquisto comunicati dal titolare: valgono su tutto lo storico e prima di ogni altro costo.
+  // perGram = € al grammo · perPiece = € al pezzo (il numero del formato è il numero di pezzi)
+  const OWNER_COSTS: { match: string; perGram?: number; perPiece?: number }[] = [
+    { match: 'squama',    perGram: 28 },
+    { match: 'packwoods', perPiece: 18 },
+    { match: 'ace premium', perPiece: 18 },
+  ]
+  const ownerCost = (name?: string) => {
+    const n = (name ?? '').toLowerCase()
+    return OWNER_COSTS.find(c => n.includes(c.match)) ?? null
+  }
+
   const defaultCostPerPiece = (name?: string): number | null => {
     const n = (name ?? '').toLowerCase()
     if (n.includes('vape') || n.includes('vapepen') || n.includes('vaporizz')) return 18
@@ -122,9 +134,14 @@ export async function GET() {
       // Costo esplicito per variante; se assente, costo di default per grammo (Cali/Dry/Frozen)
       // oppure per pezzo (vapepen €18/pz)
       const explicitUnitCost = lookupCost(item.id, item.name, item.label)
+      const owner = ownerCost(item.name)
       let lineCost = 0
       let hasCost = false
-      if (explicitUnitCost != null) {
+      if (owner) {
+        const units = parseGrams(item.label ?? '') || 1   // grammi o pezzi del formato
+        lineCost = units * (owner.perGram ?? owner.perPiece ?? 0) * qty
+        hasCost = true
+      } else if (explicitUnitCost != null) {
         lineCost = explicitUnitCost * qty
         hasCost = true
       } else {
