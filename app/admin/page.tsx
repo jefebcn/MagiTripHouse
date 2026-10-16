@@ -10,7 +10,7 @@ interface Stats {
   missingCost: { name: string; revenue: number }[]
   monthly: ({ month: string } & Win)[]
   periods: Record<PeriodKey, { cur: Win; prev: Win | null }>
-  todo: { awaitingPayment: number; toShip: number; stalePending: number; payouts: number }
+  todo: { awaitingPayment: number; toShip: number; stalePending: number; partnerClaims: number; payouts: number }
   orders: { total: number; pending: number; paid: number; shipped: number; delivered: number; cancelled: number }
   users: { total: number; today: number; week: number }
   recentOrders: { id: string; userId: string; total: number; status: string; createdAt: string }[]
@@ -134,6 +134,7 @@ export default function AdminDashboard() {
   const todo = [
     { n: stats.todo.toShip, icon: '📦', label: 'da spedire', href: '/admin/orders?tab=paid', color: 'var(--a-gold)' },
     { n: stats.todo.awaitingPayment, icon: '💳', label: 'da incassare', href: '/admin/orders?tab=pending', color: 'var(--a-orange)' },
+    { n: stats.todo.partnerClaims, icon: '🏆', label: 'premi da verificare', href: '/admin/partner', color: 'var(--a-violet)' },
     { n: stats.todo.payouts, icon: '💸', label: 'prelievi affiliati', href: '/admin/affiliates', color: 'var(--a-blue)' },
     { n: stats.todo.stalePending, icon: '🗂️', label: 'vecchi in attesa', href: '/admin/orders?tab=stale', color: 'var(--a-dim)' },
   ].filter(t => t.n > 0)

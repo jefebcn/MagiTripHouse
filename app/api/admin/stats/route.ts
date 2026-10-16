@@ -23,13 +23,14 @@ export async function GET() {
   const monthStart = new Date(todayStart); monthStart.setDate(todayStart.getDate() - 30)
   const yearStart = new Date(todayStart); yearStart.setFullYear(todayStart.getFullYear() - 1)
 
-  const [allOrders, users, affiliates, payouts, products, warehousePayments] = await Promise.all([
+  const [allOrders, users, affiliates, payouts, products, warehousePayments, partnerPending] = await Promise.all([
     prisma.order.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.user.findMany({ select: { createdAt: true } }),
     prisma.affiliate.findMany({ orderBy: { joinedAt: 'desc' } }),
     prisma.commissionPayout.findMany({ orderBy: { requestedAt: 'desc' } }),
     prisma.product.findMany({ select: { id: true, name: true, category: true, variants: true } }),
     prisma.warehousePayment.findMany({ select: { total: true, base: true, paidAt: true, periodStart: true, periodEnd: true }, orderBy: { periodEnd: 'asc' } }),
+    prisma.partnerClaim.count({ where: { status: 'pending' } }),
   ])
   // Gli ordini annullati non contano in fatturato, grammi e profitto
   const orders = allOrders.filter(o => o.status !== 'cancelled')
@@ -299,6 +300,7 @@ export async function GET() {
     awaitingPayment: allOrders.filter(o => o.status === 'pending' && o.createdAt >= staleLimit).length,
     toShip: allOrders.filter(o => o.status === 'paid').length,
     stalePending: allOrders.filter(o => o.status === 'pending' && o.createdAt < staleLimit).length,
+    partnerClaims: partnerPending,
     payouts: payouts.filter(p => p.status === 'pending').length,
   }
 

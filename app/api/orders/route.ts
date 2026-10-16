@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { notifyAdminOrder } from '@/lib/telegram'
 import { sendPushToUser } from '@/lib/push'
 import { getBearerUser } from '@/lib/session'
+import { validateDiscount, registerDiscountUse, redeemDiscount } from '@/lib/discount'
 
 export async function GET() {
   const session = await auth()
@@ -32,13 +33,21 @@ export async function POST(req: Request) {
     return NextResponse.json(existing, { status: 200 })
   }
 
-  // I codici sconto non esistono più: se arriva un codice (es. vecchia versione dell'app in coda) lo segnaliamo
-  // nella nota così l'admin corregge il totale.
+  // Ri-valida il codice sconto lato server (prima di creare l'ordine: il check "primo ordine" conta gli ordini esistenti).
+  // Se non è valido l'ordine passa comunque, ma viene segnalato nella nota così l'admin corregge il totale.
   let note = typeof body.note === 'string' ? body.note.slice(0, 1000) : null
+  let validCode: string | null = null
   if (typeof body.discountCode === 'string' && body.discountCode.trim()) {
-    note = `⚠️ CODICE SCONTO NON VALIDO (${body.discountCode.slice(0, 32)}: i codici sconto non sono più attivi) ${note ?? ''}`.trim()
+    const d = await validateDiscount(body.discountCode, typeof body.origin === 'string' ? body.origin : '', user.handle)
+    if (d.ok) validCode = d.code
+    else note = `⚠️ CODICE SCONTO NON VALIDO (${body.discountCode.slice(0, 32)}: ${d.error}) ${note ?? ''}`.trim()
   }
+  // Blocca il codice per questo cliente (vincolo unico: regge anche due ordini inviati insieme)
   const orderId = body.id.trim().slice(0, 64)
+  if (validCode && !(await redeemDiscount(validCode, user.handle, orderId))) {
+    note = `⚠️ CODICE SCONTO GIÀ USATO (${validCode}) ${note ?? ''}`.trim()
+    validCode = null
+  }
 
   const order = await prisma.order.create({
     data: {
@@ -51,6 +60,10 @@ export async function POST(req: Request) {
       referredBy: typeof body.referredBy === 'string' ? body.referredBy.slice(0, 32) : null,
       commissionCredited: false,
     },
+  }).catch(async (e) => {
+    // Ordine non creato: il codice torna disponibile per il cliente
+    if (validCode) await prisma.discountRedemption.deleteMany({ where: { code: validCode, userHandle: user.handle.toLowerCase() } }).catch(() => {})
+    throw e
   })
 
   // Scala il credito affiliato dell'utente stesso (mai di un altro)
@@ -68,6 +81,8 @@ export async function POST(req: Request) {
       }
     }).catch(() => {})
   }
+
+  if (validCode) registerDiscountUse(validCode).catch(() => {})
 
   // La commissione referral NON viene accreditata qui: solo quando l'admin conferma l'ordine (PATCH)
 

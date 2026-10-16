@@ -2,6 +2,7 @@
 import React from 'react'
 import Image from 'next/image'
 import Header from '@/components/layout/Header'
+import PartnerReward from './PartnerReward'
 import { useUIStore } from '@/store/uiStore'
 import { useProducts } from '@/hooks/useProducts'
 import { SHIP_META, type ShipOrigin } from '@/store/cartStore'
@@ -257,6 +258,7 @@ export default function HubView() {
             <span style={{ flexShrink: 0, fontSize: '.8rem', fontWeight: 700, color: '#a5b4fc' }}>↗</span>
           </div>
         </button>
+        <PartnerReward />
       </div>
 
       {/* ═══════════ COMMUNITY: Telegram + Affiliati ═══════════ */}
