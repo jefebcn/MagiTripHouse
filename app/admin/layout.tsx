@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 
-type BadgeKey = 'orders' | 'partnerClaims' | 'payouts'
+type BadgeKey = 'orders' | 'payouts'
 interface NavItem { href: string; icon: string; label: string; exact?: boolean; badge?: BadgeKey }
 
 // Menu raggruppato per area di lavoro
@@ -14,12 +14,10 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     { href: '/admin',           icon: '📊', label: 'Dashboard', exact: true },
     { href: '/admin/orders',    icon: '🧾', label: 'Ordini', badge: 'orders' },
     { href: '/admin/products',  icon: '📦', label: 'Prodotti' },
-    { href: '/admin/discounts', icon: '🎟️', label: 'Codici sconto' },
   ] },
   { label: 'Clienti', items: [
     { href: '/admin/members',    icon: '👥', label: 'Membri' },
     { href: '/admin/affiliates', icon: '🤝', label: 'Affiliati', badge: 'payouts' },
-    { href: '/admin/partner',    icon: '🏆', label: 'Premi partner', badge: 'partnerClaims' },
     { href: '/admin/news',       icon: '📢', label: 'Novità e push' },
   ] },
   { label: 'Gestione', items: [
@@ -58,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isActive = (n: NavItem) => n.exact ? pathname === n.href : pathname.startsWith(n.href)
   const badge = (k?: BadgeKey) => (k && badges[k] ? <span className="adm-nav-badge">{badges[k]! > 99 ? '99+' : badges[k]}</span> : null)
-  const moreBadge = (badges.partnerClaims ?? 0) + (badges.payouts ?? 0)
+  const moreBadge = badges.payouts ?? 0
 
   const sidebar = (cls: string) => (
     <aside className={`adm-side ${cls}`}>

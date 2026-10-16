@@ -2,7 +2,6 @@
 import React from 'react'
 import Image from 'next/image'
 import Header from '@/components/layout/Header'
-import PartnerReward from './PartnerReward'
 import { useUIStore } from '@/store/uiStore'
 import { useProducts } from '@/hooks/useProducts'
 import { SHIP_META, type ShipOrigin } from '@/store/cartStore'
@@ -170,7 +169,7 @@ export default function HubView() {
       {/* ═══════════ 1) RITIRO DI PERSONA (separato dalle spedizioni) ═══════════ */}
       {countByOrigin('meetup') > 0 && (
         <>
-          <SectionHead title="🤝 Ritiro di persona" sub="Prodotti solo a mano al meetup · nessuna spedizione" />
+          <SectionHead title="🤝 Ritiro di persona" sub="Meetup solo per questi prodotti · tutto il resto in spedizione" />
           <div style={{ padding: '0 16px' }}>
             <button
               onClick={() => goToCatalog({ ship: 'meetup' })}
@@ -182,7 +181,7 @@ export default function HubView() {
             >
               <span style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', background: 'rgba(192,132,252,.15)' }}>🤝</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.02rem', color: '#d8b4fe' }}>Disponibili al meetup</div>
+                <div style={{ fontFamily: "'Fredoka One', cursive", fontSize: '1.02rem', color: '#d8b4fe' }}>Ultimi prodotti al meetup</div>
                 <div style={{ fontSize: '.68rem', color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>Luogo e orario si concordano in chat dopo l’ordine</div>
               </div>
               <span style={{ flexShrink: 0, fontSize: '.72rem', fontWeight: 800, color: '#d8b4fe', background: 'rgba(192,132,252,.14)', border: '1px solid rgba(192,132,252,.35)', borderRadius: 999, padding: '5px 10px' }}>
@@ -258,7 +257,6 @@ export default function HubView() {
             <span style={{ flexShrink: 0, fontSize: '.8rem', fontWeight: 700, color: '#a5b4fc' }}>↗</span>
           </div>
         </button>
-        <PartnerReward />
       </div>
 
       {/* ═══════════ COMMUNITY: Telegram + Affiliati ═══════════ */}
@@ -398,7 +396,6 @@ function NewArrivals() {
 }
 
 // ─── Card contestuale: benvenuto per chi non ha mai ordinato, oppure stato dell'ordine in corso ───
-const WELCOME_CODE = 'BENVENUTO10'
 const WELCOME_DISMISS_KEY = 'mth_welcome_dismissed'
 type MiniOrder = { id: string; status: string; tracking: string | null; createdAt: string }
 const ACTIVE_LABEL: Record<string, { text: string; icon: string; color: string }> = {
@@ -410,10 +407,7 @@ const ACTIVE_LABEL: Record<string, { text: string; icon: string; color: string }
 function HomeOrderCard() {
   const { sessionToken, setView, goToCatalog } = useUIStore()
   const [orders, setOrders] = React.useState<MiniOrder[] | null>(null)
-  const [welcomePct, setWelcomePct] = React.useState<number | null>(null)
-  const [welcomeCap, setWelcomeCap] = React.useState<number | null>(null)
   const [dismissed, setDismissed] = React.useState(true)
-  const [copied, setCopied] = React.useState(false)
 
   React.useEffect(() => {
     try { setDismissed(localStorage.getItem(WELCOME_DISMISS_KEY) === '1') } catch { setDismissed(false) }
@@ -421,17 +415,7 @@ function HomeOrderCard() {
     const h = { Authorization: `Bearer ${sessionToken}` }
     fetch('/api/orders/mine', { headers: h })
       .then(r => r.ok ? r.json() : [])
-      .then((d: MiniOrder[]) => {
-        const list = Array.isArray(d) ? d : []
-        setOrders(list)
-        // Mostra il codice benvenuto solo se è davvero utilizzabile
-        if (list.length === 0) {
-          fetch('/api/discount/validate', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', ...h },
-            body: JSON.stringify({ code: WELCOME_CODE, origin: 'spain' }),
-          }).then(r => r.json()).then(v => { if (v?.ok) { setWelcomePct(v.percent); setWelcomeCap(v.maxDiscount ?? null) } }).catch(() => {})
-        }
-      })
+      .then((d: MiniOrder[]) => setOrders(Array.isArray(d) ? d : []))
       .catch(() => {})
   }, [sessionToken])
 
@@ -461,7 +445,7 @@ function HomeOrderCard() {
     )
   }
 
-  // Nuovo utente: come funziona + codice primo ordine
+  // Nuovo utente: come funziona
   if (dismissed) return null
   const dismiss = () => { setDismissed(true); try { localStorage.setItem(WELCOME_DISMISS_KEY, '1') } catch { /* */ } }
   const steps = [
@@ -489,18 +473,6 @@ function HomeOrderCard() {
             </div>
           ))}
         </div>
-        {welcomePct != null && (
-          <button onClick={() => { navigator.clipboard?.writeText(WELCOME_CODE).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1800) }} style={{
-            marginTop: 10, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-            background: 'rgba(245,200,66,.1)', border: '1.5px dashed rgba(245,200,66,.55)', borderRadius: 12,
-            padding: '9px 12px', cursor: 'pointer', fontFamily: 'inherit',
-          }}>
-            <span style={{ fontSize: '.76rem', color: 'var(--gold)', fontWeight: 700 }}>🎟 −{welcomePct}% sul primo ordine{welcomeCap != null ? ` (max €${welcomeCap})` : ''}</span>
-            <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'var(--gold)', letterSpacing: '.08em' }}>
-              {copied ? '✓ copiato' : WELCOME_CODE}
-            </span>
-          </button>
-        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
           <button onClick={() => goToCatalog({ ship: null })} style={{
             flex: 1, padding: '10px', borderRadius: 12, fontFamily: 'inherit', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer',
