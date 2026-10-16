@@ -24,8 +24,8 @@ export default function PartnerReward({ compact = false }: { compact?: boolean }
       .then(r => r.ok ? r.json() : null).then(d => d && setData(d)).catch(() => {})
   }, [sessionToken])
 
-  // Ricarica quando si torna su home/offerte (l'admin potrebbe aver approvato nel frattempo)
-  useEffect(() => { if (view === 'hub' || view === 'offers') load() }, [view, load])
+  // Ricarica quando si torna in home (l'admin potrebbe aver approvato nel frattempo)
+  useEffect(() => { if (view === 'hub') load() }, [view, load])
 
   async function submit() {
     setError('')
@@ -65,7 +65,7 @@ export default function PartnerReward({ compact = false }: { compact?: boolean }
           <span style={{ fontFamily: 'monospace', fontWeight: 800, letterSpacing: '.08em', color: 'var(--gold)' }}>{claim.code}</span>
           <span style={{ fontSize: '.7rem', fontWeight: 700, color: copied ? 'var(--green)' : 'var(--muted)' }}>{copied ? '✓ copiato' : '📋 copia'}</span>
         </button>
-        <div style={{ fontSize: '.64rem', color: 'var(--muted)', marginTop: 6 }}>Inseriscilo nel carrello, nel campo “Codice sconto”.</div>
+        <div style={{ fontSize: '.64rem', color: 'var(--muted)', marginTop: 6 }}>Inseriscilo nel carrello, nel campo “Codice premio KratosLabs”.</div>
       </div>
     )
   }

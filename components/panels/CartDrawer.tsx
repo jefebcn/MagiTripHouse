@@ -453,7 +453,7 @@ export default function CartDrawer() {
                       lineHeight: 1.5,
                     }}>
                       <div style={{ fontWeight: 700, color: '#d8b4fe', marginBottom: 4 }}>🤝 Ritiro in loco</div>
-                      <div>Prodotti disponibili solo di persona al meetup · nessuna spedizione</div>
+                      <div>Non facciamo più meetup: restano di persona solo questi prodotti · tutto il resto solo in spedizione</div>
                       <div>📍 Luogo e orario verranno concordati in chat dopo l&apos;ordine</div>
                       <div style={{ marginTop: 5, fontWeight: 700, color: subtotal < mMin ? '#ff8c66' : '#c9f7d4' }}>
                         {subtotal < mMin
@@ -543,14 +543,14 @@ export default function CartDrawer() {
                     style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '9px 12px', color: 'var(--text)', fontSize: '.82rem', fontFamily: 'inherit', resize: 'none', outline: 'none', boxSizing: 'border-box' }}
                   />
 
-                  {/* Codice sconto (validato dal server: origini, primo ordine, scadenza, utilizzi) */}
+                  {/* Codice premio KratosLabs (unico sconto attivo, validato dal server) */}
                   {!appliedCode && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <input
                           value={discountCode[origin]}
                           onChange={(e) => { setDiscountCode(d => ({ ...d, [origin]: e.target.value })); setDiscountMsg(m => ({ ...m, [origin]: '' })) }}
-                          placeholder="🎟 Codice sconto"
+                          placeholder="🎁 Codice premio KratosLabs"
                           style={{ flex: 1, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', color: 'var(--text)', fontSize: '.82rem', fontFamily: 'inherit', outline: 'none', textTransform: 'uppercase' }}
                         />
                         <button

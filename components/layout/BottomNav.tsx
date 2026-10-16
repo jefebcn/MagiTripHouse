@@ -3,7 +3,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useCartStore } from '@/store/cartStore'
 
 const TABS = [
-  { id: 'offers',  label: 'Offerte',  icon: '🔥' },
+  { id: 'orders',  label: 'Ordini',   icon: '📦' },
   { id: 'catalog', label: 'Catalogo', icon: '🛍️' },
   { id: 'hub',     label: 'Home',     icon: '🏠' },
   { id: 'cart',    label: 'Carrello', icon: '🛒' },

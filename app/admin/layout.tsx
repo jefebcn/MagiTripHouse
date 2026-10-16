@@ -14,7 +14,6 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     { href: '/admin',           icon: '📊', label: 'Dashboard', exact: true },
     { href: '/admin/orders',    icon: '🧾', label: 'Ordini', badge: 'orders' },
     { href: '/admin/products',  icon: '📦', label: 'Prodotti' },
-    { href: '/admin/discounts', icon: '🎟️', label: 'Codici sconto' },
   ] },
   { label: 'Clienti', items: [
     { href: '/admin/members',    icon: '👥', label: 'Membri' },

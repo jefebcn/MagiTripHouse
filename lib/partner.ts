@@ -3,6 +3,7 @@ import { prisma } from './prisma'
 
 // Premio per chi acquista sul sito partner (KratosLabs): coupon personale, monouso, con tetto in €
 export const PARTNER_REWARD = { percent: 15, maxDiscount: 50, validDays: 30 }
+export const PARTNER_CODE_PREFIX = 'KRATOS-'
 
 export function normalizePartnerOrder(raw: unknown): string {
   return typeof raw === 'string' ? raw.trim().toUpperCase().replace(/\s+/g, '').slice(0, 40) : ''
@@ -10,7 +11,7 @@ export function normalizePartnerOrder(raw: unknown): string {
 
 export async function createRewardCode(userHandle: string, partnerOrder: string): Promise<string> {
   for (let i = 0; i < 5; i++) {
-    const code = `KRATOS-${randomBytes(3).toString('hex').toUpperCase()}`
+    const code = `${PARTNER_CODE_PREFIX}${randomBytes(3).toString('hex').toUpperCase()}`
     const exists = await prisma.discountCode.findUnique({ where: { code } })
     if (exists) continue
     await prisma.discountCode.create({
